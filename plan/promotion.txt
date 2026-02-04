@@ -1,0 +1,21 @@
+Reviving the original idea of Ripple
+
+Back in the days before Bitcoin Ripple was quite a different project. It was an idea of IOU notes circulating among network of friends, where everyone would participate essentially by creating their own money.
+
+Ever since I'v been wondering where this idea got lost and still think that money based on trusted friendships would be better in many ways than the current model used in cryptocurrency space, where the value is maintained by mimicking gold or other scarce resources.
+
+So, time to take a shot at building this system from ground up: https://www.youtube.com/watch?v=ubJBjc9ztFk
+
+
+
+
+Reviving historical credit systems in digital age
+
+As we learn from David Graeber's Debt: the first 5000 years, and many other anthropological records, debt has been the basis of money and exchange even longer than coined money. Personal debts have many advantages over coined money, that is typically centrally controlled. Personal debts help to create local relationships and has more power in directing the types of activities that money can be used for. Also the relationship of loans and gifts is interesting, since often what starts as a loan can end up becoming a gift through the act of debt forgiveness. The term "human economy" is often used in these kind of systems. In the digital age we a possibility to revive these systems in a more global setting, so here i'm starting a project and discussion to hopefully do just that: https://youtu.be/ubJBjc9ztFk
+
+
+
+
+
+Message to Architect:
+
