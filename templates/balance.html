@@ -32,14 +32,24 @@
   <div class="hero-label">Trust</div>
   <div class="hero-amount"><span class="hero-number" data-bind="available-credit"></span> <span>available credit</span></div>
   <div class="hero-sub">
-    <div class="pill static">
-      <div>Credit from others</div>
-      <strong data-bind="credit-from-others"></strong>
-    </div>
-    <div class="pill static">
-      <div>Credit you extend</div>
-      <strong data-bind="credit-you-extend"></strong>
-    </div>
+    <button class="pill toggle" type="button" aria-expanded="false">
+      <div class="pill-row">
+        <div>Credit you are given</div>
+        <strong data-bind="credit-from-others"></strong>
+      </div>
+      <div class="sub-card" aria-label="Credit you are given">
+        <div class="inline-list" data-list="credit-from-others"></div>
+      </div>
+    </button>
+    <button class="pill toggle" type="button" aria-expanded="false">
+      <div class="pill-row">
+        <div>Credit you extend</div>
+        <strong data-bind="credit-you-extend"></strong>
+      </div>
+      <div class="sub-card" aria-label="Credit you extend">
+        <div class="inline-list" data-list="credit-you-extend"></div>
+      </div>
+    </button>
   </div>
 </div>
 

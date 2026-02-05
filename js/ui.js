@@ -87,27 +87,30 @@ export const setActiveNav = (navButtons, page) => {
 };
 
 export const initBalanceToggles = (root) => {
-  const toggleButtons = Array.from(root.querySelectorAll(".pill.toggle"));
-  if (!toggleButtons.length) return;
+  const groups = Array.from(root.querySelectorAll(".hero-sub"));
+  groups.forEach((group) => {
+    const toggleButtons = Array.from(group.querySelectorAll(".pill.toggle"));
+    if (!toggleButtons.length) return;
 
-  toggleButtons.forEach((button) => {
-    const panel = button.querySelector(".sub-card");
-    if (!panel) return;
-    button.setAttribute("aria-expanded", "false");
-    panel.style.height = "0px";
-    panel.style.opacity = "0";
+    toggleButtons.forEach((button) => {
+      const panel = button.querySelector(".sub-card");
+      if (!panel) return;
+      button.setAttribute("aria-expanded", "false");
+      panel.style.height = "0px";
+      panel.style.opacity = "0";
 
-    button.addEventListener("click", () => {
-      const isOpen = button.getAttribute("aria-expanded") === "true";
-      toggleButtons.forEach((other) => {
-        if (other === button) return;
-        closePanel(other, other.querySelector(".sub-card"));
+      button.addEventListener("click", () => {
+        const isOpen = button.getAttribute("aria-expanded") === "true";
+        toggleButtons.forEach((other) => {
+          if (other === button) return;
+          closePanel(other, other.querySelector(".sub-card"));
+        });
+        if (isOpen) {
+          closePanel(button, panel);
+        } else {
+          openPanel(button, panel);
+        }
       });
-      if (isOpen) {
-        closePanel(button, panel);
-      } else {
-        openPanel(button, panel);
-      }
     });
   });
 };
@@ -138,7 +141,7 @@ export const initAccordion = (root) => {
   });
 };
 
-const renderInlineList = (root, list, templateSelector) => {
+const renderInlineList = (root, list, templateSelector, options = {}) => {
   const container = root.querySelector(templateSelector.list);
   if (!container) return;
   container.innerHTML = "";
@@ -151,10 +154,24 @@ const renderInlineList = (root, list, templateSelector) => {
     const nameEl = node.querySelector('[data-bind="name"]');
     const amountEl = node.querySelector('[data-bind="amount"]');
     if (nameEl) nameEl.textContent = entry.person_name || entry.name || entry.person_id;
+
     if (amountEl) {
-      amountEl.textContent = formatSigned(entry.debt_eur);
-      amountEl.classList.add(entry.debt_eur >= 0 ? "pos" : "neg");
+      const amountValue = options.formatAmount
+        ? options.formatAmount(entry)
+        : formatSigned(entry.debt_eur);
+      if (options.amountAsHtml) {
+        amountEl.innerHTML = amountValue;
+      } else {
+        amountEl.textContent = amountValue;
+      }
+      if (options.amountClass) {
+        const className = options.amountClass(entry);
+        if (className) amountEl.classList.add(className);
+      } else {
+        amountEl.classList.add(entry.debt_eur >= 0 ? "pos" : "neg");
+      }
     }
+
     container.appendChild(node);
   });
 };
@@ -195,6 +212,47 @@ export const bindBalance = (root, data) => {
     list: '[data-list="you-owe"]',
     template: '[data-template="inline-item"]',
   });
+
+  const creditFromOthers = data.connections
+    .filter((connection) => (connection.inbound_credit_limit_eur || 0) > 0)
+    .sort((a, b) => b.inbound_credit_limit_eur - a.inbound_credit_limit_eur);
+
+  const creditYouExtend = data.connections
+    .filter((connection) => (connection.trust_credit_limit_eur || 0) > 0)
+    .sort((a, b) => b.trust_credit_limit_eur - a.trust_credit_limit_eur);
+
+  renderInlineList(
+    root,
+    creditFromOthers,
+    {
+      list: '[data-list="credit-from-others"]',
+      template: '[data-template="inline-item"]',
+    },
+    {
+      formatAmount: (entry) => {
+        const limit = entry.inbound_credit_limit_eur || 0;
+        const used = Math.max(entry.debt_eur || 0, 0);
+        if (used > 0) {
+          return `<span class=\"credit-limit\">${formatCurrency(limit)}</span><span class=\"credit-used\"> − ${formatCurrency(used)}</span>`;
+        }
+        return `<span class=\"credit-limit\">${formatCurrency(limit)}</span>`;
+      },
+      amountAsHtml: true,
+      amountClass: () => "",
+    }
+  );
+  renderInlineList(
+    root,
+    creditYouExtend,
+    {
+      list: '[data-list="credit-you-extend"]',
+      template: '[data-template="inline-item"]',
+    },
+    {
+      formatAmount: (entry) => formatCurrency(entry.trust_credit_limit_eur || 0),
+      amountClass: () => "",
+    }
+  );
 };
 
 export const bindFriends = (root, data) => {

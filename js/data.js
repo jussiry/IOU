@@ -25,32 +25,40 @@ export const loadData = async () => {
     })
   );
 
-  const creditFromOthers = inboundCredits.reduce((sum, value) => sum + value, 0);
-  const creditYouExtend = connections.reduce(
+  const connectionsWithInbound = connections.map((connection, index) => ({
+    ...connection,
+    inbound_credit_limit_eur: inboundCredits[index] || 0,
+  }));
+
+  const creditFromOthers = connectionsWithInbound.reduce(
+    (sum, connection) => sum + (connection.inbound_credit_limit_eur || 0),
+    0
+  );
+  const creditYouExtend = connectionsWithInbound.reduce(
     (sum, connection) => sum + (connection.trust_credit_limit_eur || 0),
     0
   );
 
-  const friendsOweTotal = connections.reduce(
+  const friendsOweTotal = connectionsWithInbound.reduce(
     (sum, connection) => sum + Math.max(connection.debt_eur || 0, 0),
     0
   );
-  const youOweTotal = connections.reduce(
+  const youOweTotal = connectionsWithInbound.reduce(
     (sum, connection) => sum + Math.max(-(connection.debt_eur || 0), 0),
     0
   );
   const netBalance = friendsOweTotal - youOweTotal;
 
-  const availableCredit = connections.reduce((sum, connection, index) => {
-    const creditLimit = inboundCredits[index] || 0;
+  const availableCredit = connectionsWithInbound.reduce((sum, connection) => {
+    const creditLimit = connection.inbound_credit_limit_eur || 0;
     const debtUsed = Math.max(connection.debt_eur || 0, 0);
-    const remaining = Math.max(creditLimit - Math.min(debtUsed, creditLimit), 0);
+    const remaining = Math.max(creditLimit - debtUsed, 0);
     return sum + remaining;
   }, 0);
 
   cachedData = {
     you,
-    connections,
+    connections: connectionsWithInbound,
     totals: {
       netBalance,
       friendsOweTotal,

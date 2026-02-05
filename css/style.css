@@ -135,9 +135,6 @@ header {
   cursor: pointer;
 }
 
-.pill.static {
-  cursor: default;
-}
 
 .pill.toggle {
   padding: 12px 14px 10px;
@@ -281,6 +278,13 @@ summary::-webkit-details-marker {
 .inline-item .amount {
   font-weight: 500;
   font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.inline-item .credit-used {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 500;
 }
 
 .tx-wrap {
