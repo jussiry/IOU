@@ -1,6 +1,6 @@
 <div class="balance-hero" aria-label="Total balance">
-  <div class="hero-label">Net balance</div>
-  <div class="hero-amount"><span data-bind="net-balance"></span> <span>overall</span></div>
+  <div class="hero-label">Current balance</div>
+  <div class="hero-amount"><span class="hero-number" data-bind="net-balance"></span></div>
   <div class="hero-sub">
     <button class="pill toggle" type="button" aria-expanded="false">
       <div class="pill-row">
@@ -30,7 +30,7 @@
 </div>
 <div class="balance-hero trust-hero" aria-label="Trust allowances">
   <div class="hero-label">Trust</div>
-  <div class="hero-amount"><span data-bind="total-credit"></span> <span>total credit</span></div>
+  <div class="hero-amount"><span class="hero-number" data-bind="available-credit"></span> <span>available credit</span></div>
   <div class="hero-sub">
     <div class="pill static">
       <div>Credit from others</div>

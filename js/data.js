@@ -41,6 +41,13 @@ export const loadData = async () => {
   );
   const netBalance = friendsOweTotal - youOweTotal;
 
+  const availableCredit = connections.reduce((sum, connection, index) => {
+    const creditLimit = inboundCredits[index] || 0;
+    const debtUsed = Math.max(connection.debt_eur || 0, 0);
+    const remaining = Math.max(creditLimit - Math.min(debtUsed, creditLimit), 0);
+    return sum + remaining;
+  }, 0);
+
   cachedData = {
     you,
     connections,
@@ -50,7 +57,7 @@ export const loadData = async () => {
       youOweTotal,
       creditFromOthers,
       creditYouExtend,
-      totalCredit: creditFromOthers + creditYouExtend,
+      availableCredit,
     },
   };
 

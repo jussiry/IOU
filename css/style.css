@@ -1,8 +1,6 @@
 :root {
-  --bg: #f7f4ef;
   --ink: #1b1b1b;
   --muted: #6b635e;
-  --accent: #0e6f66;
   --accent-2: #f4b860;
   --card: #ffffff;
   --danger: #b93b3b;
@@ -70,6 +68,31 @@ header {
   display: none;
 }
 
+.trust-hero .hero-amount {
+  font-weight: 600;
+}
+
+.trust-hero .hero-number {
+  font-size: 32px;
+  color: var(--muted);
+}
+
+.trust-hero .hero-amount span:not(.hero-number) {
+  font-size: 14px;
+}
+
+.trust-hero .pill {
+  background: #f2efe9;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.trust-hero .pill strong {
+  font-size: 14px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
 .hero-label {
   color: var(--muted);
   text-transform: uppercase;
@@ -79,12 +102,15 @@ header {
 }
 
 .hero-amount {
-  font-size: 40px;
   font-weight: 700;
   margin: 8px 0 12px;
 }
 
-.hero-amount span {
+.hero-number {
+  font-size: 40px;
+}
+
+.hero-amount span:not(.hero-number) {
   font-size: 18px;
   color: var(--muted);
   margin-left: 4px;
@@ -230,13 +256,6 @@ summary::-webkit-details-marker {
   will-change: height, opacity;
 }
 
-.sub-card h3 {
-  margin: 0 0 10px;
-  font-size: 14px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--muted);
-}
 
 .inline-list {
   background: transparent;
@@ -347,7 +366,6 @@ nav {
   font-size: 12px;
   display: grid;
   gap: 6px;
-  text-decoration: none;
   cursor: pointer;
 }
 

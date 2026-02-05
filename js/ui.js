@@ -150,7 +150,7 @@ const renderInlineList = (root, list, templateSelector) => {
     const node = template.content.firstElementChild.cloneNode(true);
     const nameEl = node.querySelector('[data-bind="name"]');
     const amountEl = node.querySelector('[data-bind="amount"]');
-    if (nameEl) nameEl.textContent = entry.name;
+    if (nameEl) nameEl.textContent = entry.person_name || entry.name || entry.person_id;
     if (amountEl) {
       amountEl.textContent = formatSigned(entry.debt_eur);
       amountEl.classList.add(entry.debt_eur >= 0 ? "pos" : "neg");
@@ -175,8 +175,8 @@ export const bindBalance = (root, data) => {
   root.querySelector('[data-bind="credit-you-extend"]').textContent = formatCurrency(
     data.totals.creditYouExtend
   );
-  root.querySelector('[data-bind="total-credit"]').textContent = formatCurrency(
-    data.totals.totalCredit
+  root.querySelector('[data-bind="available-credit"]').textContent = formatCurrency(
+    data.totals.availableCredit
   );
 
   const friendsOwe = data.connections
