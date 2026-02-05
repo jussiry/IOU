@@ -1,0 +1,105 @@
+{
+  "id": "you",
+  "name": "You",
+  "connections": [
+    {
+      "person_id": "jamie-tran",
+      "person_name": "Jamie Tran",
+      "debt_eur": 248.50,
+      "trust_credit_limit_eur": 300.00,
+      "recent_transactions": [
+        {
+          "date": "2026-01-30",
+          "amount_eur": 84.00,
+          "note": "Flight split"
+        },
+        {
+          "date": "2026-01-26",
+          "amount_eur": 42.00,
+          "note": "Concert tickets"
+        },
+        {
+          "date": "2026-01-20",
+          "amount_eur": 18.50,
+          "note": "Taxi home"
+        },
+        {
+          "date": "2026-01-14",
+          "amount_eur": 68.00,
+          "note": "Grocery run"
+        },
+        {
+          "date": "2026-01-11",
+          "amount_eur": 36.00,
+          "note": "Coffee + pastries"
+        }
+      ]
+    },
+    {
+      "person_id": "alex-lin",
+      "person_name": "Alex Lin",
+      "debt_eur": 88.00,
+      "trust_credit_limit_eur": 200.00,
+      "recent_transactions": [
+        {
+          "date": "2026-01-29",
+          "amount_eur": 24.00,
+          "note": "Fuel top-up"
+        },
+        {
+          "date": "2026-01-24",
+          "amount_eur": 32.00,
+          "note": "Cabin groceries"
+        },
+        {
+          "date": "2026-01-18",
+          "amount_eur": 16.00,
+          "note": "Parking fee"
+        },
+        {
+          "date": "2026-01-12",
+          "amount_eur": 10.00,
+          "note": "Snack run"
+        },
+        {
+          "date": "2026-01-06",
+          "amount_eur": 6.00,
+          "note": "Car wash"
+        }
+      ]
+    },
+    {
+      "person_id": "mo-kaur",
+      "person_name": "Mo Kaur",
+      "debt_eur": -54.50,
+      "trust_credit_limit_eur": 150.00,
+      "recent_transactions": [
+        {
+          "date": "2026-01-31",
+          "amount_eur": -22.00,
+          "note": "Canvas set"
+        },
+        {
+          "date": "2026-01-27",
+          "amount_eur": -14.50,
+          "note": "Ink refills"
+        },
+        {
+          "date": "2026-01-19",
+          "amount_eur": -9.00,
+          "note": "Brush pack"
+        },
+        {
+          "date": "2026-01-10",
+          "amount_eur": -6.00,
+          "note": "Studio snacks"
+        },
+        {
+          "date": "2026-01-03",
+          "amount_eur": -3.00,
+          "note": "Parking meter"
+        }
+      ]
+    }
+  ]
+}

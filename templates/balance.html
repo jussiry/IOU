@@ -1,6 +1,6 @@
 <div class="balance-hero" aria-label="Total balance">
   <div class="hero-label">Net balance</div>
-  <div class="hero-amount">€124.00 <span>overall</span></div>
+  <div class="hero-amount"><span data-bind="net-balance"></span> <span>overall</span></div>
   <div class="hero-sub">
     <button class="pill toggle" type="button" aria-expanded="false">
       <div class="pill-row">
@@ -8,19 +8,10 @@
           Friends owe
           <small>to you</small>
         </div>
-        <strong class="pos">+€336.50</strong>
+        <strong class="pos" data-bind="friends-owe-total"></strong>
       </div>
       <div class="sub-card" aria-label="Friends owe to you">
-        <div class="inline-list">
-          <div class="inline-item">
-            <div>Jamie Tran</div>
-            <div class="amount pos">+€248.50</div>
-          </div>
-          <div class="inline-item">
-            <div>Alex Lin</div>
-            <div class="amount pos">+€88.00</div>
-          </div>
-        </div>
+        <div class="inline-list" data-list="friends-owe"></div>
       </div>
     </button>
     <button class="pill toggle" type="button" aria-expanded="false">
@@ -29,30 +20,32 @@
           You owe
           <small>to friends</small>
         </div>
-        <strong class="neg">−€212.50</strong>
+        <strong class="neg" data-bind="you-owe-total"></strong>
       </div>
       <div class="sub-card" aria-label="You owe to friends">
-        <div class="inline-list">
-          <div class="inline-item">
-            <div>Mo Kaur</div>
-            <div class="amount neg">−€54.50</div>
-          </div>
-        </div>
+        <div class="inline-list" data-list="you-owe"></div>
       </div>
     </button>
   </div>
 </div>
 <div class="balance-hero trust-hero" aria-label="Trust allowances">
   <div class="hero-label">Trust</div>
-  <div class="hero-amount">€500.00 <span>total credit</span></div>
+  <div class="hero-amount"><span data-bind="total-credit"></span> <span>total credit</span></div>
   <div class="hero-sub">
     <div class="pill static">
       <div>Credit from others</div>
-      <strong>€400.00</strong>
+      <strong data-bind="credit-from-others"></strong>
     </div>
     <div class="pill static">
       <div>Credit you extend</div>
-      <strong>€600.00</strong>
+      <strong data-bind="credit-you-extend"></strong>
     </div>
   </div>
 </div>
+
+<template data-template="inline-item">
+  <div class="inline-item">
+    <div data-bind="name"></div>
+    <div class="amount" data-bind="amount"></div>
+  </div>
+</template>

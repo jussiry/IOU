@@ -1,0 +1,18 @@
+{
+  "id": "jamie-tran",
+  "name": "Jamie Tran",
+  "connections": [
+    {
+      "person_id": "you",
+      "person_name": "You",
+      "debt_eur": -248.50,
+      "trust_credit_limit_eur": 400.00
+    },
+    {
+      "person_id": "alex-lin",
+      "person_name": "Alex Lin",
+      "debt_eur": 36.00,
+      "trust_credit_limit_eur": 120.00
+    }
+  ]
+}

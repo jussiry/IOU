@@ -301,9 +301,13 @@ summary::-webkit-details-marker {
   font-size: 12px;
 }
 
-.tx-list li span {
+.tx-date {
   color: var(--muted);
   font-variant-numeric: tabular-nums;
+}
+
+.tx-note {
+  color: var(--ink);
 }
 
 .empty {
