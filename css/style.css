@@ -17,6 +17,11 @@ body {
   background: radial-gradient(120% 120% at 20% -10%, #fff1d7 0%, #f7f4ef 50%, #ecf0ee 100%);
   color: var(--ink);
   font-family: "Space Grotesk", "IBM Plex Sans", "Avenir Next", sans-serif;
+  overflow-x: hidden;
+}
+
+#page-content {
+  padding-bottom: calc(104px + env(safe-area-inset-bottom, 0px));
 }
 
 .app {
@@ -191,6 +196,10 @@ header {
   color: var(--muted);
 }
 
+.section h2.section-title {
+  margin-bottom: 16px;
+}
+
 .subpage {
   padding: 0;
 }
@@ -200,6 +209,14 @@ header {
   align-items: center;
   gap: 12px;
   margin: 22px 20px 18px;
+}
+
+.subpage-title-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
 }
 
 .back-button {
@@ -216,6 +233,23 @@ header {
 .subpage-title {
   margin: 0;
   font-size: 20px;
+}
+
+.subpage-amount {
+  font-weight: 700;
+  font-size: 16px;
+  background: #fff;
+  border-radius: 999px;
+  padding: 6px 10px;
+  box-shadow: 0 10px 20px rgba(15, 12, 8, 0.08);
+}
+
+.subpage-amount-label {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 
 .subpage-card .tx-list {
@@ -408,7 +442,7 @@ summary::-webkit-details-marker {
 
 nav {
   margin-top: auto;
-  padding: 12px 16px 18px;
+  padding: 12px 16px calc(18px + env(safe-area-inset-bottom, 0px));
   background: rgba(255, 255, 255, 0.7);
   backdrop-filter: blur(10px);
   border-top: 1px solid rgba(0, 0, 0, 0.05);

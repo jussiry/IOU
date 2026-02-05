@@ -6,10 +6,12 @@ import {
   initBalanceToggles,
   setActiveNav,
 } from "./ui.js";
+import { getSlideDirection, swapPage } from "./page-transitions.js";
 
 const navButtons = Array.from(document.querySelectorAll(".nav-item[data-page]"));
 const contentRoot = document.getElementById("page-content");
 const appRoot = document.querySelector(".app");
+const navOrder = navButtons.map((button) => button.dataset.page).filter(Boolean);
 
 const pageTitles = {
   balance: "IOU — Balance",
@@ -32,6 +34,21 @@ const pageBinders = {
 };
 
 let lastMainPage = "balance";
+let currentRoute = null;
+let navigationSequence = 0;
+
+const fetchTemplate = async (path) => {
+  const response = await fetch(path, { cache: "no-store" });
+  if (!response.ok) throw new Error("Template not found");
+  return response.text();
+};
+
+const createPageView = (html) => {
+  const page = document.createElement("div");
+  page.className = "page-view";
+  page.innerHTML = html;
+  return page;
+};
 
 const parseRoute = () => {
   const hash = window.location.hash.replace("#", "");
@@ -46,11 +63,13 @@ const parseRoute = () => {
 const loadPage = async (route) => {
   const target =
     route.type === "friend" ? templatePaths.subpage : templatePaths[route.page] || templatePaths.balance;
+  const direction = getSlideDirection(currentRoute, route, navOrder);
+  const sequence = (navigationSequence += 1);
   try {
-    const response = await fetch(target, { cache: "no-store" });
-    if (!response.ok) throw new Error("Template not found");
-    const html = await response.text();
-    contentRoot.innerHTML = html;
+    const [html, data] = await Promise.all([fetchTemplate(target), loadData()]);
+    if (sequence !== navigationSequence) return;
+
+    const pageView = createPageView(html);
     if (route.type === "friend") {
       appRoot?.classList.add("is-subpage");
       setActiveNav(navButtons, null);
@@ -58,19 +77,17 @@ const loadPage = async (route) => {
       appRoot?.classList.remove("is-subpage");
       document.title = pageTitles[route.page] || pageTitles.balance;
       setActiveNav(navButtons, route.page);
-      lastMainPage = route.page;
     }
 
-    const data = await loadData();
     if (route.type === "friend") {
-      bindFriendDetail(contentRoot, data, route.friendId);
+      bindFriendDetail(pageView, data, route.friendId);
       const friend = data.connections.find((entry) => entry.person_id === route.friendId);
       if (friend?.person_name) {
         document.title = `IOU — ${friend.person_name}`;
       } else {
         document.title = "IOU — Friend";
       }
-      const backButton = contentRoot.querySelector("[data-back]");
+      const backButton = pageView.querySelector("[data-back]");
       if (backButton) {
         backButton.addEventListener("click", () => {
           window.location.hash = lastMainPage || "balance";
@@ -79,13 +96,24 @@ const loadPage = async (route) => {
     } else {
       const binder = pageBinders[route.page];
       if (binder) {
-        binder(contentRoot, data);
+        binder(pageView, data);
       }
     }
 
-    initBalanceToggles(contentRoot);
+    initBalanceToggles(pageView);
+    await swapPage(contentRoot, pageView, { direction });
+    if (sequence !== navigationSequence) return;
+
+    currentRoute = route;
+    if (route.type === "page") {
+      lastMainPage = route.page;
+    }
   } catch (error) {
-    contentRoot.innerHTML = `<div class="section"><div class="empty">Failed to load page.</div></div>`;
+    if (sequence !== navigationSequence) return;
+    const errorView = createPageView(
+      `<div class="section"><div class="empty">Failed to load page.</div></div>`
+    );
+    await swapPage(contentRoot, errorView, { direction: null });
   }
 };
 

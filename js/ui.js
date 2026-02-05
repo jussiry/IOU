@@ -243,6 +243,7 @@ export const bindFriends = (root, data) => {
 export const bindFriendDetail = (root, data, friendId) => {
   const titleEl = root.querySelector('[data-bind="subpage-title"]');
   const labelEl = root.querySelector('[data-bind="subpage-label"]');
+  const amountEl = root.querySelector('[data-bind="subpage-amount"]');
   const bodyEl = root.querySelector('[data-section="subpage-body"]');
   const listEl = root.querySelector('[data-list="friend-transactions"]');
   const txTemplate = root.querySelector('[data-template="tx-item"]');
@@ -253,6 +254,11 @@ export const bindFriendDetail = (root, data, friendId) => {
 
   if (titleEl) titleEl.textContent = friendName;
   if (labelEl) labelEl.textContent = `My transactions with ${friendFirstName}`;
+  if (amountEl) {
+    const debt = connection?.debt_eur || 0;
+    const label = debt >= 0 ? "owes you" : "you owe";
+    amountEl.innerHTML = `<span class="subpage-amount-label">${label}</span> ${formatSigned(debt)}`;
+  }
 
   if (!bodyEl || !listEl || !txTemplate) return;
   listEl.innerHTML = "";

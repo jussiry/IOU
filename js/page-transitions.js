@@ -1,0 +1,140 @@
+const PAGE_CLASS = "page-view";
+const ACTIVE_CLASS = "is-active";
+const ENTERING_CLASS = "is-entering";
+const EXITING_CLASS = "is-exiting";
+
+const transitionSequences = new WeakMap();
+
+const prefersReducedMotion = () =>
+  window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches ?? false;
+
+const waitForTransitionEnd = (element, { timeoutMs = 400 } = {}) =>
+  new Promise((resolve) => {
+    if (!element) {
+      resolve();
+      return;
+    }
+
+    let settled = false;
+    const settle = () => {
+      if (settled) return;
+      settled = true;
+      element.removeEventListener("transitionend", onEnd);
+      window.clearTimeout(timer);
+      resolve();
+    };
+
+    const onEnd = (event) => {
+      if (event.target !== element) return;
+      if (event.propertyName !== "transform") return;
+      settle();
+    };
+
+    const timer = window.setTimeout(settle, timeoutMs);
+    element.addEventListener("transitionend", onEnd);
+  });
+
+const getPages = (container) =>
+  Array.from(container?.querySelectorAll?.(`:scope > .${PAGE_CLASS}`) ?? []);
+
+const getActivePage = (container) =>
+  container?.querySelector?.(`:scope > .${PAGE_CLASS}.${ACTIVE_CLASS}`) ??
+  container?.querySelector?.(`:scope > .${PAGE_CLASS}:last-child`) ??
+  null;
+
+const normalizeContainer = (container) => {
+  if (!container) return;
+
+  const pages = getPages(container);
+  if (pages.length <= 1) {
+    const onlyPage = pages[0];
+    if (onlyPage) {
+      onlyPage.classList.add(PAGE_CLASS, ACTIVE_CLASS);
+      onlyPage.classList.remove(ENTERING_CLASS, EXITING_CLASS);
+      onlyPage.style.transform = "";
+      onlyPage.removeAttribute("aria-hidden");
+    }
+    container.removeAttribute("data-transitioning");
+    return;
+  }
+
+  const keep = pages[pages.length - 1];
+  pages.slice(0, -1).forEach((page) => page.remove());
+  keep.classList.add(PAGE_CLASS, ACTIVE_CLASS);
+  keep.classList.remove(ENTERING_CLASS, EXITING_CLASS);
+  keep.style.transform = "";
+  keep.removeAttribute("aria-hidden");
+  container.removeAttribute("data-transitioning");
+};
+
+export const getSlideDirection = (fromRoute, toRoute, navOrder) => {
+  if (!fromRoute || !toRoute) return null;
+
+  if (fromRoute.type === "friend" && toRoute.type === "page") return "from-left";
+  if (toRoute.type === "friend") return "from-right";
+
+  if (fromRoute.type === "page" && toRoute.type === "page") {
+    const fromIndex = navOrder.indexOf(fromRoute.page);
+    const toIndex = navOrder.indexOf(toRoute.page);
+    if (fromIndex === -1 || toIndex === -1 || fromIndex === toIndex) return null;
+    return toIndex > fromIndex ? "from-right" : "from-left";
+  }
+
+  return null;
+};
+
+export const swapPage = async (container, nextPage, { direction } = {}) => {
+  if (!container || !nextPage) return;
+
+  const seq = (transitionSequences.get(container) ?? 0) + 1;
+  transitionSequences.set(container, seq);
+
+  normalizeContainer(container);
+
+  nextPage.classList.add(PAGE_CLASS);
+
+  const currentPage = getActivePage(container);
+  if (!currentPage) {
+    nextPage.classList.add(ACTIVE_CLASS);
+    container.appendChild(nextPage);
+    return;
+  }
+
+  if (!direction || prefersReducedMotion()) {
+    currentPage.remove();
+    nextPage.classList.add(ACTIVE_CLASS);
+    container.appendChild(nextPage);
+    container.removeAttribute("data-transitioning");
+    return;
+  }
+
+  const enterFromRight = direction === "from-right";
+  const enterStart = enterFromRight ? "100%" : "-100%";
+  const exitEnd = enterFromRight ? "-100%" : "100%";
+
+  currentPage.classList.remove(ACTIVE_CLASS);
+  currentPage.classList.add(EXITING_CLASS);
+  currentPage.setAttribute("aria-hidden", "true");
+
+  nextPage.classList.add(ENTERING_CLASS);
+  nextPage.style.transform = `translateX(${enterStart})`;
+
+  container.setAttribute("data-transitioning", "true");
+  container.appendChild(nextPage);
+
+  await new Promise(requestAnimationFrame);
+  if (transitionSequences.get(container) !== seq) return;
+  currentPage.style.transform = `translateX(${exitEnd})`;
+  nextPage.style.transform = "translateX(0%)";
+
+  await waitForTransitionEnd(currentPage, { timeoutMs: 500 });
+  if (transitionSequences.get(container) !== seq) return;
+
+  currentPage.remove();
+  nextPage.classList.remove(ENTERING_CLASS);
+  nextPage.classList.add(ACTIVE_CLASS);
+  nextPage.style.transform = "";
+  nextPage.removeAttribute("aria-hidden");
+
+  container.removeAttribute("data-transitioning");
+};
