@@ -281,14 +281,12 @@ summary::-webkit-details-marker {
   font-variant-numeric: tabular-nums;
 }
 
-.credit-item .credit-used {
-  color: var(--muted);
+.credit-item .amount .used-of {
   font-size: 11px;
-  font-weight: 500;
-  width: 5em;
-  display: inline-block;
-  text-align: right;
+  color: var(--muted);
+  margin-right: 4px;
 }
+
 
 .tx-wrap {
   height: 0;

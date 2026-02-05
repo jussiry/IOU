@@ -10,6 +10,13 @@ const formatDate = (isoDate) => {
   return parsed.toLocaleString("en-US", { month: "short", day: "numeric" });
 };
 
+const formatCreditUsage = (used, limit) => {
+  if (used <= 0) {
+    return `${formatCurrency(limit)}`;
+  }
+  return `<span class="used-of">${formatCurrency(used)}</span> <span class="used-of">used of</span> ${formatCurrency(limit)}`;
+};
+
 const closePanel = (button, panel) => {
   if (!panel || button.getAttribute("aria-expanded") !== "true") return;
   panel.style.height = `${panel.getBoundingClientRect().height}px`;
@@ -164,10 +171,7 @@ const renderInlineList = (root, list, templateSelector, options = {}) => {
       } else {
         amountEl.textContent = amountValue;
       }
-      if (options.amountClass) {
-        const className = options.amountClass(entry);
-        if (className) amountEl.classList.add(className);
-      } else {
+      if (!options.skipSignClass) {
         amountEl.classList.add(entry.debt_eur >= 0 ? "pos" : "neg");
       }
     }
@@ -232,11 +236,10 @@ export const bindBalance = (root, data) => {
       formatAmount: (entry) => {
         const limit = entry.inbound_credit_limit_eur || 0;
         const used = Math.max(entry.debt_eur || 0, 0);
-        const usedText = used > 0 ? ` − ${formatCurrency(used)}` : "";
-        return `<span class=\"credit-limit\">${formatCurrency(limit)}</span><span class=\"credit-used\">${usedText}</span>`;
+        return formatCreditUsage(used, limit);
       },
       amountAsHtml: true,
-      amountClass: () => "",
+      skipSignClass: true,
     }
   );
   renderInlineList(
@@ -250,11 +253,10 @@ export const bindBalance = (root, data) => {
       formatAmount: (entry) => {
         const limit = entry.trust_credit_limit_eur || 0;
         const used = Math.max(-(entry.debt_eur || 0), 0);
-        const usedText = used > 0 ? ` − ${formatCurrency(used)}` : "";
-        return `<span class="credit-limit">${formatCurrency(limit)}</span><span class="credit-used">${usedText}</span>`;
+        return formatCreditUsage(used, limit);
       },
       amountAsHtml: true,
-      amountClass: () => "",
+      skipSignClass: true,
     }
   );
 };
