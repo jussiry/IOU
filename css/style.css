@@ -25,6 +25,13 @@ body {
   flex-direction: column;
 }
 
+.app.is-subpage {
+}
+
+.app.is-subpage header {
+  display: none;
+}
+
 header {
   padding: 24px 20px 10px;
 }
@@ -184,6 +191,57 @@ header {
   color: var(--muted);
 }
 
+.subpage {
+  padding: 0;
+}
+
+.subpage-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 22px 20px 18px;
+}
+
+.back-button {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  border: none;
+  background: #f2efe9;
+  color: var(--ink);
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.subpage-title {
+  margin: 0;
+  font-size: 20px;
+}
+
+.subpage-card .tx-list {
+  margin-top: 8px;
+}
+
+.friends-list {
+  display: grid;
+  gap: 14px;
+}
+
+.friend-row {
+  width: 100%;
+  border: none;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #fff;
+  border-radius: 12px;
+  padding: 10px 12px;
+  box-shadow: 0 10px 20px rgba(15, 12, 8, 0.08);
+  cursor: pointer;
+}
+
+
 .card {
   background: var(--card);
   border-radius: 22px;
@@ -303,9 +361,9 @@ summary::-webkit-details-marker {
 .tx-list {
   list-style: none;
   margin: 0;
-  padding: 8px 10px 10px;
+  padding: 6px 6px 6px;
   display: grid;
-  gap: 8px;
+  gap: 6px;
   color: var(--muted);
   font-size: 12px;
 }
@@ -313,12 +371,17 @@ summary::-webkit-details-marker {
 .tx-list li {
   display: grid;
   grid-template-columns: 56px 64px 1fr;
-  gap: 8px;
+  gap: 6px;
   align-items: center;
-  background: #fff;
-  padding: 8px 10px;
+  background: #f0eee9;
+  padding: 6px 8px;
   border-radius: 12px;
   color: var(--ink);
+}
+
+.subpage-card {
+  margin: 12px 20px 0;
+  padding: 20px 18px;
 }
 
 .tx-list li strong {

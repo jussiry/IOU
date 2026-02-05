@@ -1,9 +1,20 @@
 <div class="section">
   <h2>By friend</h2>
-  <div class="card accordion" data-list="friends"></div>
+  <div class="friends-list" data-list="friends"></div>
 </div>
 
 <template data-template="friend-item">
+  <button class="friend-row" type="button">
+    <div class="meta">
+      <h3 data-bind="name"></h3>
+    </div>
+    <span class="badge" data-bind="badge"></span>
+    <div class="amount" data-bind="amount"></div>
+  </button>
+</template>
+
+<!-- Saved for later: expandable friend history UI -->
+<template data-template="friend-item-detail">
   <details class="friend">
     <summary class="row">
       <div class="meta">

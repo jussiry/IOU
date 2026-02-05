@@ -49,39 +49,14 @@ const openPanel = (button, panel) => {
   panel.addEventListener("transitionend", onEnd);
 };
 
-const closeDetail = (detail, wrap) => {
-  if (!wrap || !detail.hasAttribute("open")) return;
-  wrap.style.height = `${wrap.getBoundingClientRect().height}px`;
-  requestAnimationFrame(() => {
-    wrap.style.height = "0px";
-    wrap.style.opacity = "0";
-  });
-  const onEnd = (event) => {
-    if (event.propertyName !== "height") return;
-    detail.removeAttribute("open");
-    wrap.removeEventListener("transitionend", onEnd);
-  };
-  wrap.addEventListener("transitionend", onEnd);
-};
-
-const openDetail = (detail, wrap) => {
-  if (!wrap || detail.hasAttribute("open")) return;
-  detail.setAttribute("open", "");
-  wrap.style.height = "0px";
-  wrap.style.opacity = "0";
-  requestAnimationFrame(() => {
-    wrap.style.height = `${wrap.scrollHeight}px`;
-    wrap.style.opacity = "1";
-  });
-  const onEnd = (event) => {
-    if (event.propertyName !== "height") return;
-    wrap.style.height = `${wrap.scrollHeight}px`;
-    wrap.removeEventListener("transitionend", onEnd);
-  };
-  wrap.addEventListener("transitionend", onEnd);
-};
-
 export const setActiveNav = (navButtons, page) => {
+  if (!page) {
+    navButtons.forEach((button) => {
+      button.classList.remove("active");
+      button.removeAttribute("aria-current");
+    });
+    return;
+  }
   navButtons.forEach((button) => {
     const isActive = button.dataset.page === page;
     button.classList.toggle("active", isActive);
@@ -116,32 +91,6 @@ export const initBalanceToggles = (root) => {
           closePanel(button, panel);
         } else {
           openPanel(button, panel);
-        }
-      });
-    });
-  });
-};
-
-export const initAccordion = (root) => {
-  const containers = Array.from(root.querySelectorAll(".accordion"));
-  containers.forEach((container) => {
-    const friendDetails = Array.from(container.querySelectorAll(".friend"));
-    friendDetails.forEach((detail) => {
-      const summary = detail.querySelector("summary");
-      const wrap = detail.querySelector(".tx-wrap");
-      if (!summary || !wrap) return;
-
-      summary.addEventListener("click", (event) => {
-        event.preventDefault();
-        const isOpen = detail.hasAttribute("open");
-        friendDetails.forEach((other) => {
-          if (other === detail) return;
-          closeDetail(other, other.querySelector(".tx-wrap"));
-        });
-        if (isOpen) {
-          closeDetail(detail, wrap);
-        } else {
-          openDetail(detail, wrap);
         }
       });
     });
@@ -264,8 +213,7 @@ export const bindBalance = (root, data) => {
 export const bindFriends = (root, data) => {
   const listContainer = root.querySelector('[data-list="friends"]');
   const friendTemplate = root.querySelector('[data-template="friend-item"]');
-  const txTemplate = root.querySelector('[data-template="tx-item"]');
-  if (!listContainer || !friendTemplate || !txTemplate) return;
+  if (!listContainer || !friendTemplate) return;
 
   listContainer.innerHTML = "";
 
@@ -278,6 +226,9 @@ export const bindFriends = (root, data) => {
     const nameEl = node.querySelector('[data-bind="name"]');
     const badgeEl = node.querySelector('[data-bind="badge"]');
     const amountEl = node.querySelector('[data-bind="amount"]');
+    node.addEventListener("click", () => {
+      window.location.hash = `friend/${connection.person_id}`;
+    });
     if (nameEl) nameEl.textContent = connection.person_name || connection.person_id;
     if (badgeEl) badgeEl.textContent = connection.debt_eur >= 0 ? "owes you" : "you owe";
     if (amountEl) {
@@ -285,21 +236,44 @@ export const bindFriends = (root, data) => {
       amountEl.classList.add(connection.debt_eur >= 0 ? "pos" : "neg");
     }
 
-    const txList = node.querySelector('[data-list="transactions"]');
-    const transactions = Array.isArray(connection.recent_transactions)
-      ? connection.recent_transactions
-      : [];
-    transactions.forEach((tx) => {
-      const txNode = txTemplate.content.firstElementChild.cloneNode(true);
-      const dateEl = txNode.querySelector('[data-bind="date"]');
-      const amountTxEl = txNode.querySelector('[data-bind="amount"]');
-      const noteEl = txNode.querySelector('[data-bind="note"]');
-      if (dateEl) dateEl.textContent = formatDate(tx.date);
-      if (amountTxEl) amountTxEl.textContent = formatSigned(tx.amount_eur);
-      if (noteEl) noteEl.textContent = tx.note;
-      txList.appendChild(txNode);
-    });
-
     listContainer.appendChild(node);
+  });
+};
+
+export const bindFriendDetail = (root, data, friendId) => {
+  const titleEl = root.querySelector('[data-bind="subpage-title"]');
+  const labelEl = root.querySelector('[data-bind="subpage-label"]');
+  const bodyEl = root.querySelector('[data-section="subpage-body"]');
+  const listEl = root.querySelector('[data-list="friend-transactions"]');
+  const txTemplate = root.querySelector('[data-template="tx-item"]');
+
+  const connection = data.connections.find((entry) => entry.person_id === friendId);
+  const friendName = connection?.person_name || "Friend";
+  const friendFirstName = friendName.split(/\s+/)[0] || friendName;
+
+  if (titleEl) titleEl.textContent = friendName;
+  if (labelEl) labelEl.textContent = `My transactions with ${friendFirstName}`;
+
+  if (!bodyEl || !listEl || !txTemplate) return;
+  listEl.innerHTML = "";
+
+  const transactions = Array.isArray(connection?.recent_transactions)
+    ? connection.recent_transactions
+    : [];
+
+  if (!transactions.length) {
+    bodyEl.innerHTML = `<div class="empty">No transactions yet.</div>`;
+    return;
+  }
+
+  transactions.forEach((tx) => {
+    const txNode = txTemplate.content.firstElementChild.cloneNode(true);
+    const dateEl = txNode.querySelector('[data-bind="date"]');
+    const amountTxEl = txNode.querySelector('[data-bind="amount"]');
+    const noteEl = txNode.querySelector('[data-bind="note"]');
+    if (dateEl) dateEl.textContent = formatDate(tx.date);
+    if (amountTxEl) amountTxEl.textContent = formatSigned(tx.amount_eur);
+    if (noteEl) noteEl.textContent = tx.note;
+    listEl.appendChild(txNode);
   });
 };

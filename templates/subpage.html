@@ -1,0 +1,20 @@
+<div class="subpage">
+  <div class="subpage-header">
+    <button class="back-button" type="button" data-back aria-label="Back">
+      ←
+    </button>
+    <h2 class="subpage-title" data-bind="subpage-title"></h2>
+  </div>
+  <div class="balance-hero trust-hero subpage-card" data-section="subpage-body">
+    <div class="hero-label" data-bind="subpage-label">Transactions</div>
+    <ul class="tx-list" data-list="friend-transactions"></ul>
+  </div>
+</div>
+
+<template data-template="tx-item">
+  <li>
+    <span class="tx-date" data-bind="date"></span>
+    <strong class="tx-amount" data-bind="amount"></strong>
+    <span class="tx-note" data-bind="note"></span>
+  </li>
+</template>
