@@ -206,11 +206,11 @@ export const bindBalance = (root, data) => {
 
   renderInlineList(root, friendsOwe, {
     list: '[data-list="friends-owe"]',
-    template: '[data-template="inline-item"]',
+    template: '[data-template="credit-item"]',
   });
   renderInlineList(root, youOwe, {
     list: '[data-list="you-owe"]',
-    template: '[data-template="inline-item"]',
+    template: '[data-template="credit-item"]',
   });
 
   const creditFromOthers = data.connections
@@ -226,16 +226,14 @@ export const bindBalance = (root, data) => {
     creditFromOthers,
     {
       list: '[data-list="credit-from-others"]',
-      template: '[data-template="inline-item"]',
+      template: '[data-template="credit-item"]',
     },
     {
       formatAmount: (entry) => {
         const limit = entry.inbound_credit_limit_eur || 0;
         const used = Math.max(entry.debt_eur || 0, 0);
-        if (used > 0) {
-          return `<span class=\"credit-limit\">${formatCurrency(limit)}</span><span class=\"credit-used\"> − ${formatCurrency(used)}</span>`;
-        }
-        return `<span class=\"credit-limit\">${formatCurrency(limit)}</span>`;
+        const usedText = used > 0 ? ` − ${formatCurrency(used)}` : "";
+        return `<span class=\"credit-limit\">${formatCurrency(limit)}</span><span class=\"credit-used\">${usedText}</span>`;
       },
       amountAsHtml: true,
       amountClass: () => "",
@@ -246,10 +244,16 @@ export const bindBalance = (root, data) => {
     creditYouExtend,
     {
       list: '[data-list="credit-you-extend"]',
-      template: '[data-template="inline-item"]',
+      template: '[data-template="credit-item"]',
     },
     {
-      formatAmount: (entry) => formatCurrency(entry.trust_credit_limit_eur || 0),
+      formatAmount: (entry) => {
+        const limit = entry.trust_credit_limit_eur || 0;
+        const used = Math.max(-(entry.debt_eur || 0), 0);
+        const usedText = used > 0 ? ` − ${formatCurrency(used)}` : "";
+        return `<span class="credit-limit">${formatCurrency(limit)}</span><span class="credit-used">${usedText}</span>`;
+      },
+      amountAsHtml: true,
       amountClass: () => "",
     }
   );

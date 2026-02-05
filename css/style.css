@@ -263,7 +263,7 @@ summary::-webkit-details-marker {
   margin-top: 10px;
 }
 
-.inline-item {
+.credit-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -275,16 +275,19 @@ summary::-webkit-details-marker {
   font-weight: 500;
 }
 
-.inline-item .amount {
+.credit-item .amount {
   font-weight: 500;
   font-size: 13px;
   font-variant-numeric: tabular-nums;
 }
 
-.inline-item .credit-used {
+.credit-item .credit-used {
   color: var(--muted);
   font-size: 11px;
   font-weight: 500;
+  width: 5em;
+  display: inline-block;
+  text-align: right;
 }
 
 .tx-wrap {
