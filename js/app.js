@@ -5,6 +5,7 @@ import { bindLogs } from "./templates/logs.js";
 import { bindFriendDetail } from "./templates/subpage/friend.js";
 import { initIouActions } from "./templates/subpage/iou-actions.js";
 import { bindSend } from "./templates/subpage/send.js";
+import { ensureIconSprite } from "./utils/icons.js";
 import { setActiveNav } from "./utils/nav.js";
 import { getSlideDirection, swapPage } from "./page-transitions.js";
 
@@ -193,4 +194,9 @@ window.addEventListener("hashchange", () => {
   loadPage(parseRoute());
 });
 
-loadPage(parseRoute());
+const initApp = async () => {
+  await ensureIconSprite();
+  loadPage(parseRoute());
+};
+
+initApp();

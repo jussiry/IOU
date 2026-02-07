@@ -26,7 +26,12 @@
           data-bind="send-message"
         ></textarea>
       </label>
-      <button class="primary-button" type="button" data-bind="send-submit">Send IOU</button>
+      <button class="primary-button" type="button" data-bind="send-submit">
+        <svg class="primary-button-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <use href="#icon-send" />
+        </svg>
+        Send IOU
+      </button>
     </form>
   </div>
   <div class="send-explainer-card" data-bind="send-explainer">
