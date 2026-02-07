@@ -1,0 +1,35 @@
+<div class="send-content">
+  <div class="balance-hero trust-hero send-card">
+    <form class="send-form" aria-label="Send IOU form">
+      <label class="form-field">
+        <span class="form-label">Send to</span>
+        <select class="form-select" data-bind="send-to"></select>
+      </label>
+      <label class="form-field">
+        <span class="form-label">Amount (EUR)</span>
+        <input
+          class="form-input"
+          type="number"
+          inputmode="decimal"
+          min="0"
+          step="0.01"
+          placeholder="0.00"
+          data-bind="send-amount"
+        />
+      </label>
+      <label class="form-field">
+        <span class="form-label">Message</span>
+        <textarea
+          class="form-textarea"
+          rows="3"
+          placeholder="Add a short note..."
+          data-bind="send-message"
+        ></textarea>
+      </label>
+      <button class="primary-button" type="button" data-bind="send-submit">Send IOU</button>
+    </form>
+  </div>
+  <div class="send-explainer-card" data-bind="send-explainer">
+    Add an explanation of what sending an IOU means.
+  </div>
+</div>

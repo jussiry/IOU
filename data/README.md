@@ -9,8 +9,15 @@ Each person has a single JSON file under `data/people/`.
 - `trust_credit_limit_eur` is the maximum trusted credit the owner extends to that person.
 - `recent_transactions` (optional) is an array of the most recent transactions between the owner and the connected person.
 
+## Logs
+`data/logs.json` stores a list of log entries. Each entry includes:
+- `id`
+- `transaction_id`
+- `timestamp` (ISO)
+- `text` (single-line summary)
+- `message` (optional detail)
+
 ## Example fields
 - `id`: stable identifier for the person.
 - `name`: display name.
 - `connections`: array of connected people and the current debt/credit limits between them.
-

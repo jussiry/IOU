@@ -1,29 +1,85 @@
-let cachedData = null;
+const STORAGE_KEY = "iou_state";
+let cachedState = null;
 
-export const loadData = async () => {
-  if (cachedData) return cachedData;
+const safeLocalStorage = {
+  get() {
+    try {
+      const raw = window.localStorage.getItem(STORAGE_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch (error) {
+      return null;
+    }
+  },
+  set(value) {
+    try {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(value));
+    } catch (error) {
+      // ignore write failures
+    }
+  },
+};
 
-  const youResponse = await fetch("data/people/you.json", { cache: "no-store" });
-  const you = await youResponse.json();
+const fetchJson = async (path) => {
+  const response = await fetch(path, { cache: "no-store" });
+  if (!response.ok) throw new Error("Not found");
+  return response.json();
+};
+
+const loadState = async () => {
+  if (cachedState) return cachedState;
+  const stored = safeLocalStorage.get();
+  if (stored) {
+    cachedState = stored;
+    return cachedState;
+  }
+
+  const you = await fetchJson("data/people/you.json");
   const connections = Array.isArray(you.connections) ? you.connections : [];
 
-  const inboundCredits = await Promise.all(
+  const peopleEntries = await Promise.all(
     connections.map(async (connection) => {
       try {
-        const response = await fetch(`data/people/${connection.person_id}.json`, {
-          cache: "no-store",
-        });
-        if (!response.ok) return 0;
-        const person = await response.json();
-        const backLink = (person.connections || []).find(
-          (entry) => entry.person_id === "you"
-        );
-        return backLink?.trust_credit_limit_eur || 0;
+        const person = await fetchJson(`data/people/${connection.person_id}.json`);
+        return [connection.person_id, person];
       } catch (error) {
-        return 0;
+        return [connection.person_id, { id: connection.person_id, name: connection.person_name || connection.person_id, connections: [] }];
       }
     })
   );
+
+  let logs = [];
+  try {
+    const logsData = await fetchJson("data/logs.json");
+    logs = Array.isArray(logsData) ? logsData : [];
+  } catch (error) {
+    logs = [];
+  }
+
+  cachedState = {
+    people: {
+      you,
+      ...Object.fromEntries(peopleEntries),
+    },
+    logs,
+  };
+  safeLocalStorage.set(cachedState);
+  return cachedState;
+};
+
+const saveState = (state) => {
+  cachedState = state;
+  safeLocalStorage.set(state);
+};
+
+const buildView = (state) => {
+  const you = state.people.you;
+  const connections = Array.isArray(you.connections) ? you.connections : [];
+
+  const inboundCredits = connections.map((connection) => {
+    const person = state.people[connection.person_id];
+    const backLink = person?.connections?.find((entry) => entry.person_id === "you");
+    return backLink?.trust_credit_limit_eur || 0;
+  });
 
   const connectionsWithInbound = connections.map((connection, index) => ({
     ...connection,
@@ -56,7 +112,7 @@ export const loadData = async () => {
     return sum + remaining;
   }, 0);
 
-  cachedData = {
+  return {
     you,
     connections: connectionsWithInbound,
     totals: {
@@ -67,7 +123,92 @@ export const loadData = async () => {
       creditYouExtend,
       availableCredit,
     },
+    logs: Array.isArray(state.logs) ? state.logs : [],
+  };
+};
+
+export const loadData = async () => {
+  const state = await loadState();
+  return buildView(state);
+};
+
+const ensureConnection = (person, friendId, friendName) => {
+  if (!person.connections) person.connections = [];
+  let connection = person.connections.find((entry) => entry.person_id === friendId);
+  if (!connection) {
+    connection = {
+      person_id: friendId,
+      person_name: friendName,
+      debt_eur: 0,
+      trust_credit_limit_eur: 0,
+      recent_transactions: [],
+    };
+    person.connections.push(connection);
+  }
+  if (!Array.isArray(connection.recent_transactions)) {
+    connection.recent_transactions = [];
+  }
+  return connection;
+};
+
+const createId = (prefix = "tx") =>
+  `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
+
+export const createTransaction = async ({ friendId, amount, message }) => {
+  if (!friendId || !amount || amount <= 0) {
+    return loadData();
+  }
+
+  const state = await loadState();
+  const you = state.people.you;
+  const friend = state.people[friendId];
+  const friendName = friend?.name || friendId;
+  const trimmedMessage = message ? message.trim() : "";
+
+  const youConnection = ensureConnection(you, friendId, friendName);
+  const friendConnection = friend ? ensureConnection(friend, "you", "You") : null;
+
+  youConnection.debt_eur = (youConnection.debt_eur || 0) - amount;
+  if (friendConnection) {
+    friendConnection.debt_eur = (friendConnection.debt_eur || 0) + amount;
+  }
+
+  const timestamp = new Date();
+  const date = timestamp.toISOString().slice(0, 10);
+  const txId = createId("tx");
+  const note = trimmedMessage.length ? trimmedMessage : "IOU sent";
+
+  youConnection.recent_transactions.unshift({
+    id: txId,
+    date,
+    amount_eur: -amount,
+    note,
+  });
+
+  if (friendConnection) {
+    friendConnection.recent_transactions.unshift({
+      id: txId,
+      date,
+      amount_eur: amount,
+      note,
+    });
+  }
+
+  const logId = createId("log");
+  const logText = `You sent ${amount.toFixed(2)}€ to ${friendName}`;
+  const logEntry = {
+    id: logId,
+    transaction_id: txId,
+    timestamp: timestamp.toISOString(),
+    text: logText,
+    message: trimmedMessage,
+    friend_id: friendId,
+    amount_eur: amount,
   };
 
-  return cachedData;
+  state.logs = Array.isArray(state.logs) ? state.logs : [];
+  state.logs.unshift(logEntry);
+
+  saveState(state);
+  return buildView(state);
 };

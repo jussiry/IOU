@@ -1,9 +1,12 @@
-import { loadData } from "./data.js";
+import { createTransaction, loadData } from "./data.js";
 import {
   bindBalance,
   bindFriendDetail,
   bindFriends,
+  bindSend,
+  bindLogs,
   initBalanceToggles,
+  initIouActions,
   setActiveNav,
 } from "./ui.js";
 import { getSlideDirection, swapPage } from "./page-transitions.js";
@@ -27,12 +30,14 @@ const templatePaths = {
   settings: "templates/settings.html",
   subpage: "templates/subpage.html",
   friend: "templates/friend.html",
+  send: "templates/send.html",
   iouActions: "templates/iou-actions.html",
 };
 
 const pageBinders = {
   balance: bindBalance,
   friends: bindFriends,
+  logs: bindLogs,
 };
 
 let lastMainPage = "balance";
@@ -65,12 +70,18 @@ const parseRoute = () => {
     const friendId = hash.replace("friend/", "");
     return { type: "friend", friendId };
   }
+  if (hash.startsWith("send")) {
+    const parts = hash.split("/");
+    return { type: "send", friendId: parts[1] || null };
+  }
   return templatePaths[hash] ? { type: "page", page: hash } : { type: "page", page: "balance" };
 };
 
 const loadPage = async (route) => {
-  const target =
-    route.type === "friend" ? templatePaths.subpage : templatePaths[route.page] || templatePaths.balance;
+  const isSubpage = route.type !== "page";
+  const target = isSubpage
+    ? templatePaths.subpage
+    : templatePaths[route.page] || templatePaths.balance;
   const direction = getSlideDirection(currentRoute, route, navOrder);
   const sequence = (navigationSequence += 1);
   try {
@@ -78,7 +89,7 @@ const loadPage = async (route) => {
     if (sequence !== navigationSequence) return;
 
     const pageView = createPageView(html);
-    if (route.type === "friend") {
+    if (isSubpage) {
       appRoot?.classList.add("is-subpage");
       setActiveNav(navButtons, null);
     } else {
@@ -108,10 +119,43 @@ const loadPage = async (route) => {
       } else {
         document.title = "IOU — Friend";
       }
+      initIouActions(pageView, route.friendId);
       const backButton = pageView.querySelector("[data-back]");
       if (backButton) {
         backButton.addEventListener("click", () => {
-          window.location.hash = lastMainPage || "balance";
+          if (window.history.length > 1) {
+            window.history.back();
+          } else {
+            window.location.hash = lastMainPage || "balance";
+          }
+        });
+      }
+    } else if (route.type === "send") {
+      const sendHtml = await fetchTemplate(templatePaths.send);
+      const contentSlot = pageView.querySelector('[data-slot="subpage-content"]');
+      if (contentSlot) {
+        contentSlot.innerHTML = sendHtml;
+      }
+      const sendHandlers = bindSend(pageView, data, route.friendId);
+      document.title = "IOU — Send";
+      const backButton = pageView.querySelector("[data-back]");
+      if (backButton) {
+        backButton.addEventListener("click", () => {
+          if (window.history.length > 1) {
+            window.history.back();
+          } else {
+            window.location.hash = lastMainPage || "balance";
+          }
+        });
+      }
+      if (sendHandlers?.submitEl) {
+        sendHandlers.submitEl.addEventListener("click", async () => {
+          const payload = sendHandlers.getPayload();
+          if (!payload.friendId || !Number.isFinite(payload.amount) || payload.amount <= 0) {
+            return;
+          }
+          await createTransaction(payload);
+          window.location.hash = `friend/${payload.friendId}`;
         });
       }
     } else {
