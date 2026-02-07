@@ -1,0 +1,56 @@
+.subpage {
+  padding: 0;
+}
+
+.subpage-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 22px 20px 18px;
+}
+
+.subpage-content {
+  display: grid;
+  gap: 16px;
+}
+
+.back-button {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  border: 1px solid rgba(17, 17, 17, 0.08);
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--ink);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 12px 26px rgba(15, 12, 8, 0.12);
+}
+
+.back-button:focus-visible {
+  outline: 3px solid rgba(244, 184, 96, 0.7);
+  outline-offset: 3px;
+}
+
+.back-icon {
+  width: 18px;
+  height: 18px;
+}
+
+.subpage-title {
+  margin: 0;
+  font-size: 20px;
+  display: inline-flex;
+  align-items: center;
+  background: #fff;
+  padding: 8px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(17, 17, 17, 0.06);
+  box-shadow: 0 10px 20px rgba(15, 12, 8, 0.08);
+  margin-right: auto;
+}
+
+.subpage-header-right {
+  display: flex;
+  align-items: center;
+}

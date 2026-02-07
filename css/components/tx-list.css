@@ -1,0 +1,33 @@
+.tx-list {
+  list-style: none;
+  margin: 0;
+  padding: 6px 6px 6px;
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.tx-list li {
+  display: grid;
+  grid-template-columns: 56px 64px 1fr;
+  gap: 6px;
+  align-items: center;
+  background: #f0eee9;
+  padding: 6px 8px;
+  border-radius: 12px;
+  color: var(--ink);
+}
+
+.tx-list li strong {
+  font-size: 12px;
+}
+
+.tx-date {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.tx-note {
+  color: var(--ink);
+}

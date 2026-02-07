@@ -1,14 +1,11 @@
 import { createTransaction, loadData } from "./data.js";
-import {
-  bindBalance,
-  bindFriendDetail,
-  bindFriends,
-  bindSend,
-  bindLogs,
-  initBalanceToggles,
-  initIouActions,
-  setActiveNav,
-} from "./ui.js";
+import { bindBalance, initBalanceToggles } from "./templates/balance.js";
+import { bindFriends } from "./templates/friends.js";
+import { bindLogs } from "./templates/logs.js";
+import { bindFriendDetail } from "./templates/subpage/friend.js";
+import { initIouActions } from "./templates/subpage/iou-actions.js";
+import { bindSend } from "./templates/subpage/send.js";
+import { setActiveNav } from "./utils/nav.js";
 import { getSlideDirection, swapPage } from "./page-transitions.js";
 
 const navButtons = Array.from(document.querySelectorAll(".nav-item[data-page]"));
@@ -24,14 +21,14 @@ const pageTitles = {
 };
 
 const templatePaths = {
-  balance: "templates/balance.html",
-  friends: "templates/friends.html",
-  logs: "templates/logs.html",
-  settings: "templates/settings.html",
-  subpage: "templates/subpage.html",
-  friend: "templates/friend.html",
-  send: "templates/send.html",
-  iouActions: "templates/iou-actions.html",
+  balance: "templates/balance/index.html",
+  friends: "templates/friends/index.html",
+  logs: "templates/logs/index.html",
+  settings: "templates/settings/index.html",
+  subpage: "templates/subpage/index.html",
+  friend: "templates/subpage/friend.html",
+  send: "templates/subpage/send.html",
+  iouActions: "templates/subpage/iou-actions.html",
 };
 
 const pageBinders = {

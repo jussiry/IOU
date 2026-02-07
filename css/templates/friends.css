@@ -1,0 +1,84 @@
+.section h2.section-title {
+  margin-bottom: 16px;
+}
+
+.friends-list {
+  display: grid;
+  gap: 14px;
+}
+
+.friend-row {
+  width: 100%;
+  border: none;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #fff;
+  border-radius: 12px;
+  padding: 10px 12px;
+  box-shadow: 0 10px 20px rgba(15, 12, 8, 0.08);
+  cursor: pointer;
+}
+
+.friend {
+  border-radius: 18px;
+  background: #faf7f2;
+  padding: 6px;
+  transition: background-color 0.25s ease;
+}
+
+.friend[open] {
+  background: #f5efe7;
+}
+
+summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+summary::-webkit-details-marker {
+  display: none;
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.meta {
+  flex: 1;
+}
+
+.meta h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.badge {
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #f0efe9;
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.amount {
+  font-weight: 700;
+  font-size: 16px;
+}
+
+.tx-wrap {
+  height: 0;
+  opacity: 0;
+  transition: height 0.4s ease, opacity 0.25s ease;
+  overflow: hidden;
+  will-change: height, opacity;
+}
+
+.friend[open] .tx-wrap {
+  opacity: 1;
+}

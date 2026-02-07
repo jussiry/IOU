@@ -1,0 +1,71 @@
+.send-card {
+  margin: 12px 20px 0;
+  padding: 20px 18px;
+}
+
+.send-form {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.form-field {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.form-label {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+}
+
+.form-input,
+.form-select,
+.form-textarea {
+  font-family: inherit;
+  font-size: 14px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: #fff;
+  color: var(--ink);
+}
+
+.form-textarea {
+  resize: vertical;
+  min-height: 88px;
+}
+
+.primary-button {
+  margin-top: 4px;
+  border: none;
+  border-radius: 14px;
+  padding: 12px 14px;
+  background: #111;
+  color: #fff;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.send-explainer-card {
+  margin: 16px 20px 0;
+  background: #fff;
+  border-radius: 18px;
+  padding: 16px 18px;
+  box-shadow: 0 10px 20px rgba(15, 12, 8, 0.08);
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.send-explainer-card p {
+  margin: 0 0 10px;
+}
+
+.send-explainer-card p:last-child {
+  margin-bottom: 0;
+}
