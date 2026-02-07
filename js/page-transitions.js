@@ -75,8 +75,20 @@ const normalizeContainer = (container) => {
 export const getSlideDirection = (fromRoute, toRoute, navOrder) => {
   if (!fromRoute || !toRoute) return null;
 
-  if (fromRoute.type === "friend" && toRoute.type === "page") return "from-left";
-  if (toRoute.type === "friend") return "from-right";
+  const getDepth = (route) => {
+    if (!route) return 0;
+    if (route.type === "page") return 0;
+    if (route.type === "friend") return 1;
+    if (route.type === "send") return 2;
+    return 1;
+  };
+
+  const fromDepth = getDepth(fromRoute);
+  const toDepth = getDepth(toRoute);
+
+  if (fromDepth !== toDepth) {
+    return toDepth > fromDepth ? "from-right" : "from-left";
+  }
 
   if (fromRoute.type === "page" && toRoute.type === "page") {
     const fromIndex = navOrder.indexOf(fromRoute.page);
