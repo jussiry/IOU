@@ -26,6 +26,8 @@ const templatePaths = {
   logs: "templates/logs.html",
   settings: "templates/settings.html",
   subpage: "templates/subpage.html",
+  friend: "templates/friend.html",
+  iouActions: "templates/iou-actions.html",
 };
 
 const pageBinders = {
@@ -36,11 +38,17 @@ const pageBinders = {
 let lastMainPage = "balance";
 let currentRoute = null;
 let navigationSequence = 0;
+const templateCache = new Map();
 
 const fetchTemplate = async (path) => {
+  if (templateCache.has(path)) {
+    return templateCache.get(path);
+  }
   const response = await fetch(path, { cache: "no-store" });
   if (!response.ok) throw new Error("Template not found");
-  return response.text();
+  const html = await response.text();
+  templateCache.set(path, html);
+  return html;
 };
 
 const createPageView = (html) => {
@@ -80,6 +88,19 @@ const loadPage = async (route) => {
     }
 
     if (route.type === "friend") {
+      const [friendHtml, actionsHtml] = await Promise.all([
+        fetchTemplate(templatePaths.friend),
+        fetchTemplate(templatePaths.iouActions),
+      ]);
+      const contentSlot = pageView.querySelector('[data-slot="subpage-content"]');
+      if (contentSlot) {
+        contentSlot.innerHTML = friendHtml;
+        const actionsSlot = contentSlot.querySelector('[data-slot="iou-actions"]');
+        if (actionsSlot) {
+          actionsSlot.innerHTML = actionsHtml;
+        }
+      }
+
       bindFriendDetail(pageView, data, route.friendId);
       const friend = data.connections.find((entry) => entry.person_id === route.friendId);
       if (friend?.person_name) {

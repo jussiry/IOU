@@ -241,10 +241,10 @@ export const bindFriends = (root, data) => {
 };
 
 export const bindFriendDetail = (root, data, friendId) => {
-  const titleEl = root.querySelector('[data-bind="subpage-title"]');
-  const labelEl = root.querySelector('[data-bind="subpage-label"]');
-  const amountEl = root.querySelector('[data-bind="subpage-amount"]');
-  const bodyEl = root.querySelector('[data-section="subpage-body"]');
+  const titleEl = root.querySelector('[data-bind="page-title"]');
+  const labelEl = root.querySelector('[data-bind="friend-label"]');
+  const headerRight = root.querySelector('[data-slot="subpage-header-right"]');
+  const bodyEl = root.querySelector('[data-section="friend-body"]');
   const listEl = root.querySelector('[data-list="friend-transactions"]');
   const txTemplate = root.querySelector('[data-template="tx-item"]');
 
@@ -254,10 +254,15 @@ export const bindFriendDetail = (root, data, friendId) => {
 
   if (titleEl) titleEl.textContent = friendName;
   if (labelEl) labelEl.textContent = `My transactions with ${friendFirstName}`;
-  if (amountEl) {
+  if (headerRight) {
     const debt = connection?.debt_eur || 0;
     const label = debt >= 0 ? "owes you" : "you owe";
-    amountEl.innerHTML = `<span class="subpage-amount-label">${label}</span> ${formatSigned(debt)}`;
+    headerRight.innerHTML = `
+      <div class="friend-amount">
+        <span class="friend-amount-label">${label}</span>
+        ${formatSigned(debt)}
+      </div>
+    `;
   }
 
   if (!bodyEl || !listEl || !txTemplate) return;

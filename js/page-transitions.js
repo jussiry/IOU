@@ -8,6 +8,11 @@ const transitionSequences = new WeakMap();
 const prefersReducedMotion = () =>
   window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches ?? false;
 
+const nextPaint = () =>
+  new Promise((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(resolve));
+  });
+
 const waitForTransitionEnd = (element, { timeoutMs = 400 } = {}) =>
   new Promise((resolve) => {
     if (!element) {
@@ -122,12 +127,20 @@ export const swapPage = async (container, nextPage, { direction } = {}) => {
   container.setAttribute("data-transitioning", "true");
   container.appendChild(nextPage);
 
-  await new Promise(requestAnimationFrame);
+  // Ensure the entering page has a committed "offscreen" paint before starting the transition.
+  // This avoids cases on slower devices where only the exiting page animates.
+  nextPage.getBoundingClientRect();
+  currentPage.getBoundingClientRect();
+
+  await nextPaint();
   if (transitionSequences.get(container) !== seq) return;
   currentPage.style.transform = `translateX(${exitEnd})`;
   nextPage.style.transform = "translateX(0%)";
 
-  await waitForTransitionEnd(currentPage, { timeoutMs: 500 });
+  await Promise.all([
+    waitForTransitionEnd(currentPage, { timeoutMs: 650 }),
+    waitForTransitionEnd(nextPage, { timeoutMs: 650 }),
+  ]);
   if (transitionSequences.get(container) !== seq) return;
 
   currentPage.remove();

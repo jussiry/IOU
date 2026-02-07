@@ -1,0 +1,15 @@
+<div class="friend-content">
+  <div data-slot="iou-actions"></div>
+  <div class="balance-hero trust-hero friend-card" data-section="friend-body">
+    <div class="hero-label" data-bind="friend-label">Transactions</div>
+    <ul class="tx-list" data-list="friend-transactions"></ul>
+  </div>
+</div>
+
+<template data-template="tx-item">
+  <li>
+    <span class="tx-date" data-bind="date"></span>
+    <strong class="tx-amount" data-bind="amount"></strong>
+    <span class="tx-note" data-bind="note"></span>
+  </li>
+</template>

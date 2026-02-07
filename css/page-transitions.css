@@ -1,6 +1,8 @@
 .page-stack {
   position: relative;
   display: grid;
+  --page-transition-duration: 320ms;
+  --page-transition-easing: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .page-stack > .page-view {
@@ -10,7 +12,7 @@
 }
 
 .page-stack[data-transitioning="true"] > .page-view {
-  transition: transform 280ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  transition: transform var(--page-transition-duration) var(--page-transition-easing);
   will-change: transform;
 }
 
