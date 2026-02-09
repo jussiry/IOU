@@ -20,10 +20,6 @@ body {
   overflow-x: hidden;
 }
 
-#page-content {
-  padding-bottom: calc(104px + env(safe-area-inset-bottom, 0px));
-}
-
 .app {
   min-height: 100vh;
   display: flex;
