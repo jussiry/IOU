@@ -20,12 +20,6 @@ body {
   overflow-x: hidden;
 }
 
-#page-content {
-  padding-bottom: calc(104px + env(safe-area-inset-bottom, 0px));
-  position: relative;
-  z-index: 0;
-}
-
 .app {
   min-height: 100vh;
   display: flex;
@@ -144,11 +138,7 @@ nav {
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 10000;
-  transform: translate3d(0, 0, 0);
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
-  will-change: transform;
+  z-index: 10;
 }
 
 .nav-bar {

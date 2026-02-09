@@ -1,8 +1,6 @@
 .page-stack {
   position: relative;
   display: grid;
-  z-index: 0;
-  isolation: isolate;
   --page-transition-duration: 320ms;
   --page-transition-easing: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
@@ -11,17 +9,11 @@
   grid-area: 1 / 1;
   width: 100%;
   transform: translateX(0%);
-  position: relative;
-  z-index: 0;
 }
 
 .page-stack[data-transitioning="true"] > .page-view {
   transition: transform var(--page-transition-duration) var(--page-transition-easing);
   will-change: transform;
-}
-
-.page-view.is-entering {
-  z-index: 1;
 }
 
 .page-view.is-exiting {
