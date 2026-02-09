@@ -1,11 +1,11 @@
 {
-  "id": "mo-kaur",
-  "name": "Mo Kaur",
+  "id": "elli",
+  "name": "Elli",
   "connections": [
     {
       "person_id": "you",
       "person_name": "You",
-      "debt_eur": 54.50,
+      "debt_eur": -48.00,
       "trust_credit_limit_eur": 100.00
     }
   ]

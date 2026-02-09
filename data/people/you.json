@@ -3,9 +3,9 @@
   "name": "You",
   "connections": [
     {
-      "person_id": "jamie-tran",
-      "person_name": "Jamie Tran",
-      "debt_eur": 248.50,
+      "person_id": "ville",
+      "person_name": "Ville",
+      "debt_eur": 112.50,
       "trust_credit_limit_eur": 300.00,
       "recent_transactions": [
         {
@@ -25,7 +25,7 @@
         },
         {
           "date": "2026-01-14",
-          "amount_eur": 68.00,
+          "amount_eur": -68.00,
           "note": "Grocery run"
         },
         {
@@ -36,9 +36,9 @@
       ]
     },
     {
-      "person_id": "alex-lin",
-      "person_name": "Alex Lin",
-      "debt_eur": 88.00,
+      "person_id": "pekka",
+      "person_name": "Pekka",
+      "debt_eur": 76.00,
       "trust_credit_limit_eur": 200.00,
       "recent_transactions": [
         {
@@ -63,15 +63,38 @@
         },
         {
           "date": "2026-01-06",
-          "amount_eur": 6.00,
+          "amount_eur": -6.00,
           "note": "Car wash"
         }
       ]
     },
     {
-      "person_id": "mo-kaur",
-      "person_name": "Mo Kaur",
-      "debt_eur": -54.50,
+      "person_id": "elli",
+      "person_name": "Elli",
+      "debt_eur": 48.00,
+      "trust_credit_limit_eur": 180.00,
+      "recent_transactions": [
+        {
+          "date": "2026-02-02",
+          "amount_eur": 42.00,
+          "note": "Weekend trip"
+        },
+        {
+          "date": "2026-01-25",
+          "amount_eur": 18.00,
+          "note": "Dinner split"
+        },
+        {
+          "date": "2026-01-17",
+          "amount_eur": -12.00,
+          "note": "Tickets"
+        }
+      ]
+    },
+    {
+      "person_id": "satu",
+      "person_name": "Satu",
+      "debt_eur": -36.50,
       "trust_credit_limit_eur": 150.00,
       "recent_transactions": [
         {
@@ -91,12 +114,12 @@
         },
         {
           "date": "2026-01-10",
-          "amount_eur": -6.00,
+          "amount_eur": 6.00,
           "note": "Studio snacks"
         },
         {
           "date": "2026-01-03",
-          "amount_eur": -3.00,
+          "amount_eur": 3.00,
           "note": "Parking meter"
         }
       ]

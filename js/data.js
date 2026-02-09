@@ -25,11 +25,71 @@ const fetchJson = async (path) => {
   return response.json();
 };
 
+const mergeBaseData = async (state) => {
+  if (!state?.people) return state;
+  let changed = false;
+
+  const baseYou = await fetchJson("data/people/you.json");
+  if (!state.people.you) {
+    state.people.you = baseYou;
+    return state;
+  }
+
+  const you = state.people.you;
+  you.name = you.name || baseYou.name;
+  you.connections = Array.isArray(you.connections) ? you.connections : [];
+
+  const byId = new Map(you.connections.map((connection) => [connection.person_id, connection]));
+  baseYou.connections.forEach((baseConnection) => {
+    const existing = byId.get(baseConnection.person_id);
+    if (!existing) {
+      you.connections.push({ ...baseConnection });
+      changed = true;
+      return;
+    }
+    if (!existing.person_name && baseConnection.person_name) {
+      existing.person_name = baseConnection.person_name;
+      changed = true;
+    }
+    if (existing.trust_credit_limit_eur == null && baseConnection.trust_credit_limit_eur != null) {
+      existing.trust_credit_limit_eur = baseConnection.trust_credit_limit_eur;
+      changed = true;
+    }
+    if (!Array.isArray(existing.recent_transactions) && Array.isArray(baseConnection.recent_transactions)) {
+      existing.recent_transactions = baseConnection.recent_transactions;
+      changed = true;
+    }
+    if (existing.debt_eur == null && baseConnection.debt_eur != null) {
+      existing.debt_eur = baseConnection.debt_eur;
+      changed = true;
+    }
+  });
+
+  await Promise.all(
+    baseYou.connections.map(async (baseConnection) => {
+      if (state.people[baseConnection.person_id]) return;
+      try {
+        const person = await fetchJson(`data/people/${baseConnection.person_id}.json`);
+        state.people[baseConnection.person_id] = person;
+        changed = true;
+      } catch (error) {
+        // ignore missing people files
+      }
+    })
+  );
+
+  if (changed) {
+    safeLocalStorage.set(state);
+  }
+
+  return state;
+};
+
 const loadState = async () => {
   if (cachedState) return cachedState;
   const stored = safeLocalStorage.get();
   if (stored) {
-    cachedState = stored;
+    cachedState = await mergeBaseData(stored);
     return cachedState;
   }
 
@@ -83,6 +143,10 @@ const buildView = (state) => {
 
   const connectionsWithInbound = connections.map((connection, index) => ({
     ...connection,
+    person_name:
+      state.people?.[connection.person_id]?.name ||
+      connection.person_name ||
+      connection.person_id,
     inbound_credit_limit_eur: inboundCredits[index] || 0,
   }));
 
