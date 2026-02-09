@@ -14,7 +14,7 @@
 
 body {
   margin: 0;
-  background: radial-gradient(120% 120% at 20% -10%, #fff1d7 0%, #f7f4ef 50%, #ecf0ee 100%);
+  background: radial-gradient(120% 120% at 20% -10%, #f4e2c5 0%, #f0ece5 50%, #e4e9e6 100%);
   color: var(--ink);
   font-family: "Space Grotesk", "IBM Plex Sans", "Avenir Next", sans-serif;
   overflow-x: hidden;

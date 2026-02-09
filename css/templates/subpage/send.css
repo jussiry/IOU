@@ -6,7 +6,6 @@
 .send-form {
   display: grid;
   gap: 12px;
-  margin-top: 12px;
 }
 
 .form-field {
@@ -14,6 +13,16 @@
   gap: 6px;
   font-size: 13px;
   color: var(--muted);
+}
+
+.form-field-inline {
+  grid-template-columns: minmax(110px, 1fr) minmax(140px, 1.2fr);
+  align-items: center;
+  gap: 12px;
+}
+
+.form-field-inline .form-label {
+  margin: 0;
 }
 
 .form-label {
@@ -26,12 +35,42 @@
 .form-select,
 .form-textarea {
   font-family: inherit;
-  font-size: 14px;
+  font-size: 18px;
   padding: 10px 12px;
   border-radius: 12px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  border: none;
   background: #fff;
   color: var(--ink);
+  text-align: right;
+}
+
+.form-textarea {
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  text-align: left;
+}
+
+.form-input:focus,
+.form-input:focus-visible,
+.form-select:focus,
+.form-select:focus-visible,
+.form-textarea:focus,
+.form-textarea:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+[data-bind="send-amount"] {
+  text-align: left;
+  font-size: 20px;
+  color: var(--ink);
+  font-weight: 700;
+}
+
+[data-bind="send-to"] {
+  font-size: 20px;
+  text-align: left;
+  color: var(--ink);
+  font-weight: 700;
 }
 
 .form-textarea {
@@ -44,8 +83,8 @@
   border: none;
   border-radius: 14px;
   padding: 12px 14px;
-  background: #2f6fed;
-  color: #fff;
+  background: rgba(244, 184, 96, 0.6);
+  color: var(--ink);
   font-weight: 700;
   font-size: 14px;
   cursor: pointer;
@@ -53,6 +92,7 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
+  box-shadow: 0 10px 20px rgba(15, 12, 8, 0.12);
 }
 
 .primary-button-icon {

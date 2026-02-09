@@ -1,3 +1,5 @@
+<div class="balance-actions" data-slot="iou-actions"></div>
+
 <div class="balance-hero" aria-label="Total balance">
   <div class="hero-label">Current balance</div>
   <div class="hero-amount"><span class="hero-number" data-bind="net-balance"></span></div>
@@ -34,7 +36,7 @@
   <div class="hero-sub">
     <button class="pill toggle" type="button" aria-expanded="false">
       <div class="pill-row">
-        <div>Credit you are given</div>
+        <div><strong>Credit</strong> you are <strong>given</strong></div>
         <strong data-bind="credit-from-others"></strong>
       </div>
       <div class="sub-card" aria-label="Credit you are given">
@@ -43,7 +45,7 @@
     </button>
     <button class="pill toggle" type="button" aria-expanded="false">
       <div class="pill-row">
-        <div>Credit you extend</div>
+        <div><strong>Credit</strong> you have <strong>extended</strong></div>
         <strong data-bind="credit-you-extend"></strong>
       </div>
       <div class="sub-card" aria-label="Credit you extend">

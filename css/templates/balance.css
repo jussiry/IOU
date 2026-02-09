@@ -4,6 +4,10 @@
   margin-top: 12px;
 }
 
+.balance-actions .iou-actions {
+  margin: 18px 20px 10px;
+}
+
 .trust-hero .hero-amount {
   font-weight: 600;
 }
@@ -76,6 +80,11 @@
 
 .pill .pos {
   color: var(--ok);
+}
+
+.inline-list .pos,
+.inline-list .neg {
+  color: inherit;
 }
 
 .sub-card {

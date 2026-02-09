@@ -17,8 +17,9 @@ export const bindFriendDetail = (root, data, friendId) => {
   if (headerRight) {
     const debt = connection?.debt_eur || 0;
     const label = debt >= 0 ? "owes you" : "you owe";
+    const toneClass = debt >= 0 ? "pos" : "neg";
     headerRight.innerHTML = `
-      <div class="friend-amount">
+      <div class="friend-amount ${toneClass}">
         <span class="friend-amount-label">${label}</span>
         ${formatSigned(debt)}
       </div>

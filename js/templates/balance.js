@@ -129,10 +129,12 @@ export const bindBalance = (root, data) => {
   renderInlineList(root, friendsOwe, {
     list: '[data-list="friends-owe"]',
     template: '[data-template="credit-item"]',
+    skipSignClass: true,
   });
   renderInlineList(root, youOwe, {
     list: '[data-list="you-owe"]',
     template: '[data-template="credit-item"]',
+    skipSignClass: true,
   });
 
   const creditFromOthers = data.connections

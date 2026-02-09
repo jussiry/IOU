@@ -2,6 +2,7 @@ import { createTransaction, loadData } from "./data.js";
 import { bindBalance, initBalanceToggles } from "./templates/balance.js";
 import { bindFriends } from "./templates/friends.js";
 import { bindLogs } from "./templates/logs.js";
+import { bindSettings } from "./templates/settings.js";
 import { bindFriendDetail } from "./templates/subpage/friend.js";
 import { initIouActions } from "./templates/subpage/iou-actions.js";
 import { bindSend } from "./templates/subpage/send.js";
@@ -36,6 +37,7 @@ const pageBinders = {
   balance: bindBalance,
   friends: bindFriends,
   logs: bindLogs,
+  settings: bindSettings,
 };
 
 let lastMainPage = "balance";
@@ -157,6 +159,14 @@ const loadPage = async (route) => {
         });
       }
     } else {
+      if (route.page === "balance") {
+        const actionsSlot = pageView.querySelector('[data-slot="iou-actions"]');
+        if (actionsSlot) {
+          const actionsHtml = await fetchTemplate(templatePaths.iouActions);
+          actionsSlot.innerHTML = actionsHtml;
+          initIouActions(pageView, null);
+        }
+      }
       const binder = pageBinders[route.page];
       if (binder) {
         binder(pageView, data);

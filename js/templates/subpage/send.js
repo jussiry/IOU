@@ -15,7 +15,7 @@ export const bindSend = (root, data, friendId) => {
     const friendName = name ? getFirstName(name) : "your friend";
     const otherName = alternate ? getFirstName(alternate) : "another friend";
     explainerEl.innerHTML = `
-      <p>When sending IOU's (I Owe You) you are making a promise of giving something of that value to that person sometime later.</p>
+      <p>When sending IOU's (I Owe You) you are <strong>making a promise</strong> of giving something of that value back some time later.</p>
       <p>This transaction can be redeemed by your friend sending their IOU's back to you. IOU's can also be redeemed in circular cancellation: <strong>you</strong> owe <strong>${friendName}</strong> who owes <strong>${otherName}</strong> who owes <strong>you</strong>. Circular cancellations are made automatically by the system.</p>
     `;
   };

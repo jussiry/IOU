@@ -7,6 +7,14 @@
   box-shadow: 0 10px 20px rgba(15, 12, 8, 0.08);
 }
 
+.friend-amount.pos {
+  color: var(--ok);
+}
+
+.friend-amount.neg {
+  color: var(--danger);
+}
+
 .friend-amount-label {
   font-size: 12px;
   color: var(--muted);

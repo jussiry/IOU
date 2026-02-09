@@ -132,6 +132,15 @@ export const loadData = async () => {
   return buildView(state);
 };
 
+export const resetState = () => {
+  cachedState = null;
+  try {
+    window.localStorage.removeItem(STORAGE_KEY);
+  } catch (error) {
+    // ignore clear failures
+  }
+};
+
 const ensureConnection = (person, friendId, friendName) => {
   if (!person.connections) person.connections = [];
   let connection = person.connections.find((entry) => entry.person_id === friendId);
