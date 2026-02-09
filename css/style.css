@@ -142,7 +142,9 @@ nav {
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 10;
+  z-index: 1000;
+  transform: translateZ(0);
+  will-change: transform;
 }
 
 .nav-bar {
