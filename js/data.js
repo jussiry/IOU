@@ -1,6 +1,6 @@
 const STORAGE_KEY = "iou_state";
 const VERSION_KEY = "iou_version";
-export const APP_VERSION = "0.1.0";
+export const APP_VERSION = "0.1.1";
 let cachedState = null;
 
 const safeLocalStorage = {
