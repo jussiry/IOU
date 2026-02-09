@@ -1,4 +1,4 @@
-import { createTransaction, loadData } from "./data.js";
+import { createTransaction, ensureVersion, loadData } from "./data.js";
 import { bindBalance, initBalanceToggles } from "./templates/balance.js";
 import { bindFriends } from "./templates/friends.js";
 import { bindLogs } from "./templates/logs.js";
@@ -44,6 +44,8 @@ let lastMainPage = "balance";
 let currentRoute = null;
 let navigationSequence = 0;
 const templateCache = new Map();
+
+ensureVersion();
 
 const fetchTemplate = async (path) => {
   if (templateCache.has(path)) {

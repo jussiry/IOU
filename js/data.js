@@ -1,4 +1,6 @@
 const STORAGE_KEY = "iou_state";
+const VERSION_KEY = "iou_version";
+export const APP_VERSION = "0.1.0";
 let cachedState = null;
 
 const safeLocalStorage = {
@@ -17,6 +19,18 @@ const safeLocalStorage = {
       // ignore write failures
     }
   },
+};
+
+export const ensureVersion = () => {
+  try {
+    const storedVersion = window.localStorage.getItem(VERSION_KEY);
+    if (storedVersion !== APP_VERSION) {
+      resetState();
+      window.localStorage.setItem(VERSION_KEY, APP_VERSION);
+    }
+  } catch (error) {
+    // ignore storage failures
+  }
 };
 
 const fetchJson = async (path) => {

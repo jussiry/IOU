@@ -1,3 +1,11 @@
+.settings-version {
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
 .settings-reset {
   margin-top: 14px;
   width: 100%;
