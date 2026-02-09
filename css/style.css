@@ -18,10 +18,13 @@ body {
   color: var(--ink);
   font-family: "Space Grotesk", "IBM Plex Sans", "Avenir Next", sans-serif;
   overflow-x: hidden;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
 .app {
-  min-height: 100vh;
+  flex: 1 0 auto;
   display: flex;
   flex-direction: column;
 }
@@ -134,10 +137,9 @@ nav {
   background: rgba(255, 255, 255, 0.7);
   backdrop-filter: blur(10px);
   border-top: 1px solid rgba(0, 0, 0, 0.05);
-  position: fixed;
-  left: 0;
-  right: 0;
   bottom: 0;
+  position: sticky;
+  margin-top: auto;
   z-index: 10;
 }
 
@@ -187,9 +189,8 @@ nav {
 
   nav {
     width: min(420px, 100%);
-    left: 50%;
-    right: auto;
-    transform: translateX(-50%);
+    margin-left: auto;
+    margin-right: auto;
     border-bottom-left-radius: 40px;
     border-bottom-right-radius: 40px;
   }
