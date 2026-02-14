@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ -n "${IOU_SKIP_VERSION_BUMP:-}" ]]; then
+  exit 0
+fi
+
+repo_root="$(git rev-parse --show-toplevel)"
+cd "$repo_root"
+
+next_version="$(bash scripts/bump-version.sh)"
+
+git add data/version.json
+git commit -m "chore: bump version to ${next_version}" -- data/version.json >/dev/null 2>&1 || true
+
+echo "Version bumped to ${next_version}. Re-run git push to include the new commit."
+exit 1

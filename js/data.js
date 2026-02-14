@@ -1,6 +1,5 @@
 const STORAGE_KEY = "iou_state";
 const VERSION_KEY = "iou_version";
-export const APP_VERSION = "0.1.1";
 let cachedState = null;
 
 const safeLocalStorage = {
@@ -21,12 +20,12 @@ const safeLocalStorage = {
   },
 };
 
-export const ensureVersion = () => {
+export const ensureVersion = (version) => {
   try {
     const storedVersion = window.localStorage.getItem(VERSION_KEY);
-    if (storedVersion !== APP_VERSION) {
+    if (version && storedVersion !== version) {
       resetState();
-      window.localStorage.setItem(VERSION_KEY, APP_VERSION);
+      window.localStorage.setItem(VERSION_KEY, version);
     }
   } catch (error) {
     // ignore storage failures

@@ -1,9 +1,9 @@
-import { APP_VERSION, resetState } from "../data.js";
+import { resetState } from "../data.js";
 
-export const bindSettings = (root) => {
+export const bindSettings = (root, data, appVersion) => {
   const versionEl = root.querySelector('[data-bind="app-version"]');
-  if (versionEl) {
-    versionEl.textContent = `Version ${APP_VERSION}`;
+  if (versionEl && appVersion) {
+    versionEl.textContent = `Version ${appVersion}`;
   }
   const resetButton = root.querySelector('[data-action="reset-state"]');
   if (!resetButton) return;

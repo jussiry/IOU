@@ -9,6 +9,7 @@ import { bindSend } from "./templates/subpage/send.js";
 import { ensureIconSprite } from "./utils/icons.js";
 import { setActiveNav } from "./utils/nav.js";
 import { getSlideDirection, swapPage } from "./page-transitions.js";
+import { getAppVersion } from "./version.js";
 
 const navButtons = Array.from(document.querySelectorAll(".nav-item[data-page]"));
 const contentRoot = document.getElementById("page-content");
@@ -44,6 +45,7 @@ let lastMainPage = "balance";
 let currentRoute = null;
 let navigationSequence = 0;
 const templateCache = new Map();
+let appVersion = null;
 
 ensureVersion();
 
@@ -171,7 +173,7 @@ const loadPage = async (route) => {
       }
       const binder = pageBinders[route.page];
       if (binder) {
-        binder(pageView, data);
+        binder(pageView, data, appVersion);
       }
     }
 
@@ -208,6 +210,8 @@ window.addEventListener("hashchange", () => {
 
 const initApp = async () => {
   await ensureIconSprite();
+  appVersion = await getAppVersion();
+  ensureVersion(appVersion);
   loadPage(parseRoute());
 };
 
