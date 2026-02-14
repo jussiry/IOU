@@ -13,5 +13,6 @@ next_version="$(bash scripts/bump-version.sh)"
 git add data/version.json
 git commit -m "chore: bump version to ${next_version}" -- data/version.json >/dev/null 2>&1 || true
 
-echo "Version bumped to ${next_version}. Re-run git push to include the new commit."
-exit 1
+IOU_SKIP_VERSION_BUMP=1 git push --no-verify "$1" HEAD
+
+echo "Version bumped to ${next_version}."
