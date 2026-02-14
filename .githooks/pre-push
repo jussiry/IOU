@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ -n "${IOU_SKIP_VERSION_BUMP:-}" ]]; then
+  exit 0
+fi
+
+repo_root="$(git rev-parse --show-toplevel)"
+cd "$repo_root"
+
+next_version="$(bash scripts/bump-version.sh)"
+
+echo "Version bumped to ${next_version} (not committed)."
+exit 0
