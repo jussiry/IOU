@@ -4,7 +4,7 @@ import { bindFriends } from "./templates/friends.js";
 import { bindLogs } from "./templates/logs.js";
 import { bindSettings } from "./templates/settings.js";
 import { bindFriendDetail } from "./templates/subpage/friend.js";
-import { initIouActions } from "./templates/subpage/iou-actions.js";
+import { initIouActions } from "./components/iou-actions.js";
 import { bindSend } from "./templates/subpage/send.js";
 import { ensureIconSprite } from "./utils/icons.js";
 import { setActiveNav } from "./utils/nav.js";
@@ -31,7 +31,7 @@ const templatePaths = {
   subpage: "templates/subpage/index.html",
   friend: "templates/subpage/friend.html",
   send: "templates/subpage/send.html",
-  iouActions: "templates/subpage/iou-actions.html",
+  iouActions: "templates/components/iou-actions.html",
 };
 
 const pageBinders = {
