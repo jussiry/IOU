@@ -1,4 +1,4 @@
-import { formatSigned } from "../utils/format.js";
+import { formatSigned } from "../../js/utils/format.js";
 
 export const bindFriends = (root, data) => {
   const listContainer = root.querySelector('[data-list="friends"]');

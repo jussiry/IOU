@@ -1,4 +1,4 @@
-const ICON_SPRITE_PATH = "templates/components/icons.html";
+const ICON_SPRITE_PATH = "modules/components/icons.html";
 let spritePromise = null;
 
 export const ensureIconSprite = async () => {

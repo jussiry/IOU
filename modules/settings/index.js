@@ -1,4 +1,4 @@
-import { resetState } from "../data.js";
+import { resetState } from "../../js/data.js";
 
 export const bindSettings = (root, data, appVersion) => {
   const versionEl = root.querySelector('[data-bind="app-version"]');

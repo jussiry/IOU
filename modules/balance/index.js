@@ -3,7 +3,7 @@ import {
   formatCreditUsage,
   formatNet,
   formatSigned,
-} from "../utils/format.js";
+} from "../../js/utils/format.js";
 
 const closePanel = (button, panel) => {
   if (!panel || button.getAttribute("aria-expanded") !== "true") return;

@@ -1,4 +1,4 @@
-import { formatDate, formatSigned } from "../../utils/format.js";
+import { formatDate, formatSigned } from "../../js/utils/format.js";
 
 export const bindFriendDetail = (root, data, friendId) => {
   const titleEl = root.querySelector('[data-bind="page-title"]');
