@@ -1,10 +1,12 @@
-import { formatDate, formatSigned } from "../../js/utils/format.js";
+import { formatCurrency, formatDate, formatSigned } from "../../js/utils/format.js";
 
 export const bindFriendDetail = (root, data, friendId) => {
   const titleEl = root.querySelector('[data-bind="page-title"]');
   const labelEl = root.querySelector('[data-bind="friend-label"]');
   const headerRight = root.querySelector('[data-slot="subpage-header-right"]');
   const bodyEl = root.querySelector('[data-section="friend-body"]');
+  const creditTitleEl = root.querySelector('[data-bind="credit-title"]');
+  const creditAmountEl = root.querySelector('[data-bind="credit-amount"]');
   const listEl = root.querySelector('[data-list="friend-transactions"]');
   const txTemplate = root.querySelector('[data-template="tx-item"]');
 
@@ -14,6 +16,13 @@ export const bindFriendDetail = (root, data, friendId) => {
 
   if (titleEl) titleEl.textContent = friendName;
   if (labelEl) labelEl.textContent = `My transactions with ${friendFirstName}`;
+  if (creditTitleEl) {
+    creditTitleEl.textContent = `Credit limit with ${friendName}`;
+  }
+  if (creditAmountEl) {
+    const creditLimit = connection?.trust_credit_limit_eur ?? 0;
+    creditAmountEl.textContent = formatCurrency(creditLimit);
+  }
   if (headerRight) {
     const debt = connection?.debt_eur || 0;
     const label = debt >= 0 ? "owes you" : "you owe";
