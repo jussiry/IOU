@@ -5,8 +5,11 @@ export const bindFriendDetail = (root, data, friendId) => {
   const labelEl = root.querySelector('[data-bind="friend-label"]');
   const headerRight = root.querySelector('[data-slot="subpage-header-right"]');
   const bodyEl = root.querySelector('[data-section="friend-body"]');
+  const debtLabelEl = root.querySelector('[data-bind="debt-label"]');
+  const debtAmountEl = root.querySelector('[data-bind="debt-amount"]');
   const creditTitleEl = root.querySelector('[data-bind="credit-title"]');
   const creditAmountEl = root.querySelector('[data-bind="credit-amount"]');
+  const creditButton = root.querySelector('[data-section="credit-limit"]');
   const listEl = root.querySelector('[data-list="friend-transactions"]');
   const txTemplate = root.querySelector('[data-template="tx-item"]');
 
@@ -16,23 +19,32 @@ export const bindFriendDetail = (root, data, friendId) => {
 
   if (titleEl) titleEl.textContent = friendName;
   if (labelEl) labelEl.textContent = `My transactions with ${friendFirstName}`;
-  if (creditTitleEl) {
-    creditTitleEl.textContent = `Credit limit with ${friendName}`;
+  if (headerRight) {
+    headerRight.innerHTML = `
+      <button class="friend-send" type="button" data-action="send" aria-label="Send IOU">
+        <svg class="friend-send-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <use href="#icon-send" />
+        </svg>
+        <span class="friend-send-label">Send</span>
+      </button>
+    `;
   }
+  if (creditTitleEl) creditTitleEl.textContent = "Credit limit";
   if (creditAmountEl) {
     const creditLimit = connection?.trust_credit_limit_eur ?? 0;
     creditAmountEl.textContent = formatCurrency(creditLimit);
   }
-  if (headerRight) {
-    const debt = connection?.debt_eur || 0;
-    const label = debt >= 0 ? "owes you" : "you owe";
-    const toneClass = debt >= 0 ? "pos" : "neg";
-    headerRight.innerHTML = `
-      <div class="friend-amount ${toneClass}">
-        <span class="friend-amount-label">${label}</span>
-        ${formatSigned(debt)}
-      </div>
-    `;
+  if (creditButton && friendId) {
+    creditButton.addEventListener("click", () => {
+      window.location.hash = `credit/${friendId}`;
+    });
+  }
+  const debt = connection?.debt_eur || 0;
+  if (debtLabelEl) debtLabelEl.textContent = debt >= 0 ? "owes you" : "you owe";
+  if (debtAmountEl) {
+    debtAmountEl.textContent = formatSigned(debt);
+    debtAmountEl.classList.toggle("pos", debt >= 0);
+    debtAmountEl.classList.toggle("neg", debt < 0);
   }
 
   if (!bodyEl || !listEl || !txTemplate) return;

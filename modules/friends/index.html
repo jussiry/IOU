@@ -6,7 +6,12 @@
 <template data-template="friend-item">
   <button class="friend-row" type="button">
     <div class="meta">
-      <h3 data-bind="name"></h3>
+      <div class="friend-name">
+        <svg class="friend-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <use href="#icon-person" />
+        </svg>
+        <h3 data-bind="name"></h3>
+      </div>
     </div>
     <span class="badge" data-bind="badge"></span>
     <div class="amount" data-bind="amount"></div>

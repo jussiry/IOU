@@ -1,9 +1,4 @@
-import {
-  formatCurrency,
-  formatCreditUsage,
-  formatNet,
-  formatSigned,
-} from "../../js/utils/format.js";
+import { formatCurrency, formatNet, formatSigned } from "../../js/utils/format.js";
 
 const closePanel = (button, panel) => {
   if (!panel || button.getAttribute("aria-expanded") !== "true") return;
@@ -108,12 +103,14 @@ export const bindBalance = (root, data) => {
   root.querySelector('[data-bind="you-owe-total"]').textContent = formatSigned(
     -data.totals.youOweTotal
   );
-  root.querySelector('[data-bind="credit-from-others"]').textContent = formatCurrency(
-    data.totals.creditFromOthers
+  const creditAgreementsTotalEl = root.querySelector(
+    '[data-bind="credit-agreements-total"]'
   );
-  root.querySelector('[data-bind="credit-you-extend"]').textContent = formatCurrency(
-    data.totals.creditYouExtend
-  );
+  if (creditAgreementsTotalEl) {
+    creditAgreementsTotalEl.textContent = formatCurrency(
+      data.totals.creditAgreements || 0
+    );
+  }
   root.querySelector('[data-bind="available-credit"]').textContent = formatCurrency(
     data.totals.availableCredit
   );
@@ -137,45 +134,20 @@ export const bindBalance = (root, data) => {
     skipSignClass: true,
   });
 
-  const creditFromOthers = data.connections
-    .filter((connection) => (connection.inbound_credit_limit_eur || 0) > 0)
-    .sort((a, b) => b.inbound_credit_limit_eur - a.inbound_credit_limit_eur);
-
-  const creditYouExtend = data.connections
+  const creditAgreements = data.connections
     .filter((connection) => (connection.trust_credit_limit_eur || 0) > 0)
     .sort((a, b) => b.trust_credit_limit_eur - a.trust_credit_limit_eur);
 
   renderInlineList(
     root,
-    creditFromOthers,
+    creditAgreements,
     {
-      list: '[data-list="credit-from-others"]',
+      list: '[data-list="credit-agreements"]',
       template: '[data-template="credit-item"]',
     },
     {
-      formatAmount: (entry) => {
-        const limit = entry.inbound_credit_limit_eur || 0;
-        const used = Math.max(entry.debt_eur || 0, 0);
-        return formatCreditUsage(used, limit);
-      },
-      amountAsHtml: true,
-      skipSignClass: true,
-    }
-  );
-  renderInlineList(
-    root,
-    creditYouExtend,
-    {
-      list: '[data-list="credit-you-extend"]',
-      template: '[data-template="credit-item"]',
-    },
-    {
-      formatAmount: (entry) => {
-        const limit = entry.trust_credit_limit_eur || 0;
-        const used = Math.max(-(entry.debt_eur || 0), 0);
-        return formatCreditUsage(used, limit);
-      },
-      amountAsHtml: true,
+      formatAmount: (entry) => formatCurrency(entry.trust_credit_limit_eur || 0),
+      amountAsHtml: false,
       skipSignClass: true,
     }
   );

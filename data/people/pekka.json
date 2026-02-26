@@ -6,13 +6,13 @@
       "person_id": "you",
       "person_name": "You",
       "debt_eur": -76.00,
-      "trust_credit_limit_eur": 250.00
+      "trust_credit_limit_eur": 200.00
     },
     {
       "person_id": "ville",
       "person_name": "Ville",
       "debt_eur": -36.00,
-      "trust_credit_limit_eur": 90.00
+      "trust_credit_limit_eur": 120.00
     }
   ]
 }

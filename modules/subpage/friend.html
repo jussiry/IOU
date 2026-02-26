@@ -1,17 +1,24 @@
 <div class="friend-content">
-  <div data-slot="iou-actions"></div>
+  <div class="friend-stats" aria-label="Debt and credit">
+    <div class="friend-stat" data-section="friend-debt">
+      <div class="friend-stat-label" data-bind="debt-label">owes you</div>
+      <div class="friend-stat-value">
+        <span class="friend-stat-amount" data-bind="debt-amount">+€0.00</span>
+      </div>
+    </div>
+    <button class="friend-stat friend-stat--credit" type="button" data-section="credit-limit">
+      <div class="friend-stat-label" data-bind="credit-title">Credit limit</div>
+      <div class="friend-stat-value friend-stat-value--small">
+        <span class="friend-stat-amount" data-bind="credit-amount">€0.00</span>
+        <svg class="friend-stat-edit-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <use href="#icon-edit" />
+        </svg>
+      </div>
+    </button>
+  </div>
   <div class="balance-hero trust-hero friend-card" data-section="friend-body">
     <div class="hero-label" data-bind="friend-label">Transactions</div>
     <ul class="tx-list" data-list="friend-transactions"></ul>
-  </div>
-  <div class="friend-credit card" data-section="credit-limit">
-    <div class="friend-credit-title" data-bind="credit-title">
-      Credit limit with Friend
-    </div>
-    <div class="friend-credit-row">
-      <div class="friend-credit-amount" data-bind="credit-amount">€0.00</div>
-      <button class="friend-credit-button" type="button">Change</button>
-    </div>
   </div>
 </div>
 

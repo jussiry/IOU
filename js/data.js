@@ -163,11 +163,7 @@ const buildView = (state) => {
     inbound_credit_limit_eur: inboundCredits[index] || 0,
   }));
 
-  const creditFromOthers = connectionsWithInbound.reduce(
-    (sum, connection) => sum + (connection.inbound_credit_limit_eur || 0),
-    0
-  );
-  const creditYouExtend = connectionsWithInbound.reduce(
+  const creditAgreements = connectionsWithInbound.reduce(
     (sum, connection) => sum + (connection.trust_credit_limit_eur || 0),
     0
   );
@@ -196,8 +192,7 @@ const buildView = (state) => {
       netBalance,
       friendsOweTotal,
       youOweTotal,
-      creditFromOthers,
-      creditYouExtend,
+      creditAgreements,
       availableCredit,
     },
     logs: Array.isArray(state.logs) ? state.logs : [],

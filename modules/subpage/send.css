@@ -66,6 +66,13 @@
   font-weight: 700;
 }
 
+[data-bind="credit-limit"] {
+  text-align: left;
+  font-size: 20px;
+  color: var(--ink);
+  font-weight: 700;
+}
+
 [data-bind="send-to"] {
   font-size: 20px;
   text-align: left;

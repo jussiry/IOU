@@ -52,6 +52,18 @@ summary::-webkit-details-marker {
   flex: 1;
 }
 
+.friend-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.friend-icon {
+  width: 18px;
+  height: 18px;
+  color: var(--muted);
+}
+
 .meta h3 {
   margin: 0;
   font-size: 16px;

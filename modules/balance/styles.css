@@ -61,6 +61,29 @@
   gap: 12px;
 }
 
+.pill-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pill-icon {
+  width: 18px;
+  height: 18px;
+  color: var(--muted);
+}
+
+.pill-text {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.pill-text small {
+  white-space: nowrap;
+}
+
 .pill.toggle .sub-card {
   width: 100%;
 }

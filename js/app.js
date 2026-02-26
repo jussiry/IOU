@@ -6,6 +6,7 @@ import { bindSettings } from "../modules/settings/index.js";
 import { bindFriendDetail } from "../modules/subpage/friend.js";
 import { initIouActions } from "../modules/components/iou-actions.js";
 import { bindSend } from "../modules/subpage/send.js";
+import { bindCredit } from "../modules/subpage/credit.js";
 import { ensureIconSprite } from "./utils/icons.js";
 import { setActiveNav } from "./utils/nav.js";
 import { getSlideDirection, swapPage } from "./page-transitions.js";
@@ -31,6 +32,7 @@ const templatePaths = {
   subpage: "modules/subpage/index.html",
   friend: "modules/subpage/friend.html",
   send: "modules/subpage/send.html",
+  credit: "modules/subpage/credit.html",
   iouActions: "modules/components/iou-actions.html",
 };
 
@@ -46,8 +48,6 @@ let currentRoute = null;
 let navigationSequence = 0;
 const templateCache = new Map();
 let appVersion = null;
-
-ensureVersion();
 
 const fetchTemplate = async (path) => {
   if (templateCache.has(path)) {
@@ -78,6 +78,10 @@ const parseRoute = () => {
     const parts = hash.split("/");
     return { type: "send", friendId: parts[1] || null };
   }
+  if (hash.startsWith("credit/")) {
+    const friendId = hash.replace("credit/", "");
+    return { type: "credit", friendId };
+  }
   return templatePaths[hash] ? { type: "page", page: hash } : { type: "page", page: "balance" };
 };
 
@@ -103,17 +107,10 @@ const loadPage = async (route) => {
     }
 
     if (route.type === "friend") {
-      const [friendHtml, actionsHtml] = await Promise.all([
-        fetchTemplate(templatePaths.friend),
-        fetchTemplate(templatePaths.iouActions),
-      ]);
+      const friendHtml = await fetchTemplate(templatePaths.friend);
       const contentSlot = pageView.querySelector('[data-slot="subpage-content"]');
       if (contentSlot) {
         contentSlot.innerHTML = friendHtml;
-        const actionsSlot = contentSlot.querySelector('[data-slot="iou-actions"]');
-        if (actionsSlot) {
-          actionsSlot.innerHTML = actionsHtml;
-        }
       }
 
       bindFriendDetail(pageView, data, route.friendId);
@@ -160,6 +157,24 @@ const loadPage = async (route) => {
           }
           await createTransaction(payload);
           window.location.hash = `friend/${payload.friendId}`;
+        });
+      }
+    } else if (route.type === "credit") {
+      const creditHtml = await fetchTemplate(templatePaths.credit);
+      const contentSlot = pageView.querySelector('[data-slot="subpage-content"]');
+      if (contentSlot) {
+        contentSlot.innerHTML = creditHtml;
+      }
+      bindCredit(pageView, data, route.friendId);
+      document.title = "IOU — Credit";
+      const backButton = pageView.querySelector("[data-back]");
+      if (backButton) {
+        backButton.addEventListener("click", () => {
+          if (window.history.length > 1) {
+            window.history.back();
+          } else {
+            window.location.hash = lastMainPage || "balance";
+          }
         });
       }
     } else {
