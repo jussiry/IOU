@@ -1,3 +1,9 @@
+/*
+This module reads the app version metadata from static JSON and caches it in memory for the current runtime session.
+
+Other modules use this value to compare against stored version information and decide when local cached state should be reset.
+*/
+
 let cachedVersion = null;
 
 export const getAppVersion = async () => {

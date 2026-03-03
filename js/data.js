@@ -1,3 +1,9 @@
+/*
+This module owns persistent application state. It loads seed JSON data, merges it with localStorage state, and exposes read/write helpers used by UI modules.
+
+The module also derives balance summaries for rendering and records new transactions so data mutations stay centralized and consistent across pages.
+*/
+
 const STORAGE_KEY = "iou_state";
 const VERSION_KEY = "iou_version";
 let cachedState = null;

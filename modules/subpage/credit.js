@@ -1,3 +1,9 @@
+/*
+This module binds the credit-agreement subpage. It initializes form defaults from the selected friend connection and updates copy for create vs change flows.
+
+It returns key form elements to the caller so submit behavior can be handled by higher-level routing logic.
+*/
+
 export const bindCredit = (root, data, friendId) => {
   const titleEl = root.querySelector('[data-bind="page-title"]');
   const limitInput = root.querySelector('[data-bind="credit-limit"]');

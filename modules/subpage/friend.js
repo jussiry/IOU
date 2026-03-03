@@ -1,3 +1,9 @@
+/*
+This module binds the friend detail subpage. It renders debt/credit summary cards, injects friend-specific labels, and lists recent transactions.
+
+It also exposes navigation triggers to related subpages by wiring the credit tile click target from the current friend context.
+*/
+
 import { formatCurrency, formatDate, formatSigned } from "../../js/utils/format.js";
 
 export const bindFriendDetail = (root, data, friendId) => {

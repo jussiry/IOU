@@ -1,3 +1,9 @@
+/*
+This module binds the send-IOU subpage form. It populates selectable friends, updates explanatory copy, and returns a payload reader for submit handling.
+
+The binder keeps send-page specific text and selection behavior local, while submit-side effects remain in the app-level route controller.
+*/
+
 export const bindSend = (root, data, friendId) => {
   const titleEl = root.querySelector('[data-bind="page-title"]');
   const selectEl = root.querySelector('[data-bind="send-to"]');

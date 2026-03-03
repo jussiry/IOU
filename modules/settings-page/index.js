@@ -1,3 +1,9 @@
+/*
+This module binds settings interactions for the app. It renders the current app version and wires the reset action used to clear local test state.
+
+By centralizing settings behavior here, the app shell only needs to pass data and version context without owning button logic.
+*/
+
 import { resetState } from "../../js/data.js";
 
 export const bindSettings = (root, data, appVersion) => {

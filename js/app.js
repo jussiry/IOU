@@ -1,3 +1,9 @@
+/*
+This module is the entry point for the client app. It parses hash routes, loads HTML templates, binds page-specific UI logic, and swaps pages with the transition controller.
+
+It also coordinates shared startup concerns such as icon sprite injection, version-gated local data resets, and active navigation state so all page modules stay focused on rendering.
+*/
+
 import { createTransaction, ensureVersion, loadData } from "./data.js";
 import { bindBalance, initBalanceToggles } from "../modules/balance-page/index.js";
 import { bindFriends } from "../modules/friends-page/index.js";
@@ -49,6 +55,45 @@ let navigationSequence = 0;
 const templateCache = new Map();
 let appVersion = null;
 
+const setRouteUiState = (route) => {
+  if (route.type !== "page") {
+    appRoot?.classList.add("is-subpage");
+    setActiveNav(navButtons, route.mainPage || lastMainPage);
+    return;
+  }
+
+  appRoot?.classList.remove("is-subpage");
+  document.title = pageTitles[route.page] || pageTitles.balance;
+  setActiveNav(navButtons, route.page);
+};
+
+const setFallbackBackNavigation = (pageView) => {
+  const backButton = pageView.querySelector("[data-back]");
+  if (!backButton) return;
+
+  backButton.addEventListener("click", () => {
+    if (window.history.length > 1) {
+      window.history.back();
+    } else {
+      window.location.hash = lastMainPage || "balance";
+    }
+  });
+};
+
+const renderSubpageContent = (pageView, html) => {
+  const contentSlot = pageView.querySelector('[data-slot="subpage-content"]');
+  if (contentSlot) {
+    contentSlot.innerHTML = html;
+  }
+  return contentSlot;
+};
+
+const createSubpageRoute = (type, friendId = null) => ({
+  type,
+  friendId,
+  mainPage: lastMainPage,
+});
+
 const fetchTemplate = async (path) => {
   if (templateCache.has(path)) {
     return templateCache.get(path);
@@ -72,15 +117,15 @@ const parseRoute = () => {
   if (!hash) return { type: "page", page: "balance" };
   if (hash.startsWith("friend/")) {
     const friendId = hash.replace("friend/", "");
-    return { type: "friend", friendId, mainPage: lastMainPage };
+    return createSubpageRoute("friend", friendId);
   }
   if (hash.startsWith("send")) {
     const parts = hash.split("/");
-    return { type: "send", friendId: parts[1] || null, mainPage: lastMainPage };
+    return createSubpageRoute("send", parts[1] || null);
   }
   if (hash.startsWith("credit/")) {
     const friendId = hash.replace("credit/", "");
-    return { type: "credit", friendId, mainPage: lastMainPage };
+    return createSubpageRoute("credit", friendId);
   }
   return templatePaths[hash] ? { type: "page", page: hash } : { type: "page", page: "balance" };
 };
@@ -97,21 +142,11 @@ const loadPage = async (route) => {
     if (sequence !== navigationSequence) return;
 
     const pageView = createPageView(html);
-    if (isSubpage) {
-      appRoot?.classList.add("is-subpage");
-      setActiveNav(navButtons, route.mainPage || lastMainPage);
-    } else {
-      appRoot?.classList.remove("is-subpage");
-      document.title = pageTitles[route.page] || pageTitles.balance;
-      setActiveNav(navButtons, route.page);
-    }
+    setRouteUiState(route);
 
     if (route.type === "friend") {
       const friendHtml = await fetchTemplate(templatePaths.friend);
-      const contentSlot = pageView.querySelector('[data-slot="subpage-content"]');
-      if (contentSlot) {
-        contentSlot.innerHTML = friendHtml;
-      }
+      renderSubpageContent(pageView, friendHtml);
 
       bindFriendDetail(pageView, data, route.friendId);
       const friend = data.connections.find((entry) => entry.person_id === route.friendId);
@@ -121,34 +156,13 @@ const loadPage = async (route) => {
         document.title = "IOU — Friend";
       }
       initIouActions(pageView, route.friendId);
-      const backButton = pageView.querySelector("[data-back]");
-      if (backButton) {
-        backButton.addEventListener("click", () => {
-          if (window.history.length > 1) {
-            window.history.back();
-          } else {
-            window.location.hash = lastMainPage || "balance";
-          }
-        });
-      }
+      setFallbackBackNavigation(pageView);
     } else if (route.type === "send") {
       const sendHtml = await fetchTemplate(templatePaths.send);
-      const contentSlot = pageView.querySelector('[data-slot="subpage-content"]');
-      if (contentSlot) {
-        contentSlot.innerHTML = sendHtml;
-      }
+      renderSubpageContent(pageView, sendHtml);
       const sendHandlers = bindSend(pageView, data, route.friendId);
       document.title = "IOU — Send";
-      const backButton = pageView.querySelector("[data-back]");
-      if (backButton) {
-        backButton.addEventListener("click", () => {
-          if (window.history.length > 1) {
-            window.history.back();
-          } else {
-            window.location.hash = lastMainPage || "balance";
-          }
-        });
-      }
+      setFallbackBackNavigation(pageView);
       if (sendHandlers?.submitEl) {
         sendHandlers.submitEl.addEventListener("click", async () => {
           const payload = sendHandlers.getPayload();
@@ -161,22 +175,10 @@ const loadPage = async (route) => {
       }
     } else if (route.type === "credit") {
       const creditHtml = await fetchTemplate(templatePaths.credit);
-      const contentSlot = pageView.querySelector('[data-slot="subpage-content"]');
-      if (contentSlot) {
-        contentSlot.innerHTML = creditHtml;
-      }
+      renderSubpageContent(pageView, creditHtml);
       bindCredit(pageView, data, route.friendId);
       document.title = "IOU — Credit";
-      const backButton = pageView.querySelector("[data-back]");
-      if (backButton) {
-        backButton.addEventListener("click", () => {
-          if (window.history.length > 1) {
-            window.history.back();
-          } else {
-            window.location.hash = lastMainPage || "balance";
-          }
-        });
-      }
+      setFallbackBackNavigation(pageView);
     } else {
       if (route.page === "balance") {
         const actionsSlot = pageView.querySelector('[data-slot="iou-actions"]');

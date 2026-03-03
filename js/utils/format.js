@@ -1,3 +1,9 @@
+/*
+This module provides formatting helpers shared by UI modules. It normalizes currency, signed money values, and date labels so all screens present values consistently.
+
+It also includes a credit usage formatter for list rows that combine "used" and "limit" values into a display string.
+*/
+
 export const formatCurrency = (value) => `€${Math.abs(value).toFixed(2)}`;
 
 export const formatSigned = (value) =>

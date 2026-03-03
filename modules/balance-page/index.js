@@ -1,3 +1,9 @@
+/*
+This module binds the balance page UI. It renders totals, populates list sections for debts and credit agreements, and controls expandable detail pills.
+
+It keeps all balance-page specific rendering logic local to this module so the app shell can treat the page as a simple binder callback.
+*/
+
 import { formatCurrency, formatNet, formatSigned } from "../../js/utils/format.js";
 
 const closePanel = (button, panel) => {
@@ -108,7 +114,7 @@ export const bindBalance = (root, data) => {
   );
   if (creditAgreementsTotalEl) {
     const total = data.totals.creditAgreements || 0;
-    creditAgreementsTotalEl.textContent = `€${Math.round(total)}`;
+    creditAgreementsTotalEl.textContent = formatCurrency(total);
   }
   root.querySelector('[data-bind="available-credit"]').textContent = formatCurrency(
     data.totals.availableCredit
@@ -145,7 +151,7 @@ export const bindBalance = (root, data) => {
       template: '[data-template="credit-item"]',
     },
     {
-      formatAmount: (entry) => `€${Math.round(entry.trust_credit_limit_eur || 0)}`,
+      formatAmount: (entry) => formatCurrency(entry.trust_credit_limit_eur || 0),
       amountAsHtml: false,
       skipSignClass: true,
     }

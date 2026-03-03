@@ -1,3 +1,9 @@
+/*
+This module binds the logs page and maps log entries into reusable template nodes. It handles timestamp formatting and optional message suffixes per entry.
+
+Keeping log-row assembly isolated here allows the data layer to stay transport-focused while this module owns presentation details.
+*/
+
 export const bindLogs = (root, data) => {
   const listEl = root.querySelector('[data-list="logs"]');
   const itemTemplate = root.querySelector('[data-template="log-item"]');

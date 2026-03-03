@@ -1,128 +1,13 @@
-.send-card {
-  margin: 12px 20px 0;
-  padding: 20px 18px;
-}
-
-.send-form {
-  display: grid;
-  gap: 12px;
-}
-
-.form-field {
-  display: grid;
-  gap: 6px;
-  font-size: 13px;
-  color: var(--muted);
-}
-
-.form-field-inline {
-  grid-template-columns: minmax(110px, 1fr) minmax(140px, 1.2fr);
-  align-items: center;
-  gap: 12px;
-}
-
-.form-field-inline .form-label {
-  margin: 0;
-}
-
-.form-label {
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  font-weight: 600;
-}
-
-.form-input,
-.form-select,
-.form-textarea {
-  font-family: inherit;
-  font-size: 18px;
-  padding: 10px 12px;
-  border-radius: 12px;
-  border: none;
-  background: #fff;
-  color: var(--ink);
-  text-align: right;
-}
-
-.form-textarea {
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  text-align: left;
-}
-
-.form-input:focus,
-.form-input:focus-visible,
-.form-select:focus,
-.form-select:focus-visible,
-.form-textarea:focus,
-.form-textarea:focus-visible {
-  outline: none;
-  box-shadow: none;
-}
-
-[data-bind="send-amount"] {
+.send-form [data-bind="send-amount"] {
   text-align: left;
   font-size: 20px;
   color: var(--ink);
   font-weight: 700;
 }
 
-[data-bind="credit-limit"] {
-  text-align: left;
-  font-size: 20px;
-  color: var(--ink);
-  font-weight: 700;
-}
-
-[data-bind="send-to"] {
+.send-form [data-bind="send-to"] {
   font-size: 20px;
   text-align: left;
   color: var(--ink);
   font-weight: 700;
-}
-
-.form-textarea {
-  resize: vertical;
-  min-height: 88px;
-}
-
-.primary-button {
-  margin-top: 4px;
-  border: none;
-  border-radius: 14px;
-  padding: 12px 14px;
-  background: rgba(244, 184, 96, 0.6);
-  color: var(--ink);
-  font-weight: 700;
-  font-size: 14px;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  box-shadow: 0 10px 20px rgba(15, 12, 8, 0.12);
-}
-
-.primary-button-icon {
-  width: 18px;
-  height: 18px;
-  color: currentColor;
-}
-
-.send-explainer-card {
-  margin: 16px 20px 0;
-  background: #fff;
-  border-radius: 18px;
-  padding: 16px 18px;
-  box-shadow: 0 10px 20px rgba(15, 12, 8, 0.08);
-  color: var(--muted);
-  font-size: 13px;
-  line-height: 1.5;
-}
-
-.send-explainer-card p {
-  margin: 0 0 10px;
-}
-
-.send-explainer-card p:last-child {
-  margin-bottom: 0;
 }

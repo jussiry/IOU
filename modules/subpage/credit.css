@@ -1,0 +1,6 @@
+.send-form [data-bind="credit-limit"] {
+  text-align: left;
+  font-size: 20px;
+  color: var(--ink);
+  font-weight: 700;
+}

@@ -1,3 +1,9 @@
+/*
+This module owns active-state handling for primary navigation buttons. It updates visual active styles and aria-current attributes from a single function.
+
+Centralizing nav state changes prevents duplicated button toggling logic across route handlers.
+*/
+
 export const setActiveNav = (navButtons, page) => {
   if (!page) {
     navButtons.forEach((button) => {

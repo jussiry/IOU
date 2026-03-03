@@ -1,4 +1,16 @@
+/*
+This module renders the friends list page. It sorts friend connections, formats debt and agreement values, and binds click handlers to open friend detail pages.
+
+The formatter helper keeps row amount markup consistent and avoids repeating debt/limit string assembly inside the render loop.
+*/
+
 import { formatSigned } from "../../js/utils/format.js";
+
+const formatDebtWithLimit = (debtValue, creditLimitValue) => {
+  const formattedDebt = formatSigned(debtValue).replace("€", "");
+  const creditLimit = Math.round(creditLimitValue || 0);
+  return `${formattedDebt} <span class="credit-limit">/ ${creditLimit} €</span>`;
+};
 
 export const bindFriends = (root, data) => {
   const listContainer = root.querySelector('[data-list="friends"]');
@@ -23,10 +35,10 @@ export const bindFriends = (root, data) => {
     if (badgeEl) badgeEl.textContent = connection.debt_eur >= 0 ? "owes you" : "you owe";
     if (amountEl) {
       const debtValue = connection.debt_eur || 0;
-      const sign = debtValue >= 0 ? "+" : "−";
-      const debtAmount = Math.abs(debtValue).toFixed(2);
-      const creditLimit = Math.round(connection.trust_credit_limit_eur || 0);
-      amountEl.innerHTML = `${sign}${debtAmount} <span class="credit-limit">/ ${creditLimit} €</span>`;
+      amountEl.innerHTML = formatDebtWithLimit(
+        debtValue,
+        connection.trust_credit_limit_eur
+      );
       amountEl.classList.add(debtValue >= 0 ? "pos" : "neg");
     }
 
