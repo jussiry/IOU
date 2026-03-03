@@ -22,8 +22,12 @@ export const bindFriends = (root, data) => {
     if (nameEl) nameEl.textContent = connection.person_name || connection.person_id;
     if (badgeEl) badgeEl.textContent = connection.debt_eur >= 0 ? "owes you" : "you owe";
     if (amountEl) {
-      amountEl.textContent = formatSigned(connection.debt_eur);
-      amountEl.classList.add(connection.debt_eur >= 0 ? "pos" : "neg");
+      const debtValue = connection.debt_eur || 0;
+      const sign = debtValue >= 0 ? "+" : "−";
+      const debtAmount = Math.abs(debtValue).toFixed(2);
+      const creditLimit = Math.round(connection.trust_credit_limit_eur || 0);
+      amountEl.innerHTML = `${sign}${debtAmount} <span class="credit-limit">/ ${creditLimit} €</span>`;
+      amountEl.classList.add(debtValue >= 0 ? "pos" : "neg");
     }
 
     listContainer.appendChild(node);

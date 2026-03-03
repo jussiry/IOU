@@ -79,9 +79,24 @@ export const getSlideDirection = (fromRoute, toRoute, navOrder) => {
     if (!route) return 0;
     if (route.type === "page") return 0;
     if (route.type === "friend") return 1;
-    if (route.type === "send") return 2;
+    if (route.type === "send" || route.type === "credit") return 2;
     return 1;
   };
+
+  if (fromRoute.type !== "page" && toRoute.type === "page") {
+    const fromPage = fromRoute.mainPage;
+    const toPage = toRoute.page;
+    if (fromPage && toPage) {
+      if (fromPage === toPage) {
+        return "from-left";
+      }
+      const fromIndex = navOrder.indexOf(fromPage);
+      const toIndex = navOrder.indexOf(toPage);
+      if (fromIndex !== -1 && toIndex !== -1 && fromIndex !== toIndex) {
+        return toIndex > fromIndex ? "from-right" : "from-left";
+      }
+    }
+  }
 
   const fromDepth = getDepth(fromRoute);
   const toDepth = getDepth(toRoute);

@@ -72,15 +72,15 @@ const parseRoute = () => {
   if (!hash) return { type: "page", page: "balance" };
   if (hash.startsWith("friend/")) {
     const friendId = hash.replace("friend/", "");
-    return { type: "friend", friendId };
+    return { type: "friend", friendId, mainPage: lastMainPage };
   }
   if (hash.startsWith("send")) {
     const parts = hash.split("/");
-    return { type: "send", friendId: parts[1] || null };
+    return { type: "send", friendId: parts[1] || null, mainPage: lastMainPage };
   }
   if (hash.startsWith("credit/")) {
     const friendId = hash.replace("credit/", "");
-    return { type: "credit", friendId };
+    return { type: "credit", friendId, mainPage: lastMainPage };
   }
   return templatePaths[hash] ? { type: "page", page: hash } : { type: "page", page: "balance" };
 };
@@ -99,7 +99,7 @@ const loadPage = async (route) => {
     const pageView = createPageView(html);
     if (isSubpage) {
       appRoot?.classList.add("is-subpage");
-      setActiveNav(navButtons, null);
+      setActiveNav(navButtons, route.mainPage || lastMainPage);
     } else {
       appRoot?.classList.remove("is-subpage");
       document.title = pageTitles[route.page] || pageTitles.balance;

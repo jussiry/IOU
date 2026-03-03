@@ -107,9 +107,8 @@ export const bindBalance = (root, data) => {
     '[data-bind="credit-agreements-total"]'
   );
   if (creditAgreementsTotalEl) {
-    creditAgreementsTotalEl.textContent = formatCurrency(
-      data.totals.creditAgreements || 0
-    );
+    const total = data.totals.creditAgreements || 0;
+    creditAgreementsTotalEl.textContent = `€${Math.round(total)}`;
   }
   root.querySelector('[data-bind="available-credit"]').textContent = formatCurrency(
     data.totals.availableCredit
@@ -146,7 +145,7 @@ export const bindBalance = (root, data) => {
       template: '[data-template="credit-item"]',
     },
     {
-      formatAmount: (entry) => formatCurrency(entry.trust_credit_limit_eur || 0),
+      formatAmount: (entry) => `€${Math.round(entry.trust_credit_limit_eur || 0)}`,
       amountAsHtml: false,
       skipSignClass: true,
     }
