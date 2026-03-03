@@ -1,8 +1,8 @@
 import { createTransaction, ensureVersion, loadData } from "./data.js";
-import { bindBalance, initBalanceToggles } from "../modules/balance/index.js";
-import { bindFriends } from "../modules/friends/index.js";
-import { bindLogs } from "../modules/logs/index.js";
-import { bindSettings } from "../modules/settings/index.js";
+import { bindBalance, initBalanceToggles } from "../modules/balance-page/index.js";
+import { bindFriends } from "../modules/friends-page/index.js";
+import { bindLogs } from "../modules/logs-page/index.js";
+import { bindSettings } from "../modules/settings-page/index.js";
 import { bindFriendDetail } from "../modules/subpage/friend.js";
 import { initIouActions } from "../modules/components/iou-actions.js";
 import { bindSend } from "../modules/subpage/send.js";
@@ -25,10 +25,10 @@ const pageTitles = {
 };
 
 const templatePaths = {
-  balance: "modules/balance/index.html",
-  friends: "modules/friends/index.html",
-  logs: "modules/logs/index.html",
-  settings: "modules/settings/index.html",
+  balance: "modules/balance-page/index.html",
+  friends: "modules/friends-page/index.html",
+  logs: "modules/logs-page/index.html",
+  settings: "modules/settings-page/index.html",
   subpage: "modules/subpage/index.html",
   friend: "modules/subpage/friend.html",
   send: "modules/subpage/send.html",
