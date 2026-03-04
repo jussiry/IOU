@@ -1,0 +1,8 @@
+{
+  "name": "iou",
+  "private": true,
+  "scripts": {
+    "dev": "node --watch --watch-path=backend --watch-path=client backend/server.js",
+    "start": "node backend/server.js"
+  }
+}

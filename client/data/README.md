@@ -1,6 +1,6 @@
 # IOU Data Model
 
-Each person has a single JSON file under `data/people/`.
+Each person has a single JSON file under `client/data/people/`.
 
 ## Conventions
 - `debt_eur` is from the perspective of the file owner.
@@ -10,7 +10,7 @@ Each person has a single JSON file under `data/people/`.
 - `recent_transactions` (optional) is an array of the most recent transactions between the owner and the connected person.
 
 ## Logs
-`data/logs.json` stores a list of log entries. Each entry includes:
+`client/data/logs.json` stores a list of log entries. Each entry includes:
 - `id`
 - `transaction_id`
 - `timestamp` (ISO)

@@ -20,5 +20,5 @@ Technologies used:
 
 ## Relay bakckends
 
-Node.js backend, that has two main functions: to serve client files and initiate peer-to-peer WebRTC connections between clients. These functionalities should be kept separete since later they may be split into two different servers. Backends may also be used to cache messages for clients that are offline at the time of sending the message.
+Node.js backend, that has two main functions: to serve client files and initiate peer-to-peer WebRTC connections between clients. These functionalities should be kept separete since later they may be split into two different servers. Backends may also be used to cache messages for clients that are offline at the time of sending the message. To keep application decentralized there can be many backends / relay servers, and client can choose in its settings to which servers to connect to.
 

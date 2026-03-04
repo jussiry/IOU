@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-version_file="data/version.json"
+version_file="client/data/version.json"
 
 if [[ ! -f "$version_file" ]]; then
   echo "0.0.1"
