@@ -2,7 +2,7 @@
   "name": "iou",
   "private": true,
   "scripts": {
-    "dev": "node --watch --watch-path=backend --watch-path=client backend/server.js",
+    "dev": "node scripts/dev-watch.js",
     "start": "node backend/server.js"
   }
 }

@@ -8,11 +8,13 @@ const fs = require("fs");
 const fsp = fs.promises;
 const http = require("http");
 const path = require("path");
+const { createDevReload } = require("./devReload");
 
 const HOST = process.env.HOST || "0.0.0.0";
 const PORT = Number(process.env.PORT) || 3000;
 const CLIENT_ROOT = path.resolve(__dirname, "..", "client");
 const INDEX_FILE = path.join(CLIENT_ROOT, "index.html");
+const IS_DEV_SERVER = process.env.IOU_DEV_SERVER === "1";
 
 const MIME_TYPES = new Map([
   [".css", "text/css; charset=utf-8"],
@@ -80,6 +82,8 @@ const sendText = (response, statusCode, message) => {
   response.end(message);
 };
 
+const devReload = createDevReload({ isDevServer: IS_DEV_SERVER, sendText });
+
 const sendFile = async (request, response, filePath) => {
   try {
     const fileStats = await fsp.stat(filePath);
@@ -112,16 +116,26 @@ const sendFile = async (request, response, filePath) => {
 
 const server = http.createServer(async (request, response) => {
   const method = request.method || "GET";
+  const requestUrl = new URL(request.url || "/", `http://${request.headers.host || "localhost"}`);
+
+  if (devReload.handleDevReloadRoute({ method, pathname: requestUrl.pathname, request, response })) {
+    return;
+  }
+
   if (!["GET", "HEAD"].includes(method)) {
     response.setHeader("Allow", "GET, HEAD");
     sendText(response, 405, "Method not allowed.");
     return;
   }
 
-  const requestUrl = new URL(request.url || "/", `http://${request.headers.host || "localhost"}`);
   const filePath = await resolveFilePath(requestUrl.pathname);
   if (!filePath) {
     sendText(response, 404, "Not found.");
+    return;
+  }
+
+  if (devReload.isDevAppEntryPath(requestUrl.pathname)) {
+    await devReload.sendDevAppEntry(request, response, filePath);
     return;
   }
 
@@ -131,3 +145,4 @@ const server = http.createServer(async (request, response) => {
 server.listen(PORT, HOST, () => {
   console.log(`IOU backend server listening on http://${HOST}:${PORT}`);
 });
+devReload.bindShutdownSignals(server);

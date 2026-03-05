@@ -8,6 +8,16 @@
   --shadow: 0 18px 40px rgba(15, 12, 8, 0.12);
 }
 
+
+.surface-box {
+  --surface-radius: 14px;
+  --surface-background: #fff;
+  --surface-shadow: 0 10px 20px rgba(15, 12, 8, 0.08);
+  background: var(--surface-background);
+  border-radius: var(--surface-radius);
+  box-shadow: var(--surface-shadow);
+}
+
 * {
   box-sizing: border-box;
 }
@@ -26,10 +36,22 @@ body {
   flex-direction: column;
 }
 
+.app.is-welcome {
+  min-height: 100vh;
+}
+
+.app.is-welcome header {
+  display: none;
+}
+
 .app.is-subpage {
 }
 
 .app.is-subpage header {
+  display: none;
+}
+
+body.is-welcome nav {
   display: none;
 }
 
@@ -146,6 +168,7 @@ nav {
   grid-template-columns: repeat(4, 1fr);
   gap: 8px;
 }
+
 
 .nav-item {
   appearance: none;

@@ -38,15 +38,13 @@
 }
 
 .subpage-title {
+  --surface-radius: 14px;
   margin: 0;
   font-size: 20px;
   display: inline-flex;
   align-items: center;
-  background: #fff;
   padding: 8px 12px;
-  border-radius: 14px;
   border: 1px solid rgba(17, 17, 17, 0.06);
-  box-shadow: 0 10px 20px rgba(15, 12, 8, 0.08);
   margin-right: auto;
 }
 

@@ -1,0 +1,76 @@
+.welcome-screen {
+  min-height: 100vh;
+  padding: 24px;
+  display: grid;
+  align-items: center;
+}
+
+.welcome-card {
+  background: rgba(255, 255, 255, 0.92);
+  border-radius: 28px;
+  padding: 28px 24px;
+  box-shadow: 0 22px 44px rgba(14, 14, 14, 0.14);
+  display: grid;
+  gap: 16px;
+}
+
+.welcome-card h1 {
+  margin: 0;
+  font-size: 30px;
+  line-height: 1.15;
+}
+
+.welcome-copy {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.45;
+  font-size: 16px;
+}
+
+.welcome-form {
+  display: grid;
+  gap: 14px;
+}
+
+.welcome-label {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.welcome-input {
+  border: none;
+  border-radius: 16px;
+  padding: 14px 16px;
+  font-size: 20px;
+  font-weight: 600;
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--ink);
+}
+
+.welcome-input:focus {
+  outline: none;
+}
+
+.welcome-error {
+  margin: 0;
+  color: var(--danger);
+  font-size: 13px;
+}
+
+.welcome-create {
+  border: none;
+  border-radius: 18px;
+  padding: 18px 20px;
+  font-size: 20px;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, #1f6ecf, #0b519f);
+  box-shadow: 0 16px 28px rgba(16, 64, 125, 0.28);
+  cursor: pointer;
+}
+
+.welcome-create:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}

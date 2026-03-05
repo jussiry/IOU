@@ -4,10 +4,8 @@
 }
 
 .log-item {
-  background: #fff;
-  border-radius: 12px;
+  --surface-radius: 12px;
   padding: 10px 12px;
-  box-shadow: 0 10px 20px rgba(15, 12, 8, 0.08);
   display: grid;
   grid-template-columns: auto 1fr;
   gap: 12px;

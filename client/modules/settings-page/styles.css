@@ -1,3 +1,48 @@
+.settings-user {
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.settings-field {
+  display: inline-flex;
+  align-items: center;
+}
+
+.settings-field-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--muted);
+  margin-right: 0.5em;
+}
+
+.settings-field-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.settings-edit-name {
+  border: 1px solid rgba(17, 17, 17, 0.08);
+  background: #f6f6f6;
+  color: var(--ink);
+  border-radius: 10px;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.settings-edit-name svg {
+  width: 18px;
+  height: 18px;
+}
+
 .settings-version {
   margin-top: 18px;
   color: var(--muted);
@@ -6,15 +51,22 @@
   text-transform: uppercase;
 }
 
-.settings-reset {
+.settings-remove {
+  --surface-radius: 14px;
   margin-top: 14px;
   width: 100%;
-  border: 1px solid rgba(17, 17, 17, 0.08);
-  border-radius: 14px;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   padding: 12px 14px;
-  background: #fff;
-  color: var(--ink);
+  color: var(--danger);
   font-weight: 600;
   cursor: pointer;
-  box-shadow: 0 10px 20px rgba(15, 12, 8, 0.08);
+}
+
+.settings-remove-icon {
+  width: 17px;
+  height: 17px;
 }

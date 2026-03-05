@@ -1,6 +1,6 @@
 # IOU Data Model
 
-Each person has a single JSON file under `client/data/people/`.
+Runtime user data is persisted in IndexedDB. Seed person fixtures used for tests live under `tests/people/`.
 
 ## Conventions
 - `debt_eur` is from the perspective of the file owner.
@@ -10,7 +10,7 @@ Each person has a single JSON file under `client/data/people/`.
 - `recent_transactions` (optional) is an array of the most recent transactions between the owner and the connected person.
 
 ## Logs
-`client/data/logs.json` stores a list of log entries. Each entry includes:
+`client/data/logs.json` can store seed log fixtures. Runtime logs are persisted in IndexedDB. Each log entry includes:
 - `id`
 - `transaction_id`
 - `timestamp` (ISO)

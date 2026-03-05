@@ -4,11 +4,18 @@ This module is the entry point for the client app. It parses hash routes, loads 
 It also coordinates shared startup concerns such as icon sprite injection, version-gated local data resets, and active navigation state so all page modules stay focused on rendering.
 */
 
-import { createTransaction, ensureVersion, loadData } from "./data.js";
+import {
+  createTransaction,
+  createUser,
+  ensureVersion,
+  hasUserData,
+  loadData,
+} from "./data.js";
 import { bindBalance, initBalanceToggles } from "../modules/balance-page/index.js";
 import { bindFriends } from "../modules/friends-page/index.js";
 import { bindLogs } from "../modules/logs-page/index.js";
 import { bindSettings } from "../modules/settings-page/index.js";
+import { bindWelcome } from "../modules/welcome-page/index.js";
 import { bindFriendDetail } from "../modules/subpage/friend.js";
 import { initIouActions } from "../modules/components/iou-actions.js";
 import { bindSend } from "../modules/subpage/send.js";
@@ -31,6 +38,7 @@ const pageTitles = {
 };
 
 const templatePaths = {
+  welcome: "modules/welcome-page/index.html",
   balance: "modules/balance-page/index.html",
   friends: "modules/friends-page/index.html",
   logs: "modules/logs-page/index.html",
@@ -56,6 +64,17 @@ const templateCache = new Map();
 let appVersion = null;
 
 const setRouteUiState = (route) => {
+  const isWelcome = route.type === "welcome";
+  appRoot?.classList.toggle("is-welcome", isWelcome);
+  document.body.classList.toggle("is-welcome", isWelcome);
+
+  if (isWelcome) {
+    appRoot?.classList.remove("is-subpage");
+    document.title = "IOU — Welcome";
+    setActiveNav(navButtons, null);
+    return;
+  }
+
   if (route.type !== "page") {
     appRoot?.classList.add("is-subpage");
     setActiveNav(navButtons, route.mainPage || lastMainPage);
@@ -115,6 +134,9 @@ const createPageView = (html) => {
 const parseRoute = () => {
   const hash = window.location.hash.replace("#", "");
   if (!hash) return { type: "page", page: "balance" };
+  if (hash === "welcome") {
+    return { type: "welcome" };
+  }
   if (hash.startsWith("friend/")) {
     const friendId = hash.replace("friend/", "");
     return createSubpageRoute("friend", friendId);
@@ -127,24 +149,64 @@ const parseRoute = () => {
     const friendId = hash.replace("credit/", "");
     return createSubpageRoute("credit", friendId);
   }
-  return templatePaths[hash] ? { type: "page", page: hash } : { type: "page", page: "balance" };
+  return pageTitles[hash] ? { type: "page", page: hash } : { type: "page", page: "balance" };
+};
+
+const resolveRouteForUserState = async (route) => {
+  const userExists = await hasUserData();
+
+  if (!userExists) {
+    if (route.type !== "welcome") {
+      window.location.hash = "welcome";
+      return null;
+    }
+    return route;
+  }
+
+  if (route.type === "welcome") {
+    window.location.hash = "balance";
+    return null;
+  }
+
+  return route;
 };
 
 const loadPage = async (route) => {
-  const isSubpage = route.type !== "page";
-  const target = isSubpage
+  const isWelcome = route.type === "welcome";
+  const isSubpage = !isWelcome && route.type !== "page";
+  const target = isWelcome
+    ? templatePaths.welcome
+    : isSubpage
     ? templatePaths.subpage
     : templatePaths[route.page] || templatePaths.balance;
-  const direction = getSlideDirection(currentRoute, route, navOrder);
+  const direction =
+    isWelcome || currentRoute?.type === "welcome"
+      ? null
+      : getSlideDirection(currentRoute, route, navOrder);
   const sequence = (navigationSequence += 1);
+
   try {
-    const [html, data] = await Promise.all([fetchTemplate(target), loadData()]);
+    const [html, data] = await Promise.all([
+      fetchTemplate(target),
+      isWelcome ? Promise.resolve(null) : loadData(),
+    ]);
     if (sequence !== navigationSequence) return;
+    if (!isWelcome && !data) {
+      window.location.hash = "welcome";
+      return;
+    }
 
     const pageView = createPageView(html);
     setRouteUiState(route);
 
-    if (route.type === "friend") {
+    if (route.type === "welcome") {
+      bindWelcome(pageView, {
+        onCreateUser: async (name) => {
+          await createUser(name);
+          window.location.hash = "balance";
+        },
+      });
+    } else if (route.type === "friend") {
       const friendHtml = await fetchTemplate(templatePaths.friend);
       renderSubpageContent(pageView, friendHtml);
 
@@ -194,7 +256,9 @@ const loadPage = async (route) => {
       }
     }
 
-    initBalanceToggles(pageView);
+    if (!isWelcome) {
+      initBalanceToggles(pageView);
+    }
     await swapPage(contentRoot, pageView, { direction });
     if (sequence !== navigationSequence) return;
 
@@ -221,15 +285,22 @@ navButtons.forEach((button) => {
   });
 });
 
+const loadActiveRoute = async () => {
+  const parsedRoute = parseRoute();
+  const resolvedRoute = await resolveRouteForUserState(parsedRoute);
+  if (!resolvedRoute) return;
+  await loadPage(resolvedRoute);
+};
+
 window.addEventListener("hashchange", () => {
-  loadPage(parseRoute());
+  void loadActiveRoute();
 });
 
 const initApp = async () => {
   await ensureIconSprite();
   appVersion = await getAppVersion();
-  ensureVersion(appVersion);
-  loadPage(parseRoute());
+  await ensureVersion(appVersion);
+  await loadActiveRoute();
 };
 
-initApp();
+void initApp();

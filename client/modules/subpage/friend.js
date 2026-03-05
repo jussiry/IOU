@@ -27,7 +27,7 @@ export const bindFriendDetail = (root, data, friendId) => {
   if (labelEl) labelEl.textContent = `My transactions with ${friendFirstName}`;
   if (headerRight) {
     headerRight.innerHTML = `
-      <button class="friend-send" type="button" data-action="send" aria-label="Send IOU">
+      <button class="friend-send surface-box" type="button" data-action="send" aria-label="Send IOU">
         <svg class="friend-send-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
           <use href="#icon-send" />
         </svg>

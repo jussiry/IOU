@@ -1,0 +1,25 @@
+<section class="welcome-screen" data-section="welcome">
+  <div class="welcome-card">
+    <h1>Welcome to IOU</h1>
+    <p class="welcome-copy">
+      IOU is a peer-to-peer app for tracking trust-based credit between people you know, so you
+      can send and receive informal promises of value directly with friends.
+    </p>
+
+    <form class="welcome-form" data-form="welcome">
+      <label class="welcome-label" for="welcome-name">Choose a name</label>
+      <input
+        id="welcome-name"
+        class="welcome-input"
+        type="text"
+        autocomplete="nickname"
+        maxlength="40"
+        data-bind="welcome-name"
+      />
+      <p class="welcome-error" data-bind="welcome-error" hidden></p>
+      <button class="welcome-create" type="submit" data-action="create-user">
+        Create a user
+      </button>
+    </form>
+  </div>
+</section>

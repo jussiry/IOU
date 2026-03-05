@@ -6,9 +6,9 @@ name = "IOU"
 script = ""
 
 [[actions]]
-name = "Run"
+name = "Run dev"
 icon = "run"
 command = '''
 cd ~/code/IOU
-npx browser-sync start --server --files "**/*.html, **/*.css, **/*.js, **/*.json"
+npm run dev
 '''
