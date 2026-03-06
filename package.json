@@ -2,7 +2,10 @@
   "name": "iou",
   "private": true,
   "scripts": {
-    "dev": "node scripts/dev-watch.js",
+    "dev": "nodemon --watch backend --watch client --ext js,html,css,json backend/server.js",
     "start": "node backend/server.js"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.10"
   }
 }
