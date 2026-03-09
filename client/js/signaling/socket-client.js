@@ -4,7 +4,7 @@ This module owns the browser-side websocket connection used for development relo
 The reconnect loop is intentionally small and self-contained. The websocket close event signals that the backend restarted, and a successful reconnect is treated as the point where reloading the browser is safe.
 */
 
-const RECONNECT_DELAY_MS = 100;
+const RECONNECT_DELAY_MS = 5000;
 const isDevServer = window.location.hostname === 'localhost'
 
 const getSocketUrl = () => {
@@ -36,7 +36,7 @@ const createSignalingClient = () => {
 
   const connect = () => {
     const socket = new WebSocket(getSocketUrl());
-
+    window.socket = socket
     socket.addEventListener("open", () => {
       clearReconnectTimer();
       if (isWaitingForReconnect && isDevServer) {

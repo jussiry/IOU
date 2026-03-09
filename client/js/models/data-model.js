@@ -11,16 +11,37 @@ const asNumberOrDefault = (value, defaultValue = 0) => {
   return Number.isFinite(parsedValue) ? parsedValue : defaultValue;
 };
 
+export const normalizeCurrencyAmount = (value, defaultValue = 0) => {
+  return asNumberOrDefault(value, defaultValue);
+};
+
 const asStringOrDefault = (value, defaultValue = "") => {
   return typeof value === "string" ? value : defaultValue;
 };
 
+const asTrimmedStringOrDefault = (value, defaultValue = "") => {
+  return asStringOrDefault(value, defaultValue).trim();
+};
+
+const normalizeConnectionList = (connections) => {
+  if (!Array.isArray(connections)) return [];
+
+  const normalizedConnections = new Map();
+  connections.forEach((connection) => {
+    const normalizedConnection = createConnectionModel(connection);
+    if (!normalizedConnection.person_id) return;
+    normalizedConnections.set(normalizedConnection.person_id, normalizedConnection);
+  });
+
+  return Array.from(normalizedConnections.values());
+};
+
 export const createTransactionModel = (input = {}) => {
   return {
-    id: asStringOrDefault(input.id),
-    date: asStringOrDefault(input.date),
+    id: asTrimmedStringOrDefault(input.id),
+    date: asTrimmedStringOrDefault(input.date),
     amount_eur: asNumberOrDefault(input.amount_eur, 0),
-    note: asStringOrDefault(input.note),
+    note: asTrimmedStringOrDefault(input.note),
   };
 };
 
@@ -30,41 +51,49 @@ export const createConnectionModel = (input = {}) => {
     : [];
 
   return {
-    person_id: asStringOrDefault(input.person_id),
-    person_name: asStringOrDefault(input.person_name),
+    person_id: asTrimmedStringOrDefault(input.person_id),
+    person_name: asTrimmedStringOrDefault(input.person_name),
     debt_eur: asNumberOrDefault(input.debt_eur, 0),
     trust_credit_limit_eur: asNumberOrDefault(input.trust_credit_limit_eur, 0),
     recent_transactions: transactions,
   };
 };
 
-export const createPersonModel = (input = {}) => {
-  const normalizedName = asStringOrDefault(input.name).trim();
-  const normalizedPublicKey = asStringOrDefault(input.public_key).trim();
-  const personId = asStringOrDefault(input.id).trim() || normalizedPublicKey;
-  const connections = Array.isArray(input.connections)
-    ? input.connections.map((connection) => createConnectionModel(connection))
-    : [];
+export const createPersonModel = (input = {}, options = {}) => {
+  const { includePrivateKeys = true } = options;
+  const normalizedName = asTrimmedStringOrDefault(input.name);
+  const normalizedId = asTrimmedStringOrDefault(input.id);
+  const normalizedPublicKey = asTrimmedStringOrDefault(input.public_key);
+  const personId = normalizedPublicKey || normalizedId;
+  const connections = normalizeConnectionList(input.connections);
 
   return {
     id: personId,
     name: normalizedName || "Anonymous",
-    public_key: normalizedPublicKey || personId,
-    public_key_hex: asStringOrDefault(input.public_key_hex),
-    private_key: asStringOrDefault(input.private_key),
-    private_key_hex: asStringOrDefault(input.private_key_hex),
+    public_key: personId,
+    public_key_hex: asTrimmedStringOrDefault(input.public_key_hex),
+    private_key: includePrivateKeys
+      ? asTrimmedStringOrDefault(input.private_key)
+      : "",
+    private_key_hex: includePrivateKeys
+      ? asTrimmedStringOrDefault(input.private_key_hex)
+      : "",
     connections,
   };
 };
 
+export const createPublicPersonModel = (input = {}) => {
+  return createPersonModel(input, { includePrivateKeys: false });
+};
+
 export const createLogEntryModel = (input = {}) => {
   return {
-    id: asStringOrDefault(input.id),
-    transaction_id: asStringOrDefault(input.transaction_id),
-    timestamp: asStringOrDefault(input.timestamp),
-    text: asStringOrDefault(input.text),
-    message: asStringOrDefault(input.message),
-    friend_id: asStringOrDefault(input.friend_id),
+    id: asTrimmedStringOrDefault(input.id),
+    transaction_id: asTrimmedStringOrDefault(input.transaction_id),
+    timestamp: asTrimmedStringOrDefault(input.timestamp),
+    text: asTrimmedStringOrDefault(input.text),
+    message: asTrimmedStringOrDefault(input.message),
+    friend_id: asTrimmedStringOrDefault(input.friend_id),
     amount_eur: asNumberOrDefault(input.amount_eur, 0),
   };
 };
@@ -82,7 +111,7 @@ export const normalizeContactsMap = (contacts) => {
   if (!contacts || typeof contacts !== "object") return {};
 
   return Object.entries(contacts).reduce((normalizedContacts, [contactKey, contactValue]) => {
-    const normalizedContact = createPersonModel({
+    const normalizedContact = createPublicPersonModel({
       ...contactValue,
       id: contactValue?.id || contactKey,
       public_key: contactValue?.public_key || contactKey,

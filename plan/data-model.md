@@ -8,7 +8,7 @@ Runtime state is stored in IndexedDB (`iou_client_db`, object store `app_state`,
 {
   "model_version": 1,
   "user": { "...": "PersonModel" },
-  "contacts": { "<npub>": { "...": "PersonModel" } },
+  "contacts": { "<npub>": { "...": "ContactPersonModel" } },
   "logs": [{ "...": "LogEntryModel" }]
 }
 ```
@@ -28,6 +28,10 @@ Runtime state is stored in IndexedDB (`iou_client_db`, object store `app_state`,
 ```
 
 `id` uses the same `npub` format as Nostr and is the canonical user ID.
+
+## ContactPersonModel
+
+Same as `PersonModel`, except contact records do not store `private_key` or `private_key_hex`.
 
 ## ConnectionModel
 

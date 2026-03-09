@@ -18,6 +18,7 @@ Runtime user data is persisted in IndexedDB. Seed person fixtures used for tests
 - `message` (optional detail)
 
 ## Example fields
-- `id`: stable identifier for the person.
+- `id`: stable identifier for the person. Runtime records use the Nostr `npub` public key as the canonical ID.
 - `name`: display name.
 - `connections`: array of connected people and the current debt/credit limits between them.
+- Only the local user record stores private key material. Contact records keep public identity data only.

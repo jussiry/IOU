@@ -9,19 +9,28 @@ import {
   createEmptyAppState,
   createLogEntryModel,
   createPersonModel,
+  createPublicPersonModel,
   createTransactionModel,
+  normalizeCurrencyAmount,
   normalizeAppState,
 } from "./models/data-model.js";
-import { deleteAppDatabase, loadAppState, saveAppState } from "./storage/indexeddb.js";
+import {
+  clearAppState,
+  loadAppState,
+  saveAppState,
+} from "./storage/indexeddb.js";
 import { generateNostrKeyPair } from "./utils/nostr-keys.js";
 
 const VERSION_KEY = "iou_version";
-const LEGACY_STORAGE_KEY = "iou_state";
 
 let cachedState = null;
 
 const hasUser = (state) => {
-  return Boolean(state?.user?.id && state?.user?.public_key);
+  return Boolean(
+    state?.user?.id &&
+      state?.user?.public_key &&
+      state.user.id === state.user.public_key
+  );
 };
 
 const loadState = async () => {
@@ -32,9 +41,14 @@ const loadState = async () => {
 };
 
 const persistState = async (state) => {
-  cachedState = state;
-  await saveAppState(state);
-  return state;
+  const normalizedState = normalizeAppState(state);
+  if (!normalizedState) {
+    throw new Error("Cannot persist invalid application state.");
+  }
+
+  cachedState = normalizedState;
+  await saveAppState(normalizedState);
+  return normalizedState;
 };
 
 const ensureContacts = (state) => {
@@ -43,16 +57,28 @@ const ensureContacts = (state) => {
   }
 };
 
+const asTrimmedString = (value) => {
+  return typeof value === "string" ? value.trim() : "";
+};
+
 const ensureConnection = (person, friendId, friendName) => {
+  const normalizedFriendId = asTrimmedString(friendId);
+  const normalizedFriendName = asTrimmedString(friendName);
+  if (!normalizedFriendId) {
+    return null;
+  }
+
   if (!Array.isArray(person.connections)) {
     person.connections = [];
   }
 
-  let connection = person.connections.find((entry) => entry.person_id === friendId);
+  let connection = person.connections.find(
+    (entry) => entry.person_id === normalizedFriendId
+  );
   if (!connection) {
     connection = createConnectionModel({
-      person_id: friendId,
-      person_name: friendName || friendId,
+      person_id: normalizedFriendId,
+      person_name: normalizedFriendName || normalizedFriendId,
       debt_eur: 0,
       trust_credit_limit_eur: 0,
       recent_transactions: [],
@@ -60,7 +86,8 @@ const ensureConnection = (person, friendId, friendName) => {
     person.connections.push(connection);
   }
 
-  connection.person_name = connection.person_name || friendName || friendId;
+  connection.person_name =
+    normalizedFriendName || connection.person_name || normalizedFriendId;
   if (!Array.isArray(connection.recent_transactions)) {
     connection.recent_transactions = [];
   }
@@ -69,16 +96,25 @@ const ensureConnection = (person, friendId, friendName) => {
 };
 
 const ensureContact = (state, contactId, contactName) => {
-  ensureContacts(state);
-  if (state.contacts[contactId]) {
-    return state.contacts[contactId];
+  const normalizedContactId = asTrimmedString(contactId);
+  const normalizedContactName = asTrimmedString(contactName);
+  if (!normalizedContactId) {
+    return null;
   }
 
-  const contact = createPersonModel({
-    id: contactId,
-    name: contactName || contactId,
-    public_key: contactId,
-    private_key: "",
+  ensureContacts(state);
+  if (state.contacts[normalizedContactId]) {
+    const existingContact = state.contacts[normalizedContactId];
+    if (normalizedContactName) {
+      existingContact.name = normalizedContactName;
+    }
+    return existingContact;
+  }
+
+  const contact = createPublicPersonModel({
+    id: normalizedContactId,
+    name: normalizedContactName || normalizedContactId,
+    public_key: normalizedContactId,
     connections: [],
   });
   state.contacts[contact.id] = contact;
@@ -86,9 +122,12 @@ const ensureContact = (state, contactId, contactName) => {
 };
 
 const createId = (prefix = "tx") => {
-  return `${prefix}_${Date.now().toString(36)}_${Math.random()
-    .toString(36)
-    .slice(2, 7)}`;
+  if (window.crypto?.randomUUID) {
+    return `${prefix}_${window.crypto.randomUUID()}`;
+  }
+
+  const randomToken = Math.random().toString(36).slice(2, 10);
+  return `${prefix}_${Date.now().toString(36)}_${randomToken}`;
 };
 
 const buildView = (state) => {
@@ -129,7 +168,7 @@ const buildView = (state) => {
   }, 0);
 
   return {
-    you: user,
+    you: createPublicPersonModel(user),
     connections: connectionsWithInbound,
     totals: {
       netBalance,
@@ -142,13 +181,25 @@ const buildView = (state) => {
   };
 };
 
+const syncUserNameAcrossContacts = (state) => {
+  if (!hasUser(state)) return;
+
+  Object.values(state.contacts || {}).forEach((contact) => {
+    const userConnection = Array.isArray(contact.connections)
+      ? contact.connections.find((entry) => entry.person_id === state.user.id)
+      : null;
+    if (!userConnection) return;
+    userConnection.person_name = state.user.name;
+  });
+};
+
 export const hasUserData = async () => {
   const state = await loadState();
   return hasUser(state);
 };
 
 export const createUser = async (name) => {
-  const trimmedName = typeof name === "string" ? name.trim() : "";
+  const trimmedName = asTrimmedString(name);
   const {
     privateKeyHex,
     privateKeyNsec,
@@ -167,8 +218,8 @@ export const createUser = async (name) => {
   });
 
   const state = createEmptyAppState(user);
-  await persistState(state);
-  return buildView(state);
+  const persistedState = await persistState(state);
+  return buildView(persistedState);
 };
 
 export const loadData = async () => {
@@ -180,7 +231,7 @@ export const loadData = async () => {
 };
 
 export const updateUserName = async (name) => {
-  const trimmedName = typeof name === "string" ? name.trim() : "";
+  const trimmedName = asTrimmedString(name);
   if (!trimmedName) {
     return loadData();
   }
@@ -191,8 +242,9 @@ export const updateUserName = async (name) => {
   }
 
   state.user.name = trimmedName;
-  await persistState(state);
-  return buildView(state);
+  syncUserNameAcrossContacts(state);
+  const persistedState = await persistState(state);
+  return buildView(persistedState);
 };
 
 export const ensureVersion = async (version) => {
@@ -210,13 +262,12 @@ export const ensureVersion = async (version) => {
 export const resetState = async () => {
   cachedState = null;
   try {
-    await deleteAppDatabase();
+    await clearAppState();
   } catch (error) {
-    // ignore delete failures
+    // ignore clear failures
   }
 
   try {
-    window.localStorage.removeItem(LEGACY_STORAGE_KEY);
     window.localStorage.removeItem(VERSION_KEY);
   } catch (error) {
     // ignore clear failures
@@ -224,7 +275,9 @@ export const resetState = async () => {
 };
 
 export const createTransaction = async ({ friendId, amount, message }) => {
-  if (!friendId || !amount || amount <= 0) {
+  const normalizedFriendId = asTrimmedString(friendId);
+  const normalizedAmount = normalizeCurrencyAmount(amount, NaN);
+  if (!normalizedFriendId || !Number.isFinite(normalizedAmount) || normalizedAmount <= 0) {
     return loadData();
   }
 
@@ -232,17 +285,27 @@ export const createTransaction = async ({ friendId, amount, message }) => {
   if (!hasUser(state)) {
     return null;
   }
+  if (normalizedFriendId === state.user.id) {
+    return loadData();
+  }
 
   const user = state.user;
-  const friend = ensureContact(state, friendId, friendId);
-  const friendName = friend?.name || friendId;
-  const trimmedMessage = typeof message === "string" ? message.trim() : "";
+  const friend = ensureContact(state, normalizedFriendId, normalizedFriendId);
+  if (!friend) {
+    return loadData();
+  }
 
-  const userConnection = ensureConnection(user, friendId, friendName);
+  const friendName = friend.name || normalizedFriendId;
+  const trimmedMessage = asTrimmedString(message);
+
+  const userConnection = ensureConnection(user, normalizedFriendId, friendName);
   const friendConnection = ensureConnection(friend, user.id, user.name);
+  if (!userConnection || !friendConnection) {
+    return loadData();
+  }
 
-  userConnection.debt_eur = (userConnection.debt_eur || 0) - amount;
-  friendConnection.debt_eur = (friendConnection.debt_eur || 0) + amount;
+  userConnection.debt_eur = (userConnection.debt_eur || 0) - normalizedAmount;
+  friendConnection.debt_eur = (friendConnection.debt_eur || 0) + normalizedAmount;
 
   const timestamp = new Date();
   const date = timestamp.toISOString().slice(0, 10);
@@ -253,7 +316,7 @@ export const createTransaction = async ({ friendId, amount, message }) => {
     createTransactionModel({
       id: transactionId,
       date,
-      amount_eur: -amount,
+      amount_eur: -normalizedAmount,
       note,
     })
   );
@@ -262,25 +325,25 @@ export const createTransaction = async ({ friendId, amount, message }) => {
     createTransactionModel({
       id: transactionId,
       date,
-      amount_eur: amount,
+      amount_eur: normalizedAmount,
       note,
     })
   );
 
-  const logText = `You sent ${amount.toFixed(2)}€ to ${friendName}`;
+  const logText = `You sent ${normalizedAmount.toFixed(2)}€ to ${friendName}`;
   const logEntry = createLogEntryModel({
     id: createId("log"),
     transaction_id: transactionId,
     timestamp: timestamp.toISOString(),
     text: logText,
     message: trimmedMessage,
-    friend_id: friendId,
-    amount_eur: amount,
+    friend_id: normalizedFriendId,
+    amount_eur: normalizedAmount,
   });
 
   state.logs = Array.isArray(state.logs) ? state.logs : [];
   state.logs.unshift(logEntry);
 
-  await persistState(state);
-  return buildView(state);
+  const persistedState = await persistState(state);
+  return buildView(persistedState);
 };
