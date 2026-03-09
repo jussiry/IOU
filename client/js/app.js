@@ -1,7 +1,7 @@
 /*
 This module is the entry point for the client app. It parses hash routes, loads HTML templates, binds page-specific UI logic, and swaps pages with the transition controller.
 
-It also coordinates shared startup concerns such as icon sprite injection, version-gated local data resets, and active navigation state so all page modules stay focused on rendering.
+It also coordinates shared startup concerns such as icon sprite injection, version-gated local data resets, navigation state, and development websocket setup so all page modules stay focused on rendering.
 */
 
 import {
@@ -23,6 +23,7 @@ import { bindCredit } from "../modules/subpage/credit.js";
 import { ensureIconSprite } from "./utils/icons.js";
 import { setActiveNav } from "./utils/nav.js";
 import { getSlideDirection, swapPage } from "./page-transitions.js";
+import { createSignalingClient } from "./signaling/socket-client.js";
 import { getAppVersion } from "./version.js";
 
 const navButtons = Array.from(document.querySelectorAll(".nav-item[data-page]"));
@@ -297,6 +298,7 @@ window.addEventListener("hashchange", () => {
 });
 
 const initApp = async () => {
+  createSignalingClient();
   await ensureIconSprite();
   appVersion = await getAppVersion();
   await ensureVersion(appVersion);

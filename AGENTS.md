@@ -1,6 +1,6 @@
 
 ## Code style
-- Make DRY code, find patterns that repeat and wrap them into a function to keep code succinct.
+- Make DRY code: find patterns that repeat in code and wrap them into a function or other construct that can be reused to produce the same functionality in many places.
 - At the beginning of each JS file describe that code in one or two paragraphs.
 - Use modular design:
   * Use dependencies between functions and variables as the main determinant in choosing what parts of the code should go into which module.

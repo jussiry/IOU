@@ -1,13 +1,14 @@
 /*
-This backend module starts a local Node.js server for the IOU app. It serves the browser client as static files from the `/client` folder so development and deployment can use the same entry point.
+This backend module starts the IOU HTTP server and keeps the browser client and development websocket connection behind the same Node.js entry point. That lets the app serve static assets and expose a simple liveness channel without splitting runtime concerns across multiple processes.
 
-The implementation keeps static file resolution explicit and safe against path traversal. It also falls back to `index.html` for extensionless routes so the client can be loaded reliably before route handling takes over.
+The implementation keeps static file resolution explicit and safe against path traversal, while delegating websocket transport details to a focused signaling module. The main file stays responsible only for composing the server pieces together.
 */
 
 const fs = require("fs");
 const fsp = fs.promises;
 const http = require("http");
 const path = require("path");
+const { createSignalingServer } = require("./signaling/websocket-server");
 
 const HOST = process.env.HOST || "0.0.0.0";
 const PORT = Number(process.env.PORT) || 3000;
@@ -128,6 +129,8 @@ const server = http.createServer(async (request, response) => {
 
   await sendFile(request, response, filePath);
 });
+
+createSignalingServer(server);
 
 server.listen(PORT, HOST, () => {
   console.log(`IOU backend server listening on http://${HOST}:${PORT}`);
