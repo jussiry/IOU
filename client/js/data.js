@@ -251,7 +251,7 @@ export const ensureVersion = async (version) => {
   try {
     const storedVersion = window.localStorage.getItem(VERSION_KEY);
     if (version && storedVersion !== version) {
-      await resetState();
+      //await resetState();
       window.localStorage.setItem(VERSION_KEY, version);
     }
   } catch (error) {
