@@ -253,6 +253,11 @@ const createChecksumWords = (humanReadablePart, dataWords) => {
   });
 };
 
+const verifyChecksumWords = (humanReadablePart, allWords) => {
+  const expandedHrp = hrpExpand(humanReadablePart);
+  return bech32Polymod([...expandedHrp, ...allWords]) === 1;
+};
+
 const convertBits = (inputValues, fromBits, toBits, shouldPad) => {
   let accumulator = 0;
   let bitCount = 0;
@@ -296,11 +301,61 @@ const encodeBech32 = (humanReadablePart, dataWords) => {
   return `${humanReadablePart}1${encodedWords}`;
 };
 
+const decodeBech32 = (encodedValue) => {
+  if (typeof encodedValue !== "string") {
+    throw new Error("Expected a bech32 string.");
+  }
+
+  const trimmedValue = encodedValue.trim();
+  const normalizedValue = trimmedValue.toLowerCase();
+  if (!trimmedValue || trimmedValue !== normalizedValue) {
+    throw new Error("Bech32 value must be lowercase.");
+  }
+
+  const separatorIndex = normalizedValue.lastIndexOf("1");
+  if (separatorIndex <= 0 || separatorIndex + 7 > normalizedValue.length) {
+    throw new Error("Invalid bech32 separator position.");
+  }
+
+  const humanReadablePart = normalizedValue.slice(0, separatorIndex);
+  const encodedWords = normalizedValue.slice(separatorIndex + 1);
+  const allWords = Array.from(encodedWords, (character) => {
+    const index = BECH32_CHARSET.indexOf(character);
+    if (index === -1) {
+      throw new Error("Bech32 value contains invalid characters.");
+    }
+    return index;
+  });
+
+  if (!verifyChecksumWords(humanReadablePart, allWords)) {
+    throw new Error("Bech32 checksum verification failed.");
+  }
+
+  return {
+    humanReadablePart,
+    dataWords: allWords.slice(0, -6),
+  };
+};
+
 const encodeNip19Key = (humanReadablePart, keyHex) => {
   const normalizedHex = normalizeHex(keyHex, 32);
   const keyBytes = hexToBytes(normalizedHex);
   const fiveBitWords = convertBits(Array.from(keyBytes), 8, 5, true);
   return encodeBech32(humanReadablePart, fiveBitWords);
+};
+
+export const isValidNpub = (encodedValue) => {
+  try {
+    const { humanReadablePart, dataWords } = decodeBech32(encodedValue);
+    if (humanReadablePart !== "npub") {
+      return false;
+    }
+
+    const decodedBytes = convertBits(dataWords, 5, 8, false);
+    return decodedBytes.length === 32;
+  } catch (error) {
+    return false;
+  }
 };
 
 export const encodeNpubFromPublicKeyHex = (publicKeyHex) => {

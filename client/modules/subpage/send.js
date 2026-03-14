@@ -6,6 +6,7 @@ The binder keeps send-page specific text and selection behavior local, while sub
 
 export const bindSend = (root, data, friendId) => {
   const titleEl = root.querySelector('[data-bind="page-title"]');
+  const contentEl = root.querySelector(".send-content");
   const selectEl = root.querySelector('[data-bind="send-to"]');
   const explainerEl = root.querySelector('[data-bind="send-explainer"]');
   const amountEl = root.querySelector('[data-bind="send-amount"]');
@@ -13,6 +14,27 @@ export const bindSend = (root, data, friendId) => {
   const submitEl = root.querySelector('[data-bind="send-submit"]');
 
   if (titleEl) titleEl.textContent = "Send IOU";
+
+  const connections = Array.isArray(data?.connections) ? data.connections : [];
+  if (!connections.length) {
+    if (contentEl) {
+      contentEl.innerHTML = `
+        <div class="send-empty-state empty">
+          No friends exist. <a class="send-empty-link" href="#add-friend">Add a new friend</a> to
+          make your first transaction.
+        </div>
+      `;
+    }
+
+    return {
+      submitEl: null,
+      getPayload: () => ({
+        friendId: "",
+        amount: NaN,
+        message: "",
+      }),
+    };
+  }
 
   const getFirstName = (fullName) => fullName.split(/\s+/)[0] || fullName;
 
@@ -28,7 +50,7 @@ export const bindSend = (root, data, friendId) => {
 
   if (selectEl) {
     selectEl.innerHTML = "";
-    const sorted = [...data.connections].sort((a, b) => {
+    const sorted = [...connections].sort((a, b) => {
       const nameA = a.person_name || a.person_id || "";
       const nameB = b.person_name || b.person_id || "";
       return nameA.localeCompare(nameB);

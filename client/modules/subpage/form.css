@@ -21,6 +21,19 @@
   gap: 12px;
 }
 
+.form-field-inline-full {
+  grid-template-columns: minmax(0, 1fr) auto;
+  width: 100%;
+}
+
+.form-field-inline-full .form-label {
+  white-space: nowrap;
+}
+
+.form-field-inline-full > :last-child {
+  justify-self: end;
+}
+
 .form-field-inline .form-label {
   margin: 0;
 }
@@ -29,6 +42,12 @@
   text-transform: uppercase;
   letter-spacing: 0.06em;
   font-weight: 600;
+}
+
+.form-error {
+  margin: -4px 0 0;
+  color: var(--danger);
+  font-size: 12px;
 }
 
 .form-input,
@@ -76,6 +95,12 @@
   justify-content: center;
   gap: 8px;
   box-shadow: 0 10px 20px rgba(15, 12, 8, 0.12);
+}
+
+.primary-button:disabled,
+.primary-button.is-disabled {
+  background: lightgray;
+  cursor: not-allowed;
 }
 
 .primary-button-icon {

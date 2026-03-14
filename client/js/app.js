@@ -5,11 +5,13 @@ It also coordinates shared startup concerns such as icon sprite injection, versi
 */
 
 import {
+  createFriend,
   createTransaction,
   createUser,
   ensureVersion,
   hasUserData,
   loadData,
+  updateCreditLimit,
 } from "./data.js";
 import { bindBalance, initBalanceToggles } from "../modules/balance-page/index.js";
 import { bindFriends } from "../modules/friends-page/index.js";
@@ -17,6 +19,7 @@ import { bindLogs } from "../modules/logs-page/index.js";
 import { bindSettings } from "../modules/settings-page/index.js";
 import { bindWelcome } from "../modules/welcome-page/index.js";
 import { bindFriendDetail } from "../modules/subpage/friend.js";
+import { bindAddFriend } from "../modules/subpage/add-friend.js";
 import { initIouActions } from "../modules/components/iou-actions.js";
 import { bindSend } from "../modules/subpage/send.js";
 import { bindCredit } from "../modules/subpage/credit.js";
@@ -46,8 +49,11 @@ const templatePaths = {
   settings: "modules/settings-page/index.html",
   subpage: "modules/subpage/index.html",
   friend: "modules/subpage/friend.html",
+  addFriend: "modules/subpage/add-friend.html",
   send: "modules/subpage/send.html",
   credit: "modules/subpage/credit.html",
+  creditLimitField: "modules/subpage/credit-limit-field.html",
+  creditExplainer: "modules/subpage/credit-explainer.html",
   iouActions: "modules/components/iou-actions.html",
 };
 
@@ -108,6 +114,12 @@ const renderSubpageContent = (pageView, html) => {
   return contentSlot;
 };
 
+const renderTemplateIntoSlots = (root, slotName, html) => {
+  root.querySelectorAll(`[data-slot="${slotName}"]`).forEach((slot) => {
+    slot.innerHTML = html;
+  });
+};
+
 const createSubpageRoute = (type, friendId = null) => ({
   type,
   friendId,
@@ -141,6 +153,9 @@ const parseRoute = () => {
   if (hash.startsWith("friend/")) {
     const friendId = hash.replace("friend/", "");
     return createSubpageRoute("friend", friendId);
+  }
+  if (hash === "add-friend") {
+    return createSubpageRoute("add-friend");
   }
   if (hash.startsWith("send")) {
     const parts = hash.split("/");
@@ -220,6 +235,29 @@ const loadPage = async (route) => {
       }
       initIouActions(pageView, route.friendId);
       setFallbackBackNavigation(pageView);
+    } else if (route.type === "add-friend") {
+      const [addFriendHtml, creditLimitFieldHtml, creditExplainerHtml] = await Promise.all([
+        fetchTemplate(templatePaths.addFriend),
+        fetchTemplate(templatePaths.creditLimitField),
+        fetchTemplate(templatePaths.creditExplainer),
+      ]);
+      renderSubpageContent(pageView, addFriendHtml);
+      renderTemplateIntoSlots(pageView, "credit-limit-field", creditLimitFieldHtml);
+      renderTemplateIntoSlots(pageView, "credit-explainer", creditExplainerHtml);
+
+      const addFriendHandlers = bindAddFriend(pageView);
+      document.title = "IOU — Add a friend";
+      setFallbackBackNavigation(pageView);
+      if (addFriendHandlers?.submitEl) {
+        addFriendHandlers.submitEl.addEventListener("click", async () => {
+          const payload = addFriendHandlers.getPayload();
+          if (!payload.friendId || payload.friendId === data.you.id) {
+            return;
+          }
+          await createFriend(payload);
+          window.location.hash = `friend/${payload.friendId}`;
+        });
+      }
     } else if (route.type === "send") {
       const sendHtml = await fetchTemplate(templatePaths.send);
       renderSubpageContent(pageView, sendHtml);
@@ -237,11 +275,29 @@ const loadPage = async (route) => {
         });
       }
     } else if (route.type === "credit") {
-      const creditHtml = await fetchTemplate(templatePaths.credit);
+      const [creditHtml, creditLimitFieldHtml, creditExplainerHtml] = await Promise.all([
+        fetchTemplate(templatePaths.credit),
+        fetchTemplate(templatePaths.creditLimitField),
+        fetchTemplate(templatePaths.creditExplainer),
+      ]);
       renderSubpageContent(pageView, creditHtml);
-      bindCredit(pageView, data, route.friendId);
+      renderTemplateIntoSlots(pageView, "credit-limit-field", creditLimitFieldHtml);
+      renderTemplateIntoSlots(pageView, "credit-explainer", creditExplainerHtml);
+      const creditHandlers = bindCredit(pageView, data, route.friendId);
       document.title = "IOU — Credit";
       setFallbackBackNavigation(pageView);
+      if (creditHandlers?.submitEl && route.friendId) {
+        creditHandlers.submitEl.addEventListener("click", async () => {
+          const limit = creditHandlers.limitInput
+            ? parseFloat(creditHandlers.limitInput.value)
+            : NaN;
+          if (!Number.isFinite(limit) || limit < 0) {
+            return;
+          }
+          await updateCreditLimit(route.friendId, limit);
+          window.location.hash = `friend/${route.friendId}`;
+        });
+      }
     } else {
       if (route.page === "balance") {
         const actionsSlot = pageView.querySelector('[data-slot="iou-actions"]');

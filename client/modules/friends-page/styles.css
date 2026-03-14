@@ -7,6 +7,43 @@
   gap: 14px;
 }
 
+.friends-add-inline {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 18px;
+  padding-bottom: 6px;
+}
+
+.friends-add-button {
+  width: 64px;
+  height: 64px;
+  border: none;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #1b1b1b, #38312c);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  box-shadow: 0 20px 38px rgba(15, 12, 8, 0.24);
+}
+
+.friends-add-button:focus-visible {
+  outline: 3px solid rgba(244, 184, 96, 0.7);
+  outline-offset: 4px;
+}
+
+.friends-add-button-icon {
+  width: 26px;
+  height: 26px;
+}
+
+.friends-add-button--floating {
+  position: fixed;
+  right: 20px;
+  bottom: calc(114px + env(safe-area-inset-bottom, 0px));
+  z-index: 9;
+}
+
 .friend-row {
   --surface-radius: 12px;
   width: 100%;
@@ -96,4 +133,10 @@ summary::-webkit-details-marker {
 
 .friend[open] .tx-wrap {
   opacity: 1;
+}
+
+@media (min-width: 600px) {
+  .friends-add-button--floating {
+    right: calc(50% - 210px + 20px);
+  }
 }

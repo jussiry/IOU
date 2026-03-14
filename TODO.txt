@@ -1,0 +1,18 @@
+
+- WebRTC yhteyden muodostus
+- kaverin lisäys
+(- näytä kaveri listassa online kaverit)
+- IOU:n lähetys webRTC:n kautta
+- IOU:n lähetys cachettamalla severiin jos kaveri ei online
+  * message quet jotka lähetetään kun niiden vastaanottaja on online
+  * message quet myös clientteihin, eli kun kaveri tulee online, varmistetaan onko hän saanut viestin (serveristä tai muualta) - ja jos ei ole lähetetään itse
+
+  Joskus myöhemmin:
+  - Currencies sivu
+    * listaa kaikki itse käytetyt ja kaverien käyttämät valuutat
+    * Sama ticker voi olla eri valuutoilla, mutta ei samaa selostusta valuutasta
+    * listaa suosituimmuus järjestyksessä, joten ei haittaa vaikka joku "spämmää" 
+
+
+
+On friends page add large "+" button hovering on bottom right corner. When pressed move to "Add a friend" subpage. On the page there is a "Friends key" title with input field for it (public key). Also add toggle button for "Suggest credit limit". When toggle is on, use same html (make a template of it) as in credit page to input credit limit. At the bottom there is "Add friend" button with same styles as in "Send" page.

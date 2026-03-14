@@ -1,18 +1,7 @@
 <div class="send-content">
   <div class="balance-hero trust-hero send-card">
     <form class="send-form" aria-label="Credit agreement form">
-      <label class="form-field form-field-inline">
-        <span class="form-label">Credit limit</span>
-        <input
-          class="form-input"
-          type="number"
-          inputmode="decimal"
-          min="0"
-          step="0.01"
-          placeholder="0.00"
-          data-bind="credit-limit"
-        />
-      </label>
+      <div data-slot="credit-limit-field"></div>
       <button class="primary-button" type="button" data-bind="credit-submit">
         <svg class="primary-button-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
           <use href="#icon-edit" />
@@ -21,12 +10,5 @@
       </button>
     </form>
   </div>
-  <div class="send-explainer-card surface-box" data-bind="credit-explainer">
-    <strong>Credit agreements</strong> are used when sending IOU's between people who don't know
-    each other. Credit agreements <strong>won't change your total IOU balance</strong>, but they can
-    exchange IOU's you have with one of your friend to IOU's with another one of your friends. With
-    the help of credit agreements you can
-    <strong>trade with friends friends friend, without knowing or having to trust that person
-    yourself</strong>.
-  </div>
+  <div data-slot="credit-explainer"></div>
 </div>

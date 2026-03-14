@@ -11,3 +11,15 @@
   color: var(--ink);
   font-weight: 700;
 }
+
+.send-empty-state {
+  margin: 12px 20px 0;
+  line-height: 1.5;
+}
+
+.send-empty-link {
+  color: var(--ink);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}

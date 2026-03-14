@@ -1,0 +1,23 @@
+.add-friend-form {
+  gap: 16px;
+}
+
+.add-friend-key-input {
+  text-align: left;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.add-friend-toggle-row {
+  align-items: center;
+}
+
+.add-friend-credit-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.add-friend-credit-panel[hidden],
+.add-friend-credit-explainer[hidden] {
+  display: none;
+}

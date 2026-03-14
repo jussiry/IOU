@@ -1,6 +1,13 @@
 <div class="section">
   <h2 class="section-title">My friends</h2>
   <div class="friends-list" data-list="friends"></div>
+  <div class="friends-add-inline">
+    <button class="friends-add-button" type="button" data-action="add-friend" aria-label="Add a friend">
+      <svg class="friends-add-button-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <use href="#icon-plus" />
+      </svg>
+    </button>
+  </div>
 </div>
 
 <template data-template="friend-item">

@@ -121,6 +121,39 @@ const ensureContact = (state, contactId, contactName) => {
   return contact;
 };
 
+const ensureFriendState = (state, friendId, friendName = friendId) => {
+  if (!hasUser(state)) {
+    return null;
+  }
+
+  const normalizedFriendId = asTrimmedString(friendId);
+  const normalizedFriendName = asTrimmedString(friendName) || normalizedFriendId;
+  if (!normalizedFriendId || normalizedFriendId === state.user.id) {
+    return null;
+  }
+
+  const friend = ensureContact(state, normalizedFriendId, normalizedFriendName);
+  if (!friend) {
+    return null;
+  }
+
+  const userConnection = ensureConnection(
+    state.user,
+    normalizedFriendId,
+    friend.name || normalizedFriendName
+  );
+  const friendConnection = ensureConnection(friend, state.user.id, state.user.name);
+  if (!userConnection || !friendConnection) {
+    return null;
+  }
+
+  return {
+    friend,
+    friendConnection,
+    userConnection,
+  };
+};
+
 const createId = (prefix = "tx") => {
   if (window.crypto?.randomUUID) {
     return `${prefix}_${window.crypto.randomUUID()}`;
@@ -200,6 +233,7 @@ export const hasUserData = async () => {
 
 export const createUser = async (name) => {
   const trimmedName = asTrimmedString(name);
+  const userName = trimmedName || "You";
   const {
     privateKeyHex,
     privateKeyNsec,
@@ -209,7 +243,7 @@ export const createUser = async (name) => {
 
   const user = createPersonModel({
     id: publicKeyNpub,
-    name: trimmedName || "You",
+    name: userName,
     public_key: publicKeyNpub,
     public_key_hex: publicKeyHex,
     private_key: privateKeyNsec,
@@ -218,6 +252,17 @@ export const createUser = async (name) => {
   });
 
   const state = createEmptyAppState(user);
+  state.logs.unshift(
+    createLogEntryModel({
+      id: createId("log"),
+      transaction_id: "",
+      timestamp: new Date().toISOString(),
+      text: `User **${userName}** created`,
+      message: "",
+      friend_id: "",
+      amount_eur: 0,
+    })
+  );
   const persistedState = await persistState(state);
   return buildView(persistedState);
 };
@@ -285,24 +330,14 @@ export const createTransaction = async ({ friendId, amount, message }) => {
   if (!hasUser(state)) {
     return null;
   }
-  if (normalizedFriendId === state.user.id) {
+  const friendState = ensureFriendState(state, normalizedFriendId);
+  if (!friendState) {
     return loadData();
   }
-
-  const user = state.user;
-  const friend = ensureContact(state, normalizedFriendId, normalizedFriendId);
-  if (!friend) {
-    return loadData();
-  }
+  const { friend, friendConnection, userConnection } = friendState;
 
   const friendName = friend.name || normalizedFriendId;
   const trimmedMessage = asTrimmedString(message);
-
-  const userConnection = ensureConnection(user, normalizedFriendId, friendName);
-  const friendConnection = ensureConnection(friend, user.id, user.name);
-  if (!userConnection || !friendConnection) {
-    return loadData();
-  }
 
   userConnection.debt_eur = (userConnection.debt_eur || 0) - normalizedAmount;
   friendConnection.debt_eur = (friendConnection.debt_eur || 0) + normalizedAmount;
@@ -343,6 +378,46 @@ export const createTransaction = async ({ friendId, amount, message }) => {
 
   state.logs = Array.isArray(state.logs) ? state.logs : [];
   state.logs.unshift(logEntry);
+
+  const persistedState = await persistState(state);
+  return buildView(persistedState);
+};
+
+export const createFriend = async ({ friendId, creditLimit }) => {
+  const normalizedFriendId = asTrimmedString(friendId);
+  if (!normalizedFriendId) {
+    return loadData();
+  }
+
+  const state = await loadState();
+  const friendState = ensureFriendState(state, normalizedFriendId);
+  if (!friendState) {
+    return loadData();
+  }
+
+  const normalizedCreditLimit = normalizeCurrencyAmount(creditLimit, NaN);
+  if (Number.isFinite(normalizedCreditLimit) && normalizedCreditLimit >= 0) {
+    friendState.userConnection.trust_credit_limit_eur = normalizedCreditLimit;
+  }
+
+  const persistedState = await persistState(state);
+  return buildView(persistedState);
+};
+
+export const updateCreditLimit = async (friendId, creditLimit) => {
+  const normalizedFriendId = asTrimmedString(friendId);
+  const normalizedCreditLimit = normalizeCurrencyAmount(creditLimit, NaN);
+  if (!normalizedFriendId || !Number.isFinite(normalizedCreditLimit) || normalizedCreditLimit < 0) {
+    return loadData();
+  }
+
+  const state = await loadState();
+  const friendState = ensureFriendState(state, normalizedFriendId);
+  if (!friendState) {
+    return loadData();
+  }
+
+  friendState.userConnection.trust_credit_limit_eur = normalizedCreditLimit;
 
   const persistedState = await persistState(state);
   return buildView(persistedState);

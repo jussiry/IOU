@@ -4,6 +4,8 @@ This module binds the logs page and maps log entries into reusable template node
 Keeping log-row assembly isolated here allows the data layer to stay transport-focused while this module owns presentation details.
 */
 
+import { formatMarkdownish } from "../../js/utils/markdownish.js";
+
 export const bindLogs = (root, data) => {
   const listEl = root.querySelector('[data-list="logs"]');
   const itemTemplate = root.querySelector('[data-template="log-item"]');
@@ -30,7 +32,7 @@ export const bindLogs = (root, data) => {
     if (textEl) {
       const message = log.message ? log.message.trim() : "";
       const messageSuffix = message ? ` — ${message}` : "";
-      textEl.textContent = `${log.text || ""}${messageSuffix}`;
+      textEl.innerHTML = formatMarkdownish(`${log.text || ""}${messageSuffix}`);
     }
     listEl.appendChild(node);
   });

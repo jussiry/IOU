@@ -1,0 +1,39 @@
+.check-toggle {
+  justify-self: start;
+  border: none;
+  background: transparent;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.check-toggle-track {
+  width: 54px;
+  height: 32px;
+  padding: 4px;
+  border-radius: 999px;
+  background: rgba(27, 27, 27, 0.12);
+  display: inline-flex;
+  align-items: center;
+  transition: background-color 0.2s ease;
+}
+
+.check-toggle-thumb {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 6px 12px rgba(15, 12, 8, 0.18);
+  transition: transform 0.2s ease;
+}
+
+.check-toggle.is-active .check-toggle-track {
+  background: rgba(244, 184, 96, 0.85);
+}
+
+.check-toggle.is-active .check-toggle-thumb {
+  transform: translateX(22px);
+}
