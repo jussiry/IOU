@@ -1,7 +1,7 @@
 /*
 This module is the entry point for the client app. It parses hash routes, loads HTML templates, binds page-specific UI logic, and swaps pages with the transition controller.
 
-It also coordinates shared startup concerns such as icon sprite injection, version-gated local data resets, navigation state, and development websocket setup so all page modules stay focused on rendering.
+It also coordinates shared startup concerns such as icon sprite injection, version-gated local data resets, navigation state, and the realtime transport bootstrap so all page modules stay focused on rendering.
 */
 
 import {
@@ -11,6 +11,7 @@ import {
   ensureVersion,
   hasUserData,
   loadData,
+  subscribeToDataChanges,
   updateCreditLimit,
 } from "./data.js";
 import { bindBalance, initBalanceToggles } from "../modules/balance-page/index.js";
@@ -23,10 +24,11 @@ import { bindAddFriend } from "../modules/subpage/add-friend.js";
 import { initIouActions } from "../modules/components/iou-actions.js";
 import { bindSend } from "../modules/subpage/send.js";
 import { bindCredit } from "../modules/subpage/credit.js";
+import { createRealtimeClient } from "./realtime/client.js";
+import { subscribeToPeerStatusChanges } from "./realtime/peer-status.js";
 import { ensureIconSprite } from "./utils/icons.js";
 import { setActiveNav } from "./utils/nav.js";
 import { getSlideDirection, swapPage } from "./page-transitions.js";
-import { createSignalingClient } from "./signaling/socket-client.js";
 import { getAppVersion } from "./version.js";
 
 const navButtons = Array.from(document.querySelectorAll(".nav-item[data-page]"));
@@ -69,6 +71,18 @@ let currentRoute = null;
 let navigationSequence = 0;
 const templateCache = new Map();
 let appVersion = null;
+let routeRefreshTimer = null;
+
+const scheduleRouteRefresh = () => {
+  if (routeRefreshTimer) {
+    return;
+  }
+
+  routeRefreshTimer = window.setTimeout(() => {
+    routeRefreshTimer = null;
+    void loadActiveRoute();
+  }, 0);
+};
 
 const setRouteUiState = (route) => {
   const isWelcome = route.type === "welcome";
@@ -245,7 +259,7 @@ const loadPage = async (route) => {
       renderTemplateIntoSlots(pageView, "credit-limit-field", creditLimitFieldHtml);
       renderTemplateIntoSlots(pageView, "credit-explainer", creditExplainerHtml);
 
-      const addFriendHandlers = bindAddFriend(pageView);
+      const addFriendHandlers = bindAddFriend(pageView, data);
       document.title = "IOU — Add a friend";
       setFallbackBackNavigation(pageView);
       if (addFriendHandlers?.submitEl) {
@@ -354,10 +368,12 @@ window.addEventListener("hashchange", () => {
 });
 
 const initApp = async () => {
-  createSignalingClient();
   await ensureIconSprite();
   appVersion = await getAppVersion();
   await ensureVersion(appVersion);
+  subscribeToDataChanges(scheduleRouteRefresh);
+  subscribeToPeerStatusChanges(scheduleRouteRefresh);
+  createRealtimeClient();
   await loadActiveRoute();
 };
 

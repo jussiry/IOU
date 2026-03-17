@@ -15,4 +15,13 @@
 
 
 
-On friends page add large "+" button hovering on bottom right corner. When pressed move to "Add a friend" subpage. On the page there is a "Friends key" title with input field for it (public key). Also add toggle button for "Suggest credit limit". When toggle is on, use same html (make a template of it) as in credit page to input credit limit. At the bottom there is "Add friend" button with same styles as in "Send" page.
+Scratch book
+
+On add a friend page at the top of the main box show label "My key" followed by users public key in text input that can't be edited. On right side of text input show copy button (just an icon) that copies the key on clipboard. Clicking on the text will select it (so user can also copy from there). Make text field as wide as possible, but all of the key don't need to be visible (more important is having concurring sytles with the rest of the page).
+
+on friends page list keep friends name on one row (use textoverflow: ellipsis). Also make a green version of friend icon, and when there is active webrtc connection between you and that friend, show the green icon instead of the normal gray icon.
+
+
+Security questions
+- when server sends "peer_connect" message for two peers to connect, do the clients still verify that the peer they are connecting to is still their friend? The security should always stay on client, so even conncting to malicious server should not be able to damage client data
+  * NOTE: messages between peers should always be encrypted anyways

@@ -6,10 +6,12 @@ Runtime state is stored in IndexedDB (`iou_client_db`, object store `app_state`,
 
 ```json
 {
-  "model_version": 1,
+  "model_version": 2,
   "user": { "...": "PersonModel" },
   "contacts": { "<npub>": { "...": "ContactPersonModel" } },
-  "logs": [{ "...": "LogEntryModel" }]
+  "logs": [{ "...": "LogEntryModel" }],
+  "outbox": [{ "...": "PeerMessageModel" }],
+  "processed_peer_message_ids": ["peer_..."]
 }
 ```
 
@@ -39,11 +41,19 @@ Same as `PersonModel`, except contact records do not store `private_key` or `pri
 {
   "person_id": "npub1...",
   "person_name": "Bob",
+  "friendship_status": "accepted",
   "debt_eur": 0,
   "trust_credit_limit_eur": 0,
   "recent_transactions": [{ "...": "TransactionModel" }]
 }
 ```
+
+`friendship_status` is one of:
+
+- `accepted`
+- `pending_outgoing`
+- `pending_incoming`
+- `rejected`
 
 ## TransactionModel
 
@@ -69,3 +79,25 @@ Same as `PersonModel`, except contact records do not store `private_key` or `pri
   "amount_eur": 0
 }
 ```
+
+## PeerMessageModel
+
+```json
+{
+  "id": "peer_...",
+  "type": "friend_request",
+  "from_user_id": "npub1...",
+  "to_user_id": "npub1...",
+  "created_at": "ISO-8601",
+  "payload": { "...": "type-specific data" }
+}
+```
+
+Current peer message types:
+
+- `friend_request`
+- `friend_accept`
+- `friend_reject`
+- `credit_limit_update`
+- `transaction_created`
+- `received`

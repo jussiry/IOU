@@ -49,11 +49,13 @@
   width: 100%;
   border: none;
   text-align: left;
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 12px;
   padding: 10px 12px;
   cursor: pointer;
+  overflow: hidden;
 }
 
 .friend {
@@ -84,27 +86,41 @@ summary::-webkit-details-marker {
 }
 
 .meta {
-  flex: 1;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .friend-name {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .friend-icon {
+  flex: 0 0 auto;
   width: 18px;
   height: 18px;
   color: var(--muted);
 }
 
+.friend-icon--online {
+  color: #27a857;
+}
+
 .meta h3 {
+  flex: 1;
+  min-width: 0;
   margin: 0;
   font-size: 16px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .badge {
+  flex: 0 0 auto;
   padding: 6px 10px;
   border-radius: 999px;
   background: #f0efe9;
@@ -114,13 +130,20 @@ summary::-webkit-details-marker {
 }
 
 .amount {
+  flex: 0 0 auto;
   font-weight: 700;
   font-size: 16px;
+  text-align: right;
 }
 
 .amount .credit-limit {
   color: var(--muted);
   font-weight: 400;
+}
+
+.amount--muted {
+  color: var(--muted);
+  font-weight: 600;
 }
 
 .tx-wrap {

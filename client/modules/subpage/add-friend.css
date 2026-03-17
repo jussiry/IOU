@@ -2,10 +2,49 @@
   gap: 16px;
 }
 
+.add-friend-key-display {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  width: 100%;
+}
+
 .add-friend-key-input {
   text-align: left;
   font-size: 18px;
   font-weight: 700;
+  min-width: 0;
+  width: 100%;
+}
+
+.add-friend-key-input--readonly {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: text;
+}
+
+.add-friend-copy-button {
+  flex: 0 0 auto;
+  width: 46px;
+  border: none;
+  border-radius: 12px;
+  background: #fff;
+  color: var(--ink);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.add-friend-copy-button:focus-visible {
+  outline: 3px solid rgba(244, 184, 96, 0.7);
+  outline-offset: 3px;
+}
+
+.add-friend-copy-icon {
+  width: 18px;
+  height: 18px;
 }
 
 .add-friend-toggle-row {

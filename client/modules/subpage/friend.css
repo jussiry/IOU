@@ -96,10 +96,41 @@
   color: var(--muted);
 }
 
+.friend-inline-action {
+  --surface-radius: 14px;
+  border: 1px solid rgba(17, 17, 17, 0.06);
+  padding: 8px 12px;
+  display: inline-flex;
+  align-items: center;
+  font-weight: 700;
+  color: var(--ink);
+  cursor: pointer;
+  background: #fff;
+}
+
+.friend-inline-action--primary {
+  background: rgba(244, 184, 96, 0.35);
+}
+
+.friend-status-chip {
+  --surface-radius: 14px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
 .friend-card {
   margin: 12px 20px 0;
   padding: 20px 18px;
   overflow: visible;
+}
+
+.friend-stat--disabled {
+  cursor: default;
+  opacity: 0.72;
 }
 
 .friend-card .tx-list {

@@ -2,6 +2,29 @@
   <div class="balance-hero trust-hero send-card">
     <form class="send-form add-friend-form" aria-label="Add a friend form">
       <label class="form-field">
+        <span class="form-label">My key</span>
+        <span class="add-friend-key-display">
+          <input
+            class="form-input add-friend-key-input add-friend-key-input--readonly"
+            type="text"
+            inputmode="text"
+            readonly
+            aria-readonly="true"
+            data-bind="my-key"
+          />
+          <button
+            class="add-friend-copy-button"
+            type="button"
+            data-action="copy-my-key"
+            aria-label="Copy my key"
+          >
+            <svg class="add-friend-copy-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <use href="#icon-copy" />
+            </svg>
+          </button>
+        </span>
+      </label>
+      <label class="form-field">
         <span class="form-label">Friends key</span>
         <input
           class="form-input add-friend-key-input"

@@ -5,6 +5,7 @@ It keeps all balance-page specific rendering logic local to this module so the a
 */
 
 import { formatCurrency, formatNet, formatSigned } from "../../js/utils/format.js";
+import { isAcceptedFriendshipStatus } from "../../js/utils/friendships.js";
 
 const closePanel = (button, panel) => {
   if (!panel || button.getAttribute("aria-expanded") !== "true") return;
@@ -120,26 +121,32 @@ export const bindBalance = (root, data) => {
     data.totals.availableCredit
   );
 
-  const friendsOwe = data.connections
+  const acceptedConnections = data.connections.filter((connection) =>
+    isAcceptedFriendshipStatus(connection.friendship_status)
+  );
+
+  const friendsOwe = acceptedConnections
     .filter((connection) => connection.debt_eur > 0)
     .sort((a, b) => b.debt_eur - a.debt_eur);
 
-  const youOwe = data.connections
+  const youOwe = acceptedConnections
     .filter((connection) => connection.debt_eur < 0)
     .sort((a, b) => Math.abs(b.debt_eur) - Math.abs(a.debt_eur));
 
   renderInlineList(root, friendsOwe, {
     list: '[data-list="friends-owe"]',
     template: '[data-template="credit-item"]',
+  }, {
     skipSignClass: true,
   });
   renderInlineList(root, youOwe, {
     list: '[data-list="you-owe"]',
     template: '[data-template="credit-item"]',
+  }, {
     skipSignClass: true,
   });
 
-  const creditAgreements = data.connections
+  const creditAgreements = acceptedConnections
     .filter((connection) => (connection.trust_credit_limit_eur || 0) > 0)
     .sort((a, b) => b.trust_credit_limit_eur - a.trust_credit_limit_eur);
 

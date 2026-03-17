@@ -1,8 +1,31 @@
 /*
 This module binds the send-IOU subpage form. It populates selectable friends, updates explanatory copy, and returns a payload reader for submit handling.
 
-The binder keeps send-page specific text and selection behavior local, while submit-side effects remain in the app-level route controller.
+Only accepted friendships can be used for transactions, so the binder also owns the empty states shown when the user has no friends yet or only pending friendships.
 */
+
+import { isAcceptedFriendshipStatus } from "../../js/utils/friendships.js";
+
+const renderEmptyState = (contentEl, allConnections) => {
+  if (!contentEl) {
+    return;
+  }
+
+  const hasAnyConnections = Array.isArray(allConnections) && allConnections.length > 0;
+  contentEl.innerHTML = hasAnyConnections
+    ? `
+      <div class="send-empty-state empty">
+        No accepted friends yet. Complete a pending friendship or <a class="send-empty-link" href="#add-friend">add a new friend</a>
+        before making a transaction.
+      </div>
+    `
+    : `
+      <div class="send-empty-state empty">
+        No friends exist. <a class="send-empty-link" href="#add-friend">Add a new friend</a> to
+        make your first transaction.
+      </div>
+    `;
+};
 
 export const bindSend = (root, data, friendId) => {
   const titleEl = root.querySelector('[data-bind="page-title"]');
@@ -15,17 +38,16 @@ export const bindSend = (root, data, friendId) => {
 
   if (titleEl) titleEl.textContent = "Send IOU";
 
-  const connections = Array.isArray(data?.connections) ? data.connections : [];
-  if (!connections.length) {
-    if (contentEl) {
-      contentEl.innerHTML = `
-        <div class="send-empty-state empty">
-          No friends exist. <a class="send-empty-link" href="#add-friend">Add a new friend</a> to
-          make your first transaction.
-        </div>
-      `;
-    }
-
+  const allConnections = Array.isArray(data?.connections) ? data.connections : [];
+  const acceptedConnections = allConnections
+    .filter((connection) => isAcceptedFriendshipStatus(connection.friendship_status))
+    .sort((leftConnection, rightConnection) => {
+      const leftName = leftConnection.person_name || leftConnection.person_id || "";
+      const rightName = rightConnection.person_name || rightConnection.person_id || "";
+      return leftName.localeCompare(rightName);
+    });
+  if (!acceptedConnections.length) {
+    renderEmptyState(contentEl, allConnections);
     return {
       submitEl: null,
       getPayload: () => ({
@@ -50,36 +72,40 @@ export const bindSend = (root, data, friendId) => {
 
   if (selectEl) {
     selectEl.innerHTML = "";
-    const sorted = [...connections].sort((a, b) => {
-      const nameA = a.person_name || a.person_id || "";
-      const nameB = b.person_name || b.person_id || "";
-      return nameA.localeCompare(nameB);
-    });
-
-    sorted.forEach((connection) => {
+    acceptedConnections.forEach((connection) => {
       const option = document.createElement("option");
       option.value = connection.person_id;
       option.textContent = connection.person_name || connection.person_id;
       selectEl.appendChild(option);
     });
 
-    if (friendId) {
-      selectEl.value = friendId;
+    const initialSelection =
+      acceptedConnections.find((connection) => connection.person_id === friendId) ||
+      acceptedConnections[0] ||
+      null;
+    if (initialSelection) {
+      selectEl.value = initialSelection.person_id;
     }
 
     const selectAlternate = (currentId) => {
-      const candidates = sorted.filter((connection) => connection.person_id !== currentId);
+      const candidates = acceptedConnections.filter(
+        (connection) => connection.person_id !== currentId
+      );
       if (!candidates.length) return null;
       const pick = candidates[Math.floor(Math.random() * candidates.length)];
       return pick?.person_name || pick?.person_id || null;
     };
 
-    const selected = sorted.find((connection) => connection.person_id === selectEl.value);
+    const selected = acceptedConnections.find(
+      (connection) => connection.person_id === selectEl.value
+    );
     const selectedName = selected?.person_name || selected?.person_id;
     updateExplainer(selectedName, selectAlternate(selectEl.value));
 
     selectEl.addEventListener("change", () => {
-      const current = sorted.find((connection) => connection.person_id === selectEl.value);
+      const current = acceptedConnections.find(
+        (connection) => connection.person_id === selectEl.value
+      );
       const name = current?.person_name || current?.person_id;
       updateExplainer(name, selectAlternate(selectEl.value));
     });
@@ -90,7 +116,7 @@ export const bindSend = (root, data, friendId) => {
   return {
     submitEl,
     getPayload: () => {
-      const selectedId = selectEl?.value || friendId;
+      const selectedId = selectEl?.value || acceptedConnections[0]?.person_id || "";
       const amount = amountEl ? parseFloat(amountEl.value) : NaN;
       const message = messageEl ? messageEl.value : "";
       return {

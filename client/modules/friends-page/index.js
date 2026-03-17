@@ -1,10 +1,18 @@
 /*
-This module renders the friends list page. It sorts friend connections, formats debt and agreement values, and binds click handlers to open friend detail pages.
+This module renders the friends list page. It sorts friendship rows, formats debt and credit summaries, and binds navigation to each friend's detail view.
 
-The formatter helper keeps row amount markup consistent and avoids repeating debt/limit string assembly inside the render loop.
+It also owns the add-friend button behavior and keeps accepted, pending, and rejected friendships visually distinct so the list remains useful after realtime friend requests are introduced.
 */
 
-import { formatSigned } from "../../js/utils/format.js";
+import { formatCurrency, formatSigned } from "../../js/utils/format.js";
+import { getConnectedPeerIds } from "../../js/realtime/peer-status.js";
+import {
+  FRIENDSHIP_STATUS_ACCEPTED,
+  FRIENDSHIP_STATUS_PENDING_INCOMING,
+  FRIENDSHIP_STATUS_PENDING_OUTGOING,
+  FRIENDSHIP_STATUS_REJECTED,
+  isAcceptedFriendshipStatus,
+} from "../../js/utils/friendships.js";
 
 const formatDebtWithLimit = (debtValue, creditLimitValue) => {
   const formattedDebt = formatSigned(debtValue).replace("€", "");
@@ -13,6 +21,84 @@ const formatDebtWithLimit = (debtValue, creditLimitValue) => {
 };
 
 const FLOATING_BUTTON_ID = "friends-add-button-floating";
+const FRIENDSHIP_SORT_ORDER = {
+  [FRIENDSHIP_STATUS_ACCEPTED]: 0,
+  [FRIENDSHIP_STATUS_PENDING_INCOMING]: 1,
+  [FRIENDSHIP_STATUS_PENDING_OUTGOING]: 2,
+  [FRIENDSHIP_STATUS_REJECTED]: 3,
+};
+
+const compareFriendNames = (leftConnection, rightConnection) => {
+  const leftName = leftConnection.person_name || leftConnection.person_id || "";
+  const rightName = rightConnection.person_name || rightConnection.person_id || "";
+  return leftName.localeCompare(rightName);
+};
+
+const getFriendSortWeight = (connection) => {
+  return FRIENDSHIP_SORT_ORDER[connection.friendship_status] ?? 99;
+};
+
+const getPendingCreditLimit = (connection) => {
+  if (connection.friendship_status === FRIENDSHIP_STATUS_PENDING_INCOMING) {
+    return connection.inbound_credit_limit_eur || 0;
+  }
+  if (connection.friendship_status === FRIENDSHIP_STATUS_PENDING_OUTGOING) {
+    return connection.trust_credit_limit_eur || 0;
+  }
+  return 0;
+};
+
+const getFriendRowState = (connection) => {
+  if (isAcceptedFriendshipStatus(connection.friendship_status)) {
+    const debtValue = connection.debt_eur || 0;
+    return {
+      badge: debtValue >= 0 ? "owes you" : "you owe",
+      amountHtml: formatDebtWithLimit(
+        debtValue,
+        connection.trust_credit_limit_eur
+      ),
+      amountClassName: debtValue >= 0 ? "pos" : "neg",
+    };
+  }
+
+  if (connection.friendship_status === FRIENDSHIP_STATUS_PENDING_INCOMING) {
+    const suggestedCreditLimit = getPendingCreditLimit(connection);
+    return {
+      badge: "incoming",
+      amountHtml:
+        suggestedCreditLimit > 0
+          ? `${formatCurrency(suggestedCreditLimit)} <span class="credit-limit">suggested</span>`
+          : "Pending",
+      amountClassName: "amount--muted",
+    };
+  }
+
+  if (connection.friendship_status === FRIENDSHIP_STATUS_PENDING_OUTGOING) {
+    const suggestedCreditLimit = getPendingCreditLimit(connection);
+    return {
+      badge: "pending",
+      amountHtml:
+        suggestedCreditLimit > 0
+          ? `${formatCurrency(suggestedCreditLimit)} <span class="credit-limit">suggested</span>`
+          : "Pending",
+      amountClassName: "amount--muted",
+    };
+  }
+
+  if (connection.friendship_status === FRIENDSHIP_STATUS_REJECTED) {
+    return {
+      badge: "rejected",
+      amountHtml: "",
+      amountClassName: "amount--muted",
+    };
+  }
+
+  return {
+    badge: "",
+    amountHtml: "",
+    amountClassName: "",
+  };
+};
 
 const createFloatingButton = (inlineButton) => {
   const button = document.createElement("button");
@@ -57,6 +143,7 @@ export const bindFriends = (root, data) => {
   const listContainer = root.querySelector('[data-list="friends"]');
   const friendTemplate = root.querySelector('[data-template="friend-item"]');
   const addFriendButton = root.querySelector('[data-action="add-friend"]');
+  const connectedPeerIds = new Set(getConnectedPeerIds());
   if (!listContainer || !friendTemplate) return;
 
   listContainer.innerHTML = "";
@@ -139,27 +226,51 @@ export const bindFriends = (root, data) => {
     const cancelInitialSync = scheduleAfterLayout(syncAddFriendButton);
   }
 
-  const sortedConnections = [...data.connections].sort(
-    (a, b) => Math.abs(b.debt_eur) - Math.abs(a.debt_eur)
-  );
+  const sortedConnections = [...data.connections].sort((leftConnection, rightConnection) => {
+    const sortWeightDifference =
+      getFriendSortWeight(leftConnection) - getFriendSortWeight(rightConnection);
+    if (sortWeightDifference !== 0) {
+      return sortWeightDifference;
+    }
+
+    if (
+      isAcceptedFriendshipStatus(leftConnection.friendship_status) &&
+      isAcceptedFriendshipStatus(rightConnection.friendship_status)
+    ) {
+      const debtDifference =
+        Math.abs(rightConnection.debt_eur || 0) - Math.abs(leftConnection.debt_eur || 0);
+      if (debtDifference !== 0) {
+        return debtDifference;
+      }
+    }
+
+    return compareFriendNames(leftConnection, rightConnection);
+  });
 
   sortedConnections.forEach((connection) => {
     const node = friendTemplate.content.firstElementChild.cloneNode(true);
     const nameEl = node.querySelector('[data-bind="name"]');
     const badgeEl = node.querySelector('[data-bind="badge"]');
     const amountEl = node.querySelector('[data-bind="amount"]');
+    const iconEl = node.querySelector('[data-bind="friend-icon"]');
+    const rowState = getFriendRowState(connection);
     node.addEventListener("click", () => {
       window.location.hash = `friend/${connection.person_id}`;
     });
     if (nameEl) nameEl.textContent = connection.person_name || connection.person_id;
-    if (badgeEl) badgeEl.textContent = connection.debt_eur >= 0 ? "owes you" : "you owe";
-    if (amountEl) {
-      const debtValue = connection.debt_eur || 0;
-      amountEl.innerHTML = formatDebtWithLimit(
-        debtValue,
-        connection.trust_credit_limit_eur
+    if (iconEl) {
+      iconEl.classList.toggle(
+        "friend-icon--online",
+        connectedPeerIds.has(connection.person_id)
       );
-      amountEl.classList.add(debtValue >= 0 ? "pos" : "neg");
+    }
+    if (badgeEl) badgeEl.textContent = rowState.badge;
+    if (amountEl) {
+      amountEl.innerHTML = rowState.amountHtml;
+      amountEl.classList.remove("pos", "neg", "amount--muted");
+      if (rowState.amountClassName) {
+        amountEl.classList.add(rowState.amountClassName);
+      }
     }
 
     listContainer.appendChild(node);

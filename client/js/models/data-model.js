@@ -4,7 +4,9 @@ This module defines the core persisted data model for the IOU client. It provide
 The same helpers are used for normalization when loading persisted state. Keeping model defaults in one place makes storage migrations safer and prevents repeated shape checks across UI modules.
 */
 
-export const DATA_MODEL_VERSION = 1;
+import { FRIENDSHIP_STATUS_ACCEPTED } from "../utils/friendships.js";
+
+export const DATA_MODEL_VERSION = 2;
 
 const asNumberOrDefault = (value, defaultValue = 0) => {
   const parsedValue = Number(value);
@@ -21,6 +23,31 @@ const asStringOrDefault = (value, defaultValue = "") => {
 
 const asTrimmedStringOrDefault = (value, defaultValue = "") => {
   return asStringOrDefault(value, defaultValue).trim();
+};
+
+const clonePlainObject = (value) => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+
+  try {
+    return JSON.parse(JSON.stringify(value));
+  } catch {
+    return {};
+  }
+};
+
+const normalizeStringList = (values) => {
+  if (!Array.isArray(values)) return [];
+
+  const normalizedValues = new Set();
+  values.forEach((value) => {
+    const normalizedValue = asTrimmedStringOrDefault(value);
+    if (!normalizedValue) return;
+    normalizedValues.add(normalizedValue);
+  });
+
+  return Array.from(normalizedValues);
 };
 
 const normalizeConnectionList = (connections) => {
@@ -53,6 +80,10 @@ export const createConnectionModel = (input = {}) => {
   return {
     person_id: asTrimmedStringOrDefault(input.person_id),
     person_name: asTrimmedStringOrDefault(input.person_name),
+    friendship_status: asTrimmedStringOrDefault(
+      input.friendship_status,
+      FRIENDSHIP_STATUS_ACCEPTED
+    ),
     debt_eur: asNumberOrDefault(input.debt_eur, 0),
     trust_credit_limit_eur: asNumberOrDefault(input.trust_credit_limit_eur, 0),
     recent_transactions: transactions,
@@ -98,12 +129,25 @@ export const createLogEntryModel = (input = {}) => {
   };
 };
 
+export const createPeerMessageModel = (input = {}) => {
+  return {
+    id: asTrimmedStringOrDefault(input.id),
+    type: asTrimmedStringOrDefault(input.type),
+    from_user_id: asTrimmedStringOrDefault(input.from_user_id),
+    to_user_id: asTrimmedStringOrDefault(input.to_user_id),
+    created_at: asTrimmedStringOrDefault(input.created_at),
+    payload: clonePlainObject(input.payload),
+  };
+};
+
 export const createEmptyAppState = (userPerson) => {
   return {
     model_version: DATA_MODEL_VERSION,
     user: createPersonModel(userPerson),
     contacts: {},
     logs: [],
+    outbox: [],
+    processed_peer_message_ids: [],
   };
 };
 
@@ -131,5 +175,9 @@ export const normalizeAppState = (state) => {
     user: createPersonModel(state.user),
     contacts: normalizeContactsMap(state.contacts),
     logs: Array.isArray(state.logs) ? state.logs.map((entry) => createLogEntryModel(entry)) : [],
+    outbox: Array.isArray(state.outbox)
+      ? state.outbox.map((entry) => createPeerMessageModel(entry))
+      : [],
+    processed_peer_message_ids: normalizeStringList(state.processed_peer_message_ids),
   };
 };
