@@ -18,6 +18,15 @@ import { createSignalingClient } from "../signaling/socket-client.js";
 import { createPeerMesh } from "./peer-mesh.js";
 import { replaceConnectedPeerIds } from "./peer-status.js";
 
+const logRealtimeEvent = (title, detail) => {
+  if (typeof detail === "undefined") {
+    console.log(`[Realtime] ${title}`);
+    return;
+  }
+
+  console.log(`[Realtime] ${title}`, detail);
+};
+
 const createRealtimeClient = () => {
   let currentSnapshot = null;
 
@@ -46,6 +55,17 @@ const createRealtimeClient = () => {
     },
   });
 
+  const requestPeerConnectionIfNeeded = (peerUserId, logTitle = "Requesting peer connection") => {
+    if (!peerUserId || peerMesh.canSend(peerUserId) || peerMesh.hasPeer(peerUserId)) {
+      return;
+    }
+
+    logRealtimeEvent(logTitle, {
+      peerUserId,
+    });
+    signalingClient.requestPeerConnection(peerUserId);
+  };
+
   const flushOutbox = () => {
     if (!currentSnapshot) {
       return;
@@ -53,7 +73,6 @@ const createRealtimeClient = () => {
 
     currentSnapshot.outbox.forEach((message) => {
       if (!peerMesh.canSend(message.to_user_id)) {
-        signalingClient.requestPeerConnection(message.to_user_id);
         return;
       }
 
@@ -81,7 +100,7 @@ const createRealtimeClient = () => {
     peerMesh.closePeersNotInSet(currentSnapshot.peerIds);
 
     currentSnapshot.peerIds.forEach((peerUserId) => {
-      signalingClient.requestPeerConnection(peerUserId);
+      requestPeerConnectionIfNeeded(peerUserId);
     });
     flushOutbox();
   };
@@ -98,22 +117,30 @@ const createRealtimeClient = () => {
         return;
       }
 
+      logRealtimeEvent("Peer receipt received", {
+        peerUserId,
+        data: message,
+      });
       peerMesh.clearInflightMessage(receivedMessageId);
       await markPeerMessageReceived(receivedMessageId);
       await syncRealtimeState();
       return;
     }
 
-    if (currentSnapshot?.userId) {
+    const processingResult = await applyInboundPeerMessage(message);
+    if (processingResult?.acknowledgeResult && currentSnapshot?.userId) {
       const receipt = createPeerReceiptMessage({
         fromUserId: currentSnapshot.userId,
         toUserId: peerUserId,
         messageId: message.id,
+        result: processingResult.acknowledgeResult,
+      });
+      logRealtimeEvent("Sending peer receipt", {
+        peerUserId,
+        data: receipt,
       });
       peerMesh.sendControlMessage(peerUserId, receipt);
     }
-
-    await applyInboundPeerMessage(message);
     await syncRealtimeState();
   };
 

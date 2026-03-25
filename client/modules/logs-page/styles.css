@@ -1,3 +1,30 @@
+.state-list {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.state-item {
+  --surface-radius: 12px;
+  padding: 10px 12px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  align-items: center;
+}
+
+.state-label {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.state-value {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
 .log-list {
   display: grid;
   gap: 10px;

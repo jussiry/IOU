@@ -3,10 +3,14 @@
   "private": true,
   "scripts": {
     "dev": "nodemon --watch backend --watch client --ext js,html,css,json backend/server.js",
-    "start": "node backend/server.js"
+    "start": "node backend/server.js",
+    "test:e2e:two-client": "node tests/two-client-e2e/run.cjs",
+    "test:e2e:friend-request-online": "node tests/two-client-e2e/run.cjs --scenario friend-request-online",
+    "test:e2e:reload-reconnect": "node tests/two-client-e2e/run.cjs --scenario reload-reconnect"
   },
   "devDependencies": {
-    "nodemon": "^3.1.10"
+    "nodemon": "^3.1.10",
+    "playwright": "^1.58.2"
   },
   "dependencies": {
     "ws": "^8.19.0"

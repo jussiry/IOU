@@ -10,6 +10,8 @@ export const PEER_MESSAGE_TYPE_FRIEND_REJECT = "friend_reject";
 export const PEER_MESSAGE_TYPE_CREDIT_LIMIT_UPDATE = "credit_limit_update";
 export const PEER_MESSAGE_TYPE_TRANSACTION_CREATED = "transaction_created";
 export const PEER_MESSAGE_TYPE_RECEIVED = "received";
+export const PEER_RECEIPT_RESULT_PROCESSED = "peer_processed";
+export const PEER_RECEIPT_RESULT_IGNORED = "peer_ignored";
 
 const createRuntimeMessageId = () => {
   if (window.crypto?.randomUUID) {
@@ -20,7 +22,12 @@ const createRuntimeMessageId = () => {
   return `peer_${Date.now().toString(36)}_${randomToken}`;
 };
 
-export const createPeerReceiptMessage = ({ fromUserId, toUserId, messageId }) => {
+export const createPeerReceiptMessage = ({
+  fromUserId,
+  toUserId,
+  messageId,
+  result = PEER_RECEIPT_RESULT_PROCESSED,
+}) => {
   return {
     id: createRuntimeMessageId(),
     type: PEER_MESSAGE_TYPE_RECEIVED,
@@ -29,6 +36,7 @@ export const createPeerReceiptMessage = ({ fromUserId, toUserId, messageId }) =>
     created_at: new Date().toISOString(),
     payload: {
       message_id: messageId,
+      result,
     },
   };
 };

@@ -9,6 +9,10 @@ const RTC_CONFIGURATION = {
 };
 
 const DATA_CHANNEL_LABEL = "iou-json";
+const DISCONNECTED_GRACE_PERIOD_MS = 5000;
+const REMOTE_INITIATED_PEER_GRACE_PERIOD_MS = 15000;
+const NEGOTIATION_ERROR_PATTERN =
+  /have-remote-offer|setLocalDescription|ICE restart|ice-ufrag|ice-pwd|Cannot set local offer/i;
 
 const safeParseJson = (value) => {
   try {
@@ -16,6 +20,20 @@ const safeParseJson = (value) => {
   } catch {
     return null;
   }
+};
+
+const logPeerEvent = (title, detail) => {
+  if (typeof detail === "undefined") {
+    console.log(`[WebRTC] ${title}`);
+    return;
+  }
+
+  console.log(`[WebRTC] ${title}`, detail);
+};
+
+const isRecoverableNegotiationError = (error) => {
+  const message = String(error?.message || error || "");
+  return NEGOTIATION_ERROR_PATTERN.test(message);
 };
 
 const createPeerMesh = (
@@ -47,16 +65,62 @@ const createPeerMesh = (
     }
   };
 
-  const closePeer = (peerUserId) => {
+  const clearDisconnectTimer = (peer) => {
+    if (!peer?.disconnectTimer) {
+      return;
+    }
+
+    window.clearTimeout(peer.disconnectTimer);
+    peer.disconnectTimer = null;
+  };
+
+  const clearRemoteAllowanceTimer = (peer) => {
+    if (!peer?.remoteAllowanceTimer) {
+      return;
+    }
+
+    window.clearTimeout(peer.remoteAllowanceTimer);
+    peer.remoteAllowanceTimer = null;
+  };
+
+  const scheduleRemoteAllowanceTimeout = (peer) => {
+    if (!peer || peer.allowedBySnapshot || peer.remoteAllowanceTimer) {
+      return;
+    }
+
+    peer.remoteAllowanceTimer = window.setTimeout(() => {
+      peer.remoteAllowanceTimer = null;
+      if (!peers.has(peer.peerUserId) || peer.allowedBySnapshot) {
+        return;
+      }
+
+      closePeer(peer.peerUserId, {
+        reason: "remote_allowance_timeout",
+      });
+    }, REMOTE_INITIATED_PEER_GRACE_PERIOD_MS);
+  };
+
+  const closePeer = (peerUserId, detail = {}) => {
     const peer = peers.get(peerUserId);
     if (!peer) {
       return;
     }
 
+    clearDisconnectTimer(peer);
+    clearRemoteAllowanceTimer(peer);
+    logPeerEvent("Peer connection disconnecting", {
+      peerUserId,
+      ...detail,
+    });
     peer.channel?.close();
     peer.connection?.close();
     peers.delete(peerUserId);
     notifyPeerStatusChange();
+  };
+
+  const recreatePeer = (peerUserId, detail = {}, options = {}) => {
+    closePeer(peerUserId, detail);
+    return ensurePeer(peerUserId, options);
   };
 
   const bindChannel = (peerUserId, channel) => {
@@ -67,16 +131,36 @@ const createPeerMesh = (
 
     peer.channel = channel;
     channel.addEventListener("open", () => {
+      logPeerEvent("Peer connection established", {
+        peerUserId,
+        channelLabel: channel.label,
+      });
       notifyPeerStatusChange();
       notifyPeerReady(peerUserId);
     });
     channel.addEventListener("close", () => {
+      logPeerEvent("Peer connection disconnected", {
+        peerUserId,
+        channelLabel: channel.label,
+      });
       peer.inflightMessageIds.clear();
       peer.channel = null;
+      clearDisconnectTimer(peer);
       notifyPeerStatusChange();
+      if (peers.get(peerUserId) !== peer) {
+        return;
+      }
+
+      closePeer(peerUserId, {
+        reason: "channel_closed",
+      });
     });
     channel.addEventListener("message", (event) => {
       const message = safeParseJson(event.data);
+      logPeerEvent("Peer data received", {
+        peerUserId,
+        data: message ?? event.data,
+      });
       if (!message || typeof onPeerMessage !== "function") {
         return;
       }
@@ -98,6 +182,16 @@ const createPeerMesh = (
     if (peers.has(normalizedPeerUserId)) {
       const existingPeer = peers.get(normalizedPeerUserId);
       if (initiator && !existingPeer.channel && !existingPeer.makingOffer) {
+        if (existingPeer.connection?.signalingState !== "stable") {
+          return recreatePeer(
+            normalizedPeerUserId,
+            {
+              reason: "replace_unstable_peer_before_offer",
+              signalingState: existingPeer.connection?.signalingState,
+            },
+            { initiator }
+          );
+        }
         void createOffer(existingPeer);
       }
       return existingPeer;
@@ -111,8 +205,19 @@ const createPeerMesh = (
       inflightMessageIds: new Set(),
       pendingCandidates: [],
       makingOffer: false,
+      disconnectTimer: null,
+      remoteAllowanceTimer: null,
+      allowedBySnapshot: initiator,
     };
     peers.set(normalizedPeerUserId, peer);
+    logPeerEvent("Establishing peer connection", {
+      peerUserId: normalizedPeerUserId,
+      initiator,
+    });
+
+    if (!initiator) {
+      scheduleRemoteAllowanceTimeout(peer);
+    }
 
     connection.addEventListener("icecandidate", (event) => {
       if (!event.candidate) {
@@ -126,8 +231,44 @@ const createPeerMesh = (
     });
 
     connection.addEventListener("connectionstatechange", () => {
-      if (["failed", "closed", "disconnected"].includes(connection.connectionState)) {
-        closePeer(normalizedPeerUserId);
+      logPeerEvent("Peer connection state changed", {
+        peerUserId: normalizedPeerUserId,
+        connectionState: connection.connectionState,
+      });
+
+      if (
+        connection.connectionState === "connecting" ||
+        connection.connectionState === "connected"
+      ) {
+        clearDisconnectTimer(peer);
+        return;
+      }
+
+      if (connection.connectionState === "disconnected") {
+        if (peer.disconnectTimer) {
+          return;
+        }
+
+        peer.disconnectTimer = window.setTimeout(() => {
+          peer.disconnectTimer = null;
+          if (!peers.has(normalizedPeerUserId)) {
+            return;
+          }
+          if (connection.connectionState !== "disconnected") {
+            return;
+          }
+
+          closePeer(normalizedPeerUserId, {
+            reason: "disconnected_timeout",
+          });
+        }, DISCONNECTED_GRACE_PERIOD_MS);
+        return;
+      }
+
+      if (["failed", "closed"].includes(connection.connectionState)) {
+        closePeer(normalizedPeerUserId, {
+          reason: connection.connectionState,
+        });
       }
     });
 
@@ -148,15 +289,35 @@ const createPeerMesh = (
     if (!peer || peer.makingOffer) {
       return;
     }
+    if (peer.connection?.signalingState !== "stable") {
+      return;
+    }
 
     peer.makingOffer = true;
     try {
       const offer = await peer.connection.createOffer();
+      if (peer.connection?.signalingState !== "stable") {
+        return;
+      }
       await peer.connection.setLocalDescription(offer);
+      logPeerEvent("Sending peer offer", {
+        peerUserId: peer.peerUserId,
+        description: peer.connection.localDescription,
+      });
       sendSignal(peer.peerUserId, {
         type: "description",
         description: peer.connection.localDescription,
       });
+    } catch (error) {
+      if (isRecoverableNegotiationError(error)) {
+        logPeerEvent("Skipping peer offer after negotiation race", {
+          peerUserId: peer.peerUserId,
+          message: String(error?.message || error),
+        });
+        return;
+      }
+
+      throw error;
     } finally {
       peer.makingOffer = false;
     }
@@ -167,11 +328,19 @@ const createPeerMesh = (
       return;
     }
 
+    logPeerEvent("Received peer description", {
+      peerUserId: peer.peerUserId,
+      description,
+    });
     await peer.connection.setRemoteDescription(description);
 
     if (description.type === "offer") {
       const answer = await peer.connection.createAnswer();
       await peer.connection.setLocalDescription(answer);
+      logPeerEvent("Sending peer answer", {
+        peerUserId: peer.peerUserId,
+        description: peer.connection.localDescription,
+      });
       sendSignal(peer.peerUserId, {
         type: "description",
         description: peer.connection.localDescription,
@@ -190,6 +359,10 @@ const createPeerMesh = (
       return;
     }
 
+    logPeerEvent("Received peer ICE candidate", {
+      peerUserId: peer.peerUserId,
+      candidate,
+    });
     if (!peer.connection.remoteDescription) {
       peer.pendingCandidates.push(candidate);
       return;
@@ -200,18 +373,66 @@ const createPeerMesh = (
 
   return {
     ensurePeer,
+    hasPeer: (peerUserId) => {
+      const normalizedPeerUserId =
+        typeof peerUserId === "string" ? peerUserId.trim() : "";
+      if (!normalizedPeerUserId) {
+        return false;
+      }
+
+      return peers.has(normalizedPeerUserId);
+    },
     handleSignal: async (peerUserId, signal) => {
       if (!signal || typeof signal !== "object") {
         return;
       }
 
-      const peer = ensurePeer(peerUserId, { initiator: false });
+      let peer = ensurePeer(peerUserId, { initiator: false });
       if (!peer) {
         return;
       }
 
       if (signal.type === "description") {
-        await handleDescription(peer, signal.description);
+        if (
+          signal.description?.type === "offer" &&
+          peer.connection?.signalingState !== "stable"
+        ) {
+          peer = recreatePeer(
+            peerUserId,
+            {
+              reason: "replace_unstable_peer_before_remote_offer",
+              signalingState: peer.connection?.signalingState,
+            },
+            { initiator: false }
+          );
+          if (!peer) {
+            return;
+          }
+        }
+        try {
+          await handleDescription(peer, signal.description);
+        } catch (error) {
+          if (
+            signal.description?.type === "offer" &&
+            isRecoverableNegotiationError(error)
+          ) {
+            peer = recreatePeer(
+              peerUserId,
+              {
+                reason: "recover_after_remote_description_error",
+                message: String(error?.message || error),
+              },
+              { initiator: false }
+            );
+            if (!peer) {
+              return;
+            }
+            await handleDescription(peer, signal.description);
+            return;
+          }
+
+          throw error;
+        }
       } else if (signal.type === "candidate") {
         await handleCandidate(peer, signal.candidate);
       }
@@ -239,6 +460,10 @@ const createPeerMesh = (
         return false;
       }
 
+      logPeerEvent("Peer data sent", {
+        peerUserId,
+        data: message,
+      });
       peer.channel.send(JSON.stringify(message));
       if (message?.id) {
         peer.inflightMessageIds.add(message.id);
@@ -251,15 +476,26 @@ const createPeerMesh = (
         return false;
       }
 
+      logPeerEvent("Peer control data sent", {
+        peerUserId,
+        data: message,
+      });
       peer.channel.send(JSON.stringify(message));
       return true;
     },
     closePeersNotInSet: (allowedPeerIds) => {
       const allowedIds = new Set(Array.isArray(allowedPeerIds) ? allowedPeerIds : []);
-      Array.from(peers.keys()).forEach((peerUserId) => {
-        if (allowedIds.has(peerUserId)) {
+      Array.from(peers.entries()).forEach(([peerUserId, peer]) => {
+        peer.allowedBySnapshot = allowedIds.has(peerUserId);
+        if (peer.allowedBySnapshot) {
+          clearRemoteAllowanceTimer(peer);
           return;
         }
+
+        if (peer.remoteAllowanceTimer) {
+          return;
+        }
+
         closePeer(peerUserId);
       });
     },

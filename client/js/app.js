@@ -237,11 +237,15 @@ const loadPage = async (route) => {
         },
       });
     } else if (route.type === "friend") {
+      const friend = data.connections.find((entry) => entry.person_id === route.friendId);
+      if (!friend) {
+        window.location.hash = "friends";
+        return;
+      }
       const friendHtml = await fetchTemplate(templatePaths.friend);
       renderSubpageContent(pageView, friendHtml);
 
       bindFriendDetail(pageView, data, route.friendId);
-      const friend = data.connections.find((entry) => entry.person_id === route.friendId);
       if (friend?.person_name) {
         document.title = `IOU — ${friend.person_name}`;
       } else {

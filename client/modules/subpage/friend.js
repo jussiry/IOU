@@ -4,7 +4,7 @@ This module binds the friend detail subpage. It renders debt/credit summary card
 It also exposes navigation triggers to related subpages by wiring the credit tile click target from the current friend context.
 */
 
-import { acceptFriend, rejectFriend } from "../../js/data.js";
+import { acceptFriend, rejectFriend, removeFriendRequest } from "../../js/data.js";
 import {
   FRIENDSHIP_STATUS_ACCEPTED,
   FRIENDSHIP_STATUS_PENDING_INCOMING,
@@ -55,6 +55,12 @@ export const bindFriendDetail = (root, data, friendId) => {
         </button>
         <button class="friend-inline-action surface-box" type="button" data-action="reject-friend">
           Reject
+        </button>
+      `;
+    } else if (friendshipStatus === FRIENDSHIP_STATUS_PENDING_OUTGOING) {
+      headerRight.innerHTML = `
+        <button class="friend-inline-action surface-box" type="button" data-action="remove-request">
+          Remove request
         </button>
       `;
     } else {
@@ -122,6 +128,14 @@ export const bindFriendDetail = (root, data, friendId) => {
   if (rejectButton && friendId) {
     rejectButton.addEventListener("click", async () => {
       await rejectFriend(friendId);
+      window.location.hash = "friends";
+    });
+  }
+  const removeRequestButton = headerRight?.querySelector('[data-action="remove-request"]');
+  if (removeRequestButton && friendId) {
+    removeRequestButton.addEventListener("click", async () => {
+      await removeFriendRequest(friendId);
+      window.location.hash = "friends";
     });
   }
 
