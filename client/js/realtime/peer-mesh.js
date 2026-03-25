@@ -2,6 +2,8 @@
 This module manages WebRTC peer connections and JSON data channels between eligible IOU clients.
 
 It keeps peer session state, offer/answer exchange, and data-channel delivery concerns in one place so the higher-level realtime coordinator can focus on queued application messages, state sync, and UI-facing connection status.
+
+Offer/answer negotiation follows the "perfect negotiation" pattern: peers are assigned polite or impolite roles by comparing user IDs so both sides independently agree on who yields during simultaneous offer collisions.
 */
 
 const RTC_CONFIGURATION = {
@@ -9,10 +11,8 @@ const RTC_CONFIGURATION = {
 };
 
 const DATA_CHANNEL_LABEL = "iou-json";
-const DISCONNECTED_GRACE_PERIOD_MS = 5000;
+const DISCONNECTED_GRACE_PERIOD_MS = 15000;
 const REMOTE_INITIATED_PEER_GRACE_PERIOD_MS = 15000;
-const NEGOTIATION_ERROR_PATTERN =
-  /have-remote-offer|setLocalDescription|ICE restart|ice-ufrag|ice-pwd|Cannot set local offer/i;
 
 const safeParseJson = (value) => {
   try {
@@ -31,10 +31,9 @@ const logPeerEvent = (title, detail) => {
   console.log(`[WebRTC] ${title}`, detail);
 };
 
-const isRecoverableNegotiationError = (error) => {
-  const message = String(error?.message || error || "");
-  return NEGOTIATION_ERROR_PATTERN.test(message);
-};
+// The polite peer yields during offer collisions by accepting implicit rollback.
+// Determined by comparing user IDs so both sides always agree on roles.
+const isPoliteRole = (localUserId, peerUserId) => localUserId < peerUserId;
 
 const createPeerMesh = (
   {
@@ -46,6 +45,7 @@ const createPeerMesh = (
   } = {}
 ) => {
   const peers = new Map();
+
   const getConnectedPeerIds = () => {
     return Array.from(peers.values())
       .filter((peer) => peer?.channel?.readyState === "open")
@@ -118,11 +118,6 @@ const createPeerMesh = (
     notifyPeerStatusChange();
   };
 
-  const recreatePeer = (peerUserId, detail = {}, options = {}) => {
-    closePeer(peerUserId, detail);
-    return ensurePeer(peerUserId, options);
-  };
-
   const bindChannel = (peerUserId, channel) => {
     const peer = peers.get(peerUserId);
     if (!peer) {
@@ -180,28 +175,16 @@ const createPeerMesh = (
     }
 
     if (peers.has(normalizedPeerUserId)) {
-      const existingPeer = peers.get(normalizedPeerUserId);
-      if (initiator && !existingPeer.channel && !existingPeer.makingOffer) {
-        if (existingPeer.connection?.signalingState !== "stable") {
-          return recreatePeer(
-            normalizedPeerUserId,
-            {
-              reason: "replace_unstable_peer_before_offer",
-              signalingState: existingPeer.connection?.signalingState,
-            },
-            { initiator }
-          );
-        }
-        void createOffer(existingPeer);
-      }
-      return existingPeer;
+      return peers.get(normalizedPeerUserId);
     }
 
     const connection = new RTCPeerConnection(RTC_CONFIGURATION);
+    const isPolite = isPoliteRole(getLocalUserId(), normalizedPeerUserId);
     const peer = {
       peerUserId: normalizedPeerUserId,
       connection,
       channel: null,
+      isPolite,
       inflightMessageIds: new Set(),
       pendingCandidates: [],
       makingOffer: false,
@@ -213,11 +196,37 @@ const createPeerMesh = (
     logPeerEvent("Establishing peer connection", {
       peerUserId: normalizedPeerUserId,
       initiator,
+      isPolite,
     });
 
     if (!initiator) {
       scheduleRemoteAllowanceTimeout(peer);
     }
+
+    // Perfect negotiation: onnegotiationneeded handles both initial offers and
+    // ICE restarts. setLocalDescription() with no args creates offer or answer
+    // as appropriate for the current signaling state.
+    connection.addEventListener("negotiationneeded", async () => {
+      try {
+        peer.makingOffer = true;
+        await connection.setLocalDescription();
+        logPeerEvent("Sending peer offer", {
+          peerUserId: normalizedPeerUserId,
+          description: connection.localDescription,
+        });
+        sendSignal(normalizedPeerUserId, {
+          type: "description",
+          description: connection.localDescription,
+        });
+      } catch (error) {
+        logPeerEvent("Offer creation failed", {
+          peerUserId: normalizedPeerUserId,
+          error: String(error?.message || error),
+        });
+      } finally {
+        peer.makingOffer = false;
+      }
+    });
 
     connection.addEventListener("icecandidate", (event) => {
       if (!event.candidate) {
@@ -249,12 +258,24 @@ const createPeerMesh = (
           return;
         }
 
+        // Attempt ICE restart before giving up. restartIce() fires
+        // negotiationneeded which sends a new offer with fresh ICE credentials.
+        logPeerEvent("Attempting ICE restart", { peerUserId: normalizedPeerUserId });
+        try {
+          connection.restartIce();
+        } catch {
+          // restartIce not available — fall through to close after timeout
+        }
+
         peer.disconnectTimer = window.setTimeout(() => {
           peer.disconnectTimer = null;
           if (!peers.has(normalizedPeerUserId)) {
             return;
           }
-          if (connection.connectionState !== "disconnected") {
+          if (
+            connection.connectionState === "connected" ||
+            connection.connectionState === "connecting"
+          ) {
             return;
           }
 
@@ -279,52 +300,27 @@ const createPeerMesh = (
     if (initiator) {
       const channel = connection.createDataChannel(DATA_CHANNEL_LABEL);
       bindChannel(normalizedPeerUserId, channel);
-      void createOffer(peer);
+      // createDataChannel triggers negotiationneeded, which sends the initial offer
     }
 
     return peer;
   };
 
-  const createOffer = async (peer) => {
-    if (!peer || peer.makingOffer) {
-      return;
-    }
-    if (peer.connection?.signalingState !== "stable") {
-      return;
-    }
-
-    peer.makingOffer = true;
-    try {
-      const offer = await peer.connection.createOffer();
-      if (peer.connection?.signalingState !== "stable") {
-        return;
-      }
-      await peer.connection.setLocalDescription(offer);
-      logPeerEvent("Sending peer offer", {
-        peerUserId: peer.peerUserId,
-        description: peer.connection.localDescription,
-      });
-      sendSignal(peer.peerUserId, {
-        type: "description",
-        description: peer.connection.localDescription,
-      });
-    } catch (error) {
-      if (isRecoverableNegotiationError(error)) {
-        logPeerEvent("Skipping peer offer after negotiation race", {
-          peerUserId: peer.peerUserId,
-          message: String(error?.message || error),
-        });
-        return;
-      }
-
-      throw error;
-    } finally {
-      peer.makingOffer = false;
-    }
-  };
-
   const handleDescription = async (peer, description) => {
     if (!peer || !description) {
+      return;
+    }
+
+    // Perfect negotiation: detect a collision where both sides are trying to offer
+    // simultaneously. The impolite peer ignores the incoming offer and keeps its own.
+    // The polite peer proceeds — setRemoteDescription implicitly rolls back its
+    // in-progress offer so the remote offer can be accepted.
+    const offerCollision =
+      description.type === "offer" &&
+      (peer.makingOffer || peer.connection.signalingState !== "stable");
+
+    if (offerCollision && !peer.isPolite) {
+      logPeerEvent("Ignoring colliding offer (impolite peer)", { peerUserId: peer.peerUserId });
       return;
     }
 
@@ -335,8 +331,7 @@ const createPeerMesh = (
     await peer.connection.setRemoteDescription(description);
 
     if (description.type === "offer") {
-      const answer = await peer.connection.createAnswer();
-      await peer.connection.setLocalDescription(answer);
+      await peer.connection.setLocalDescription();
       logPeerEvent("Sending peer answer", {
         peerUserId: peer.peerUserId,
         description: peer.connection.localDescription,
@@ -387,52 +382,13 @@ const createPeerMesh = (
         return;
       }
 
-      let peer = ensurePeer(peerUserId, { initiator: false });
+      const peer = ensurePeer(peerUserId, { initiator: false });
       if (!peer) {
         return;
       }
 
       if (signal.type === "description") {
-        if (
-          signal.description?.type === "offer" &&
-          peer.connection?.signalingState !== "stable"
-        ) {
-          peer = recreatePeer(
-            peerUserId,
-            {
-              reason: "replace_unstable_peer_before_remote_offer",
-              signalingState: peer.connection?.signalingState,
-            },
-            { initiator: false }
-          );
-          if (!peer) {
-            return;
-          }
-        }
-        try {
-          await handleDescription(peer, signal.description);
-        } catch (error) {
-          if (
-            signal.description?.type === "offer" &&
-            isRecoverableNegotiationError(error)
-          ) {
-            peer = recreatePeer(
-              peerUserId,
-              {
-                reason: "recover_after_remote_description_error",
-                message: String(error?.message || error),
-              },
-              { initiator: false }
-            );
-            if (!peer) {
-              return;
-            }
-            await handleDescription(peer, signal.description);
-            return;
-          }
-
-          throw error;
-        }
+        await handleDescription(peer, signal.description);
       } else if (signal.type === "candidate") {
         await handleCandidate(peer, signal.candidate);
       }
