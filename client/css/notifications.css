@@ -1,0 +1,91 @@
+.notification-container {
+  position: fixed;
+  bottom: calc(105px + env(safe-area-inset-bottom, 0px));
+  left: 16px;
+  right: 16px;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.notification-toast {
+  --surface-radius: 14px;
+  appearance: none;
+  border: none;
+  width: 100%;
+  padding: 14px 18px;
+  background: var(--ink);
+  color: #fff;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: left;
+  border-radius: var(--surface-radius);
+  box-shadow: 0 8px 24px rgba(15, 12, 8, 0.2);
+  cursor: pointer;
+  pointer-events: auto;
+  animation: notification-in 280ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.notification-toast--out {
+  animation: notification-out 300ms ease-in both;
+}
+
+@keyframes notification-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes notification-out {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(8px) scale(0.96);
+  }
+}
+
+.notification-hide-all {
+  appearance: none;
+  border: none;
+  background: var(--ink);
+  color: rgba(255, 255, 255, 0.8);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  pointer-events: auto;
+  align-self: flex-end;
+  padding: 8px 16px;
+  border-radius: 20px;
+  box-shadow: 0 4px 12px rgba(15, 12, 8, 0.15);
+}
+
+.notification-hide-all[hidden] {
+  display: none;
+}
+
+body.is-welcome .notification-container {
+  display: none;
+}
+
+@media (min-width: 600px) {
+  .notification-container {
+    width: min(388px, calc(100% - 32px));
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+  }
+}

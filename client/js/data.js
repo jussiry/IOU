@@ -54,6 +54,7 @@ import {
   createInboundProcessingResult,
   routeInboundMessage,
 } from "./peer-message-handlers.js";
+import { showNotification } from "./notifications.js";
 
 const VERSION_KEY = "iou_version";
 
@@ -656,6 +657,10 @@ export const applyInboundPeerMessage = async (incomingMessage) => {
       buildView(state),
       result.acknowledgeResult
     );
+  }
+
+  if (result.notification) {
+    showNotification(result.notification);
   }
 
   return createInboundProcessingResult(

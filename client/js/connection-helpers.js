@@ -190,7 +190,7 @@ export const removeFriendRelationshipData = (state, friendId) => {
 export const cancelPendingFriendRequest = (
   state,
   friendId,
-  { direction, displayName, notifyPeer = false } = {}
+  { direction, displayName, notifyPeer = false, skipLog = false } = {}
 ) => {
   const normalizedFriendId = asTrimmedString(friendId);
   const normalizedDisplayName = asTrimmedString(displayName) || normalizedFriendId;
@@ -219,9 +219,11 @@ export const cancelPendingFriendRequest = (
       payload: {},
     });
   }
-  appendLog(state, {
-    text: `Friend request cancelled ${direction} ${normalizedDisplayName}`,
-    friendId: normalizedFriendId,
-  });
+  if (!skipLog) {
+    appendLog(state, {
+      text: `Friend request cancelled ${direction} ${normalizedDisplayName}`,
+      friendId: normalizedFriendId,
+    });
+  }
   return true;
 };

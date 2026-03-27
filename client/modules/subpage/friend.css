@@ -153,10 +153,6 @@
   display: none;
 }
 
-.credit-suggestion-explainer[hidden] {
-  display: none;
-}
-
 .credit-suggestion-label {
   font-size: 12px;
   font-weight: 700;

@@ -242,8 +242,12 @@ const loadPage = async (route) => {
         window.location.hash = "friends";
         return;
       }
-      const friendHtml = await fetchTemplate(templatePaths.friend);
+      const [friendHtml, creditExplainerHtml] = await Promise.all([
+        fetchTemplate(templatePaths.friend),
+        fetchTemplate(templatePaths.creditExplainer),
+      ]);
       renderSubpageContent(pageView, friendHtml);
+      renderTemplateIntoSlots(pageView, "credit-explainer", creditExplainerHtml);
 
       bindFriendDetail(pageView, data, route.friendId);
       if (friend?.person_name) {

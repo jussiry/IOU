@@ -2,9 +2,10 @@
 Handles inbound peer-to-peer messages by routing them to type-specific
 handlers that mutate app state.
 
-Each apply* function takes (state, message) and returns true if the message
-was successfully applied, false otherwise. The top-level routeInboundMessage
-function handles deduplication, routing, and logging for unrecognized messages.
+Each apply* function takes (state, message) and returns null if the message
+could not be applied, or a notification object { text, hash, friendId } on
+success. The notification text is reused for both the toast and the log entry,
+keeping the two in sync without duplication.
 */
 
 import {
@@ -20,6 +21,7 @@ import {
   getDisplayName,
   getUserConnection,
 } from "./connection-helpers.js";
+import { formatCurrency } from "./utils/format.js";
 import {
   hasProcessedPeerMessage,
   markProcessedPeerMessage,
@@ -35,7 +37,7 @@ import {
   PEER_RECEIPT_RESULT_IGNORED,
   PEER_RECEIPT_RESULT_PROCESSED,
 } from "./realtime/peer-messages.js";
-import { appendLog, asTrimmedString, createId, hasUser } from "./state-utils.js";
+import { appendLog, asTrimmedString, createId } from "./state-utils.js";
 import {
   FRIENDSHIP_STATUS_ACCEPTED,
   FRIENDSHIP_STATUS_PENDING_INCOMING,
@@ -69,6 +71,9 @@ const appendIllegalPeerMessageLog = (state, message) => {
   });
 };
 
+const notification = (text, friendId, hash) => ({ text, friendId, hash });
+const friendNotification = (text, friendId) => notification(text, friendId, `friend/${friendId}`);
+
 const applyFriendRequestMessage = (state, message) => {
   const requesterName =
     asTrimmedString(message.payload?.requester_name) || message.from_user_id;
@@ -78,10 +83,6 @@ const applyFriendRequestMessage = (state, message) => {
     existingConnection.friendship_status = FRIENDSHIP_STATUS_ACCEPTED;
     existingConnection.person_name = requesterName;
     ensureContact(state, message.from_user_id, requesterName);
-    appendLog(state, {
-      text: `Friendship with **${requesterName}** accepted`,
-      friendId: message.from_user_id,
-    });
     queuePeerMessage(state, {
       toUserId: message.from_user_id,
       type: PEER_MESSAGE_TYPE_FRIEND_ACCEPT,
@@ -89,15 +90,15 @@ const applyFriendRequestMessage = (state, message) => {
         accepter_name: state.user.name,
       },
     });
-    return true;
+    return friendNotification(`${requesterName} is now your friend`, message.from_user_id);
   }
 
   if (isAcceptedFriendshipStatus(existingConnection?.friendship_status)) {
-    return false;
+    return null;
   }
 
   if (existingConnection?.friendship_status === FRIENDSHIP_STATUS_PENDING_INCOMING) {
-    return false;
+    return null;
   }
 
   const userConnection = ensureUserConnection(
@@ -109,7 +110,7 @@ const applyFriendRequestMessage = (state, message) => {
     }
   );
   if (!userConnection) {
-    return false;
+    return null;
   }
 
   const contactBackLink = ensureContactBackLink(
@@ -124,11 +125,7 @@ const applyFriendRequestMessage = (state, message) => {
 
   userConnection.friendship_status = FRIENDSHIP_STATUS_PENDING_INCOMING;
   userConnection.person_name = requesterName;
-  appendLog(state, {
-    text: `Friend request received from ${requesterName}`,
-    friendId: message.from_user_id,
-  });
-  return true;
+  return friendNotification(`Friend request from ${requesterName}`, message.from_user_id);
 };
 
 const applyFriendAcceptMessage = (state, message) => {
@@ -136,10 +133,10 @@ const applyFriendAcceptMessage = (state, message) => {
     asTrimmedString(message.payload?.accepter_name) || message.from_user_id;
   const userConnection = getUserConnection(state, message.from_user_id);
   if (!userConnection) {
-    return false;
+    return null;
   }
   if (userConnection.friendship_status === FRIENDSHIP_STATUS_REJECTED) {
-    return false;
+    return null;
   }
 
   const wasAccepted = isAcceptedFriendshipStatus(userConnection.friendship_status);
@@ -147,27 +144,29 @@ const applyFriendAcceptMessage = (state, message) => {
   userConnection.person_name = accepterName;
   ensureContact(state, message.from_user_id, accepterName);
 
-  if (!wasAccepted) {
-    appendLog(state, {
-      text: `**${accepterName}** accepted your friend request`,
-      friendId: message.from_user_id,
-    });
+  if (wasAccepted) {
+    return null;
   }
-  return true;
+  return friendNotification(`${accepterName} accepted your friend request`, message.from_user_id);
 };
 
 const applyFriendRejectMessage = (state, message) => {
   const displayName = getDisplayName(state, message.from_user_id);
-  return cancelPendingFriendRequest(state, message.from_user_id, {
+  const applied = cancelPendingFriendRequest(state, message.from_user_id, {
     direction: "from",
     displayName,
+    skipLog: true,
   });
+  if (!applied) {
+    return null;
+  }
+  return notification(`${displayName} rejected your friend request`, message.from_user_id, "friends");
 };
 
 const applyCreditLimitSuggestionMessage = (state, message) => {
   const creditLimit = normalizeCurrencyAmount(message.payload?.credit_limit_eur, NaN);
   if (!Number.isFinite(creditLimit) || creditLimit < 0) {
-    return false;
+    return null;
   }
 
   const displayName = getDisplayName(state, message.from_user_id);
@@ -176,68 +175,71 @@ const applyCreditLimitSuggestionMessage = (state, message) => {
     !userConnection ||
     !isPeerEligibleFriendshipStatus(userConnection.friendship_status)
   ) {
-    return false;
+    return null;
   }
 
   const existingLimit = userConnection.trust_credit_limit_eur || 0;
   const pendingOutgoing = userConnection.pending_credit_limit_is_incoming === false
     ? userConnection.pending_credit_limit_eur
     : null;
+  const wasIncoming = userConnection.pending_credit_limit_is_incoming === true;
 
   if (Number.isFinite(pendingOutgoing) && creditLimit === pendingOutgoing) {
     // Peer accepted our suggestion — apply it locally now
     userConnection.trust_credit_limit_eur = creditLimit;
     userConnection.pending_credit_limit_eur = null;
     userConnection.pending_credit_limit_is_incoming = null;
-    appendLog(state, {
-      text: `**${displayName}** accepted the credit limit of ${creditLimit.toFixed(2)}€`,
-      friendId: message.from_user_id,
-      amount: creditLimit,
-    });
-  } else if (creditLimit === existingLimit && userConnection.pending_credit_limit_eur !== null) {
-    // Peer cancelled or declined — clear our pending suggestion
+    return friendNotification(
+      `${displayName} agreed on credit limit of ${formatCurrency(creditLimit)}`,
+      message.from_user_id,
+    );
+  }
+
+  if (creditLimit === existingLimit && userConnection.pending_credit_limit_eur !== null) {
+    // Peer cancelled or declined — clear pending
     userConnection.pending_credit_limit_eur = null;
     userConnection.pending_credit_limit_is_incoming = null;
-    appendLog(state, {
-      text: `**${displayName}** cancelled credit limit suggestion`,
-      friendId: message.from_user_id,
-    });
-  } else if (creditLimit < existingLimit) {
+    if (wasIncoming) {
+      return friendNotification(`${displayName} cancelled credit limit suggestion`, message.from_user_id);
+    }
+    return friendNotification(`${displayName} rejected credit limit suggestion`, message.from_user_id);
+  }
+
+  if (creditLimit < existingLimit) {
     // Lower: apply automatically, show notification
     userConnection.trust_credit_limit_eur = creditLimit;
     userConnection.pending_credit_limit_eur = creditLimit;
     userConnection.pending_credit_limit_is_incoming = "lowered";
-    appendLog(state, {
-      text: `**${displayName}** lowered credit limit to ${creditLimit.toFixed(2)}€`,
-      friendId: message.from_user_id,
-      amount: creditLimit,
-    });
-  } else if (creditLimit === existingLimit) {
-    // Same as current with no pending: no-op
-    return false;
-  } else {
-    // Higher than current: let user decide
-    userConnection.pending_credit_limit_eur = creditLimit;
-    userConnection.pending_credit_limit_is_incoming = true;
-    appendLog(state, {
-      text: `**${displayName}** suggested a credit limit of ${creditLimit.toFixed(2)}€`,
-      friendId: message.from_user_id,
-      amount: creditLimit,
-    });
+    return friendNotification(
+      `${displayName} lowered credit limit to ${formatCurrency(creditLimit)}`,
+      message.from_user_id,
+    );
   }
-  return true;
+
+  if (creditLimit === existingLimit) {
+    // Same as current with no pending: no-op
+    return null;
+  }
+
+  // Higher than current: let user decide
+  userConnection.pending_credit_limit_eur = creditLimit;
+  userConnection.pending_credit_limit_is_incoming = true;
+  return friendNotification(
+    `${displayName} suggested credit limit of ${formatCurrency(creditLimit)}`,
+    message.from_user_id,
+  );
 };
 
 const applyTransactionCreatedMessage = (state, message) => {
   const amount = normalizeCurrencyAmount(message.payload?.amount_eur, NaN);
   if (!Number.isFinite(amount) || amount <= 0) {
-    return false;
+    return null;
   }
 
   const displayName = getDisplayName(state, message.from_user_id);
   const userConnection = getUserConnection(state, message.from_user_id);
   if (!userConnection || !isAcceptedFriendshipStatus(userConnection.friendship_status)) {
-    return false;
+    return null;
   }
 
   const transactionId =
@@ -246,7 +248,6 @@ const applyTransactionCreatedMessage = (state, message) => {
     asTrimmedString(message.payload?.date) || new Date().toISOString().slice(0, 10);
   const note =
     asTrimmedString(message.payload?.note) || "IOU received";
-  const messageText = asTrimmedString(message.payload?.message);
 
   userConnection.person_name = displayName;
   userConnection.debt_eur = (userConnection.debt_eur || 0) + amount;
@@ -259,14 +260,7 @@ const applyTransactionCreatedMessage = (state, message) => {
     })
   );
 
-  appendLog(state, {
-    text: `**${displayName}** sent ${amount.toFixed(2)}€ to you`,
-    message: messageText,
-    friendId: message.from_user_id,
-    amount,
-    transactionId,
-  });
-  return true;
+  return friendNotification(`${displayName} sent ${amount.toFixed(2)}€ to you`, message.from_user_id);
 };
 
 const createInboundProcessingResult = (view, acknowledgeResult = null) => {
@@ -278,8 +272,9 @@ const createInboundProcessingResult = (view, acknowledgeResult = null) => {
 
 /**
  * Routes an inbound peer message through deduplication and type-specific
- * handlers. Returns { applied, acknowledgeResult } so the caller can
- * decide whether to persist and which receipt to send.
+ * handlers. Returns { applied, acknowledgeResult, notification } so the
+ * caller can decide whether to persist, which receipt to send, and
+ * whether to show a toast.
  */
 export const routeInboundMessage = (state, message) => {
   if (message.to_user_id && message.to_user_id !== state.user.id) {
@@ -294,35 +289,44 @@ export const routeInboundMessage = (state, message) => {
     return { applied: false, acknowledgeResult: null };
   }
 
-  let didApplyMessage = false;
+  let result = null;
   switch (message.type) {
     case PEER_MESSAGE_TYPE_FRIEND_REQUEST:
-      didApplyMessage = applyFriendRequestMessage(state, message);
+      result = applyFriendRequestMessage(state, message);
       break;
     case PEER_MESSAGE_TYPE_FRIEND_ACCEPT:
-      didApplyMessage = applyFriendAcceptMessage(state, message);
+      result = applyFriendAcceptMessage(state, message);
       break;
     case PEER_MESSAGE_TYPE_FRIEND_REJECT:
-      didApplyMessage = applyFriendRejectMessage(state, message);
+      result = applyFriendRejectMessage(state, message);
       break;
     case PEER_MESSAGE_TYPE_CREDIT_LIMIT_SUGGESTION:
-      didApplyMessage = applyCreditLimitSuggestionMessage(state, message);
+      result = applyCreditLimitSuggestionMessage(state, message);
       break;
     case PEER_MESSAGE_TYPE_TRANSACTION_CREATED:
-      didApplyMessage = applyTransactionCreatedMessage(state, message);
+      result = applyTransactionCreatedMessage(state, message);
       break;
     default:
       appendIllegalPeerMessageLog(state, message);
       return { applied: false, acknowledgeResult: PEER_RECEIPT_RESULT_IGNORED, persisted: true };
   }
 
-  if (!didApplyMessage) {
+  if (!result) {
     appendIllegalPeerMessageLog(state, message);
     return { applied: false, acknowledgeResult: PEER_RECEIPT_RESULT_IGNORED, persisted: true };
   }
 
   markProcessedPeerMessage(state, message.id);
-  return { applied: true, acknowledgeResult: PEER_RECEIPT_RESULT_PROCESSED };
+  appendLog(state, {
+    text: result.text,
+    friendId: result.friendId,
+  });
+
+  return {
+    applied: true,
+    acknowledgeResult: PEER_RECEIPT_RESULT_PROCESSED,
+    notification: { text: result.text, hash: result.hash },
+  };
 };
 
 export { createInboundProcessingResult };
