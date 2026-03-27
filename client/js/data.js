@@ -1,16 +1,16 @@
 /*
-This module owns persistent client state for the IOU app. It stores and reads user data from IndexedDB, derives view models for page binders, and keeps mutation logic centralized.
+Orchestrates persistent client state for the IOU app.
 
-It also manages friendship lifecycle changes, queued peer-to-peer messages, and inbound message application so UI modules and realtime transport can coordinate through one consistent state layer.
+This module owns the cached state, IndexedDB persistence, and change
+notification lifecycle. Domain logic for connections, peer messages, and
+view models lives in dedicated sibling modules — this file wires them
+together behind the public API that UI modules and realtime transport consume.
 */
 
 import {
-  createConnectionModel,
   createEmptyAppState,
-  createLogEntryModel,
   createPeerMessageModel,
   createPersonModel,
-  createPublicPersonModel,
   createTransactionModel,
   normalizeCurrencyAmount,
   normalizeAppState,
@@ -21,13 +21,8 @@ import {
   saveAppState,
 } from "./storage/indexeddb.js";
 import {
-  PEER_RECEIPT_RESULT_IGNORED,
-  PEER_RECEIPT_RESULT_PROCESSED,
-  PEER_MESSAGE_TYPE_CREDIT_LIMIT_UPDATE,
   PEER_MESSAGE_TYPE_FRIEND_ACCEPT,
-  PEER_MESSAGE_TYPE_FRIEND_REJECT,
   PEER_MESSAGE_TYPE_FRIEND_REQUEST,
-  PEER_MESSAGE_TYPE_RECEIVED,
   PEER_MESSAGE_TYPE_TRANSACTION_CREATED,
 } from "./realtime/peer-messages.js";
 import {
@@ -39,42 +34,31 @@ import {
   isPeerEligibleFriendshipStatus,
 } from "./utils/friendships.js";
 import { generateNostrKeyPair } from "./utils/nostr-keys.js";
+import { appendLog, asTrimmedString, createId, hasUser } from "./state-utils.js";
+import { buildView } from "./view-model.js";
+import {
+  ensureOutbox,
+  queueCreditLimitSuggestion,
+  queuePeerMessage,
+  removeQueuedPeerMessage,
+} from "./peer-outbox.js";
+import {
+  cancelPendingFriendRequest,
+  ensureUserConnection,
+  findConnection,
+  getDisplayName,
+  getUserConnection,
+  syncUserNameAcrossContacts,
+} from "./connection-helpers.js";
+import {
+  createInboundProcessingResult,
+  routeInboundMessage,
+} from "./peer-message-handlers.js";
 
 const VERSION_KEY = "iou_version";
-const PROCESSED_MESSAGE_ID_LIMIT = 500;
 
 let cachedState = null;
 const dataListeners = new Set();
-
-const hasUser = (state) => {
-  return Boolean(
-    state?.user?.id &&
-      state?.user?.public_key &&
-      state.user.id === state.user.public_key
-  );
-};
-
-const asTrimmedString = (value) => {
-  return typeof value === "string" ? value.trim() : "";
-};
-
-const ensureContacts = (state) => {
-  if (!state.contacts || typeof state.contacts !== "object") {
-    state.contacts = {};
-  }
-};
-
-const ensureOutbox = (state) => {
-  if (!Array.isArray(state.outbox)) {
-    state.outbox = [];
-  }
-};
-
-const ensureProcessedPeerMessageIds = (state) => {
-  if (!Array.isArray(state.processed_peer_message_ids)) {
-    state.processed_peer_message_ids = [];
-  }
-};
 
 const emitDataChange = (state) => {
   const view = buildView(state);
@@ -111,584 +95,9 @@ const persistAndBuildView = async (state) => {
   return emitDataChange(persistedState);
 };
 
-const findConnection = (person, friendId) => {
-  if (!Array.isArray(person?.connections)) {
-    return null;
-  }
-
-  const normalizedFriendId = asTrimmedString(friendId);
-  if (!normalizedFriendId) {
-    return null;
-  }
-
-  return (
-    person.connections.find((entry) => entry.person_id === normalizedFriendId) || null
-  );
-};
-
-const getUserConnection = (state, friendId) => {
-  if (!hasUser(state)) {
-    return null;
-  }
-
-  return findConnection(state.user, friendId);
-};
-
-const ensureConnection = (person, friendId, friendName, options = {}) => {
-  const normalizedFriendId = asTrimmedString(friendId);
-  const normalizedFriendName = asTrimmedString(friendName);
-  if (!normalizedFriendId) {
-    return null;
-  }
-
-  if (!Array.isArray(person.connections)) {
-    person.connections = [];
-  }
-
-  let connection = findConnection(person, normalizedFriendId);
-  if (!connection) {
-    connection = createConnectionModel({
-      person_id: normalizedFriendId,
-      person_name: normalizedFriendName || normalizedFriendId,
-      friendship_status: options.friendshipStatus || FRIENDSHIP_STATUS_ACCEPTED,
-      debt_eur: 0,
-      trust_credit_limit_eur: 0,
-      recent_transactions: [],
-    });
-    person.connections.push(connection);
-  }
-
-  connection.person_name =
-    normalizedFriendName || connection.person_name || normalizedFriendId;
-  if (!Array.isArray(connection.recent_transactions)) {
-    connection.recent_transactions = [];
-  }
-  if (options.friendshipStatus) {
-    connection.friendship_status = options.friendshipStatus;
-  }
-
-  return connection;
-};
-
-const ensureContact = (state, contactId, contactName) => {
-  const normalizedContactId = asTrimmedString(contactId);
-  const normalizedContactName = asTrimmedString(contactName);
-  if (!normalizedContactId) {
-    return null;
-  }
-
-  ensureContacts(state);
-  if (state.contacts[normalizedContactId]) {
-    const existingContact = state.contacts[normalizedContactId];
-    if (normalizedContactName) {
-      existingContact.name = normalizedContactName;
-    }
-    return existingContact;
-  }
-
-  const contact = createPublicPersonModel({
-    id: normalizedContactId,
-    name: normalizedContactName || normalizedContactId,
-    public_key: normalizedContactId,
-    connections: [],
-  });
-  state.contacts[contact.id] = contact;
-  return contact;
-};
-
-const ensureUserConnection = (state, friendId, friendName, options = {}) => {
-  if (!hasUser(state)) {
-    return null;
-  }
-
-  const normalizedFriendId = asTrimmedString(friendId);
-  if (!normalizedFriendId || normalizedFriendId === state.user.id) {
-    return null;
-  }
-
-  ensureContact(state, normalizedFriendId, friendName);
-  return ensureConnection(state.user, normalizedFriendId, friendName, options);
-};
-
-const ensureContactBackLink = (state, contactId, contactName) => {
-  if (!hasUser(state)) {
-    return null;
-  }
-
-  const contact = ensureContact(state, contactId, contactName);
-  if (!contact) {
-    return null;
-  }
-
-  return ensureConnection(contact, state.user.id, state.user.name);
-};
-
-const createId = (prefix = "tx") => {
-  if (window.crypto?.randomUUID) {
-    return `${prefix}_${window.crypto.randomUUID()}`;
-  }
-
-  const randomToken = Math.random().toString(36).slice(2, 10);
-  return `${prefix}_${Date.now().toString(36)}_${randomToken}`;
-};
-
-const appendLog = (
-  state,
-  {
-    text,
-    message = "",
-    friendId = "",
-    amount = 0,
-    transactionId = "",
-  } = {}
-) => {
-  state.logs = Array.isArray(state.logs) ? state.logs : [];
-  state.logs.unshift(
-    createLogEntryModel({
-      id: createId("log"),
-      transaction_id: transactionId,
-      timestamp: new Date().toISOString(),
-      text,
-      message,
-      friend_id: friendId,
-      amount_eur: amount,
-    })
-  );
-};
-
-const queuePeerMessage = (state, { toUserId, type, payload = {} } = {}) => {
-  if (!hasUser(state)) {
-    return null;
-  }
-
-  const normalizedTargetUserId = asTrimmedString(toUserId);
-  if (!normalizedTargetUserId) {
-    return null;
-  }
-
-  ensureOutbox(state);
-  const message = createPeerMessageModel({
-    id: createId("peer"),
-    type,
-    from_user_id: state.user.id,
-    to_user_id: normalizedTargetUserId,
-    created_at: new Date().toISOString(),
-    payload,
-  });
-  state.outbox.push(message);
-  return message;
-};
-
-const markProcessedPeerMessage = (state, messageId) => {
-  const normalizedMessageId = asTrimmedString(messageId);
-  if (!normalizedMessageId) {
-    return;
-  }
-
-  ensureProcessedPeerMessageIds(state);
-  if (state.processed_peer_message_ids.includes(normalizedMessageId)) {
-    return;
-  }
-
-  state.processed_peer_message_ids.unshift(normalizedMessageId);
-  if (state.processed_peer_message_ids.length > PROCESSED_MESSAGE_ID_LIMIT) {
-    state.processed_peer_message_ids.length = PROCESSED_MESSAGE_ID_LIMIT;
-  }
-};
-
-const hasProcessedPeerMessage = (state, messageId) => {
-  const normalizedMessageId = asTrimmedString(messageId);
-  if (!normalizedMessageId) {
-    return false;
-  }
-
-  ensureProcessedPeerMessageIds(state);
-  return state.processed_peer_message_ids.includes(normalizedMessageId);
-};
-
-const removeQueuedPeerMessage = (state, messageId) => {
-  const normalizedMessageId = asTrimmedString(messageId);
-  if (!normalizedMessageId) {
-    return false;
-  }
-
-  ensureOutbox(state);
-  const previousLength = state.outbox.length;
-  state.outbox = state.outbox.filter((message) => message.id !== normalizedMessageId);
-  return state.outbox.length !== previousLength;
-};
-
-const hasQueuedPeerMessage = (state, { toUserId = "", type = "" } = {}) => {
-  const normalizedTargetUserId = asTrimmedString(toUserId);
-  const normalizedType = asTrimmedString(type);
-  ensureOutbox(state);
-
-  return state.outbox.some((message) => {
-    if (normalizedTargetUserId && message.to_user_id !== normalizedTargetUserId) {
-      return false;
-    }
-    if (normalizedType && message.type !== normalizedType) {
-      return false;
-    }
-    return true;
-  });
-};
-
-const createInboundProcessingResult = (view, acknowledgeResult = null) => {
-  return {
-    acknowledgeResult,
-    view,
-  };
-};
-
-const serializePeerMessageData = (message) => {
-  try {
-    return JSON.stringify(createPeerMessageModel(message));
-  } catch {
-    return String(message);
-  }
-};
-
-const appendIllegalPeerMessageLog = (state, message) => {
-  appendLog(state, {
-    text: `Illegal peer message received: ${serializePeerMessageData(message)}`,
-  });
-};
-
-const removeFriendRelationshipData = (state, friendId) => {
-  const normalizedFriendId = asTrimmedString(friendId);
-  if (!normalizedFriendId || !hasUser(state)) {
-    return;
-  }
-
-  state.user.connections = Array.isArray(state.user.connections)
-    ? state.user.connections.filter((connection) => connection.person_id !== normalizedFriendId)
-    : [];
-  ensureContacts(state);
-  delete state.contacts[normalizedFriendId];
-  ensureOutbox(state);
-  state.outbox = state.outbox.filter((message) => {
-    return (
-      message.to_user_id !== normalizedFriendId &&
-      message.from_user_id !== normalizedFriendId
-    );
-  });
-};
-
-const cancelPendingFriendRequest = (
-  state,
-  friendId,
-  { direction, displayName, notifyPeer = false } = {}
-) => {
-  const normalizedFriendId = asTrimmedString(friendId);
-  const normalizedDisplayName = asTrimmedString(displayName) || normalizedFriendId;
-  const userConnection = getUserConnection(state, normalizedFriendId);
-  if (!userConnection) {
-    return false;
-  }
-  if (
-    userConnection.friendship_status !== FRIENDSHIP_STATUS_PENDING_INCOMING &&
-    userConnection.friendship_status !== FRIENDSHIP_STATUS_PENDING_OUTGOING
-  ) {
-    return false;
-  }
-
-  const hasUnsentOutgoingRequest =
-    userConnection.friendship_status === FRIENDSHIP_STATUS_PENDING_OUTGOING &&
-    hasQueuedPeerMessage(state, {
-      toUserId: normalizedFriendId,
-      type: PEER_MESSAGE_TYPE_FRIEND_REQUEST,
-    });
-  removeFriendRelationshipData(state, normalizedFriendId);
-  if (notifyPeer && !hasUnsentOutgoingRequest) {
-    queuePeerMessage(state, {
-      toUserId: normalizedFriendId,
-      type: PEER_MESSAGE_TYPE_FRIEND_REJECT,
-      payload: {},
-    });
-  }
-  appendLog(state, {
-    text: `Friend request cancelled ${direction} ${normalizedDisplayName}`,
-    friendId: normalizedFriendId,
-  });
-  return true;
-};
-
-const buildView = (state) => {
-  const user = state.user;
-  const connections = Array.isArray(user.connections) ? user.connections : [];
-
-  const connectionsWithInbound = connections.map((connection) => {
-    const contact = state.contacts?.[connection.person_id];
-    const backLink = contact?.connections?.find(
-      (entry) => entry.person_id === user.id
-    );
-    const inboundCreditLimit = backLink?.trust_credit_limit_eur || 0;
-
-    return {
-      ...connection,
-      person_name: contact?.name || connection.person_name || connection.person_id,
-      inbound_credit_limit_eur: inboundCreditLimit,
-    };
-  });
-
-  const acceptedConnections = connectionsWithInbound.filter((connection) =>
-    isAcceptedFriendshipStatus(connection.friendship_status)
-  );
-
-  const creditAgreements = acceptedConnections.reduce((sum, connection) => {
-    return sum + (connection.trust_credit_limit_eur || 0);
-  }, 0);
-
-  const friendsOweTotal = acceptedConnections.reduce((sum, connection) => {
-    return sum + Math.max(connection.debt_eur || 0, 0);
-  }, 0);
-  const youOweTotal = acceptedConnections.reduce((sum, connection) => {
-    return sum + Math.max(-(connection.debt_eur || 0), 0);
-  }, 0);
-  const netBalance = friendsOweTotal - youOweTotal;
-
-  const availableCredit = acceptedConnections.reduce((sum, connection) => {
-    const creditLimit = connection.inbound_credit_limit_eur || 0;
-    const debtUsed = Math.max(connection.debt_eur || 0, 0);
-    const remainingCredit = Math.max(creditLimit - debtUsed, 0);
-    return sum + remainingCredit;
-  }, 0);
-
-  return {
-    you: createPublicPersonModel(user),
-    connections: connectionsWithInbound,
-    totals: {
-      netBalance,
-      friendsOweTotal,
-      youOweTotal,
-      creditAgreements,
-      availableCredit,
-    },
-    logs: Array.isArray(state.logs) ? state.logs : [],
-  };
-};
-
-const syncUserNameAcrossContacts = (state) => {
-  if (!hasUser(state)) return;
-
-  Object.values(state.contacts || {}).forEach((contact) => {
-    const userConnection = Array.isArray(contact.connections)
-      ? contact.connections.find((entry) => entry.person_id === state.user.id)
-      : null;
-    if (!userConnection) return;
-    userConnection.person_name = state.user.name;
-  });
-};
-
-const getDisplayName = (state, friendId) => {
-  const normalizedFriendId = asTrimmedString(friendId);
-  const userConnection = getUserConnection(state, normalizedFriendId);
-  const contact = state.contacts?.[normalizedFriendId];
-  return (
-    contact?.name ||
-    userConnection?.person_name ||
-    normalizedFriendId
-  );
-};
-
-const getIncomingCreditLimitFromPayload = (payload) => {
-  const suggestedCreditLimit = normalizeCurrencyAmount(
-    payload?.suggested_credit_limit_eur,
-    NaN
-  );
-  return Number.isFinite(suggestedCreditLimit) && suggestedCreditLimit >= 0
-    ? suggestedCreditLimit
-    : null;
-};
-
-const queueCurrentCreditLimitUpdate = (state, friendId, creditLimit) => {
-  if (!Number.isFinite(creditLimit) || creditLimit < 0) {
-    return null;
-  }
-
-  return queuePeerMessage(state, {
-    toUserId: friendId,
-    type: PEER_MESSAGE_TYPE_CREDIT_LIMIT_UPDATE,
-    payload: {
-      credit_limit_eur: creditLimit,
-    },
-  });
-};
-
-const applyFriendRequestMessage = (state, message) => {
-  const requesterName =
-    asTrimmedString(message.payload?.requester_name) || message.from_user_id;
-  const existingConnection = getUserConnection(state, message.from_user_id);
-
-  if (existingConnection?.friendship_status === FRIENDSHIP_STATUS_PENDING_OUTGOING) {
-    existingConnection.friendship_status = FRIENDSHIP_STATUS_ACCEPTED;
-    existingConnection.person_name = requesterName;
-    ensureContact(state, message.from_user_id, requesterName);
-    appendLog(state, {
-      text: `Friendship with **${requesterName}** accepted`,
-      friendId: message.from_user_id,
-    });
-    queuePeerMessage(state, {
-      toUserId: message.from_user_id,
-      type: PEER_MESSAGE_TYPE_FRIEND_ACCEPT,
-      payload: {
-        accepter_name: state.user.name,
-      },
-    });
-    queueCurrentCreditLimitUpdate(
-      state,
-      message.from_user_id,
-      existingConnection.trust_credit_limit_eur || 0
-    );
-    return true;
-  }
-
-  if (isAcceptedFriendshipStatus(existingConnection?.friendship_status)) {
-    return false;
-  }
-
-  if (existingConnection?.friendship_status === FRIENDSHIP_STATUS_PENDING_INCOMING) {
-    return false;
-  }
-
-  const userConnection = ensureUserConnection(
-    state,
-    message.from_user_id,
-    requesterName,
-    {
-      friendshipStatus: FRIENDSHIP_STATUS_PENDING_INCOMING,
-    }
-  );
-  if (!userConnection) {
-    return false;
-  }
-
-  const contactBackLink = ensureContactBackLink(
-    state,
-    message.from_user_id,
-    requesterName
-  );
-  const suggestedCreditLimit = getIncomingCreditLimitFromPayload(message.payload);
-  if (contactBackLink && suggestedCreditLimit !== null) {
-    contactBackLink.trust_credit_limit_eur = suggestedCreditLimit;
-  }
-
-  userConnection.friendship_status = FRIENDSHIP_STATUS_PENDING_INCOMING;
-  userConnection.person_name = requesterName;
-  appendLog(state, {
-    text: `Friend request received from ${requesterName}`,
-    friendId: message.from_user_id,
-  });
-  return true;
-};
-
-const applyFriendAcceptMessage = (state, message) => {
-  const accepterName =
-    asTrimmedString(message.payload?.accepter_name) || message.from_user_id;
-  const userConnection = getUserConnection(state, message.from_user_id);
-  if (!userConnection) {
-    return false;
-  }
-  if (userConnection.friendship_status === FRIENDSHIP_STATUS_REJECTED) {
-    return false;
-  }
-
-  const wasAccepted = isAcceptedFriendshipStatus(userConnection.friendship_status);
-  userConnection.friendship_status = FRIENDSHIP_STATUS_ACCEPTED;
-  userConnection.person_name = accepterName;
-  ensureContact(state, message.from_user_id, accepterName);
-
-  if (!wasAccepted) {
-    appendLog(state, {
-      text: `**${accepterName}** accepted your friend request`,
-      friendId: message.from_user_id,
-    });
-  }
-  return true;
-};
-
-const applyFriendRejectMessage = (state, message) => {
-  const displayName = getDisplayName(state, message.from_user_id);
-  return cancelPendingFriendRequest(state, message.from_user_id, {
-    direction: "from",
-    displayName,
-  });
-};
-
-const applyCreditLimitUpdateMessage = (state, message) => {
-  const creditLimit = normalizeCurrencyAmount(message.payload?.credit_limit_eur, NaN);
-  if (!Number.isFinite(creditLimit) || creditLimit < 0) {
-    return false;
-  }
-
-  const displayName = getDisplayName(state, message.from_user_id);
-  const userConnection = getUserConnection(state, message.from_user_id);
-  if (
-    !userConnection ||
-    !isPeerEligibleFriendshipStatus(userConnection.friendship_status)
-  ) {
-    return false;
-  }
-
-  const contactBackLink = ensureContactBackLink(
-    state,
-    message.from_user_id,
-    displayName
-  );
-  if (!contactBackLink) {
-    return false;
-  }
-
-  contactBackLink.trust_credit_limit_eur = creditLimit;
-  appendLog(state, {
-    text: `**${displayName}** updated their credit limit to ${creditLimit.toFixed(2)}€`,
-    friendId: message.from_user_id,
-    amount: creditLimit,
-  });
-  return true;
-};
-
-const applyTransactionCreatedMessage = (state, message) => {
-  const amount = normalizeCurrencyAmount(message.payload?.amount_eur, NaN);
-  if (!Number.isFinite(amount) || amount <= 0) {
-    return false;
-  }
-
-  const displayName = getDisplayName(state, message.from_user_id);
-  const userConnection = getUserConnection(state, message.from_user_id);
-  if (!userConnection || !isAcceptedFriendshipStatus(userConnection.friendship_status)) {
-    return false;
-  }
-
-  const transactionId =
-    asTrimmedString(message.payload?.transaction_id) || createId("tx");
-  const date =
-    asTrimmedString(message.payload?.date) || new Date().toISOString().slice(0, 10);
-  const note =
-    asTrimmedString(message.payload?.note) || "IOU received";
-  const messageText = asTrimmedString(message.payload?.message);
-
-  userConnection.person_name = displayName;
-  userConnection.debt_eur = (userConnection.debt_eur || 0) + amount;
-  userConnection.recent_transactions.unshift(
-    createTransactionModel({
-      id: transactionId,
-      date,
-      amount_eur: amount,
-      note,
-    })
-  );
-
-  appendLog(state, {
-    text: `**${displayName}** sent ${amount.toFixed(2)}€ to you`,
-    message: messageText,
-    friendId: message.from_user_id,
-    amount,
-    transactionId,
-  });
-  return true;
-};
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
 
 export const subscribeToDataChanges = (listener) => {
   if (typeof listener !== "function") {
@@ -805,6 +214,10 @@ export const resetState = async () => {
   }
 };
 
+// ---------------------------------------------------------------------------
+// Friend lifecycle
+// ---------------------------------------------------------------------------
+
 export const createFriend = async ({ friendId, creditLimit }) => {
   const normalizedFriendId = asTrimmedString(friendId);
   if (!normalizedFriendId) {
@@ -845,11 +258,6 @@ export const createFriend = async ({ friendId, creditLimit }) => {
         accepter_name: state.user.name,
       },
     });
-    queueCurrentCreditLimitUpdate(
-      state,
-      normalizedFriendId,
-      userConnection.trust_credit_limit_eur || 0
-    );
     return persistAndBuildView(state);
   }
 
@@ -912,11 +320,6 @@ export const acceptFriend = async (friendId) => {
       accepter_name: state.user.name,
     },
   });
-  queueCurrentCreditLimitUpdate(
-    state,
-    normalizedFriendId,
-    userConnection.trust_credit_limit_eur || 0
-  );
 
   return persistAndBuildView(state);
 };
@@ -982,6 +385,10 @@ export const removeFriendRequest = async (friendId) => {
   return persistAndBuildView(state);
 };
 
+// ---------------------------------------------------------------------------
+// Credit limit management
+// ---------------------------------------------------------------------------
+
 export const updateCreditLimit = async (friendId, creditLimit) => {
   const normalizedFriendId = asTrimmedString(friendId);
   const normalizedCreditLimit = normalizeCurrencyAmount(creditLimit, NaN);
@@ -1006,24 +413,149 @@ export const updateCreditLimit = async (friendId, creditLimit) => {
     return buildView(state);
   }
 
-  userConnection.trust_credit_limit_eur = normalizedCreditLimit;
   userConnection.person_name = displayName;
-  if (isPeerEligibleFriendshipStatus(userConnection.friendship_status)) {
-    queueCurrentCreditLimitUpdate(
-      state,
-      normalizedFriendId,
-      normalizedCreditLimit
-    );
+  const existingLimit = userConnection.trust_credit_limit_eur || 0;
+
+  if (normalizedCreditLimit === existingLimit) {
+    return buildView(state);
   }
 
-  appendLog(state, {
-    text: `You updated the credit limit for **${displayName}** to ${normalizedCreditLimit.toFixed(2)}€`,
-    friendId: normalizedFriendId,
-    amount: normalizedCreditLimit,
-  });
+  if (existingLimit > 0 && normalizedCreditLimit < existingLimit) {
+    // Lowering existing limit: apply locally immediately, peer auto-applies on receive
+    userConnection.trust_credit_limit_eur = normalizedCreditLimit;
+    userConnection.pending_credit_limit_eur = null;
+    userConnection.pending_credit_limit_is_incoming = null;
+    if (isPeerEligibleFriendshipStatus(userConnection.friendship_status)) {
+      queueCreditLimitSuggestion(state, normalizedFriendId, normalizedCreditLimit);
+    }
+    appendLog(state, {
+      text: `You lowered the credit limit for **${displayName}** to ${normalizedCreditLimit.toFixed(2)}€`,
+      friendId: normalizedFriendId,
+      amount: normalizedCreditLimit,
+    });
+  } else {
+    // New or higher limit: don't apply locally yet, wait for peer to accept
+    userConnection.pending_credit_limit_eur = normalizedCreditLimit;
+    userConnection.pending_credit_limit_is_incoming = false;
+    if (isPeerEligibleFriendshipStatus(userConnection.friendship_status)) {
+      queueCreditLimitSuggestion(state, normalizedFriendId, normalizedCreditLimit);
+    }
+    appendLog(state, {
+      text: `You suggested a credit limit of ${normalizedCreditLimit.toFixed(2)}€ to **${displayName}**`,
+      friendId: normalizedFriendId,
+      amount: normalizedCreditLimit,
+    });
+  }
 
   return persistAndBuildView(state);
 };
+
+export const respondToCreditLimitSuggestion = async (friendId, accepted) => {
+  const normalizedFriendId = asTrimmedString(friendId);
+  if (!normalizedFriendId) {
+    return loadData();
+  }
+
+  const state = await loadState();
+  if (!hasUser(state)) {
+    return null;
+  }
+
+  const displayName = getDisplayName(state, normalizedFriendId);
+  const userConnection = getUserConnection(state, normalizedFriendId);
+  if (!userConnection || userConnection.pending_credit_limit_is_incoming !== true) {
+    return loadData();
+  }
+
+  const pendingLimit = userConnection.pending_credit_limit_eur;
+
+  // On agree: apply the suggested limit. On disagree: keep current limit (sends it back so peer reverts).
+  const responseLimit = accepted && Number.isFinite(pendingLimit) && pendingLimit >= 0
+    ? pendingLimit
+    : userConnection.trust_credit_limit_eur || 0;
+
+  if (accepted) {
+    userConnection.trust_credit_limit_eur = pendingLimit;
+    appendLog(state, {
+      text: `You accepted the credit limit of ${pendingLimit.toFixed(2)}€ with **${displayName}**`,
+      friendId: normalizedFriendId,
+      amount: pendingLimit,
+    });
+  } else {
+    appendLog(state, {
+      text: `You declined the credit limit suggestion from **${displayName}**`,
+      friendId: normalizedFriendId,
+    });
+  }
+
+  userConnection.pending_credit_limit_eur = null;
+  userConnection.pending_credit_limit_is_incoming = null;
+
+  if (isPeerEligibleFriendshipStatus(userConnection.friendship_status)) {
+    queueCreditLimitSuggestion(state, normalizedFriendId, responseLimit);
+  }
+
+  return persistAndBuildView(state);
+};
+
+export const cancelCreditLimitSuggestion = async (friendId) => {
+  const normalizedFriendId = asTrimmedString(friendId);
+  if (!normalizedFriendId) {
+    return loadData();
+  }
+
+  const state = await loadState();
+  if (!hasUser(state)) {
+    return null;
+  }
+
+  const displayName = getDisplayName(state, normalizedFriendId);
+  const userConnection = getUserConnection(state, normalizedFriendId);
+  if (!userConnection || userConnection.pending_credit_limit_is_incoming !== false) {
+    return loadData();
+  }
+
+  const currentLimit = userConnection.trust_credit_limit_eur || 0;
+  userConnection.pending_credit_limit_eur = null;
+  userConnection.pending_credit_limit_is_incoming = null;
+
+  appendLog(state, {
+    text: `You cancelled your credit limit suggestion to **${displayName}**`,
+    friendId: normalizedFriendId,
+  });
+
+  if (isPeerEligibleFriendshipStatus(userConnection.friendship_status)) {
+    queueCreditLimitSuggestion(state, normalizedFriendId, currentLimit);
+  }
+
+  return persistAndBuildView(state);
+};
+
+export const dismissCreditLimitNotification = async (friendId) => {
+  const normalizedFriendId = asTrimmedString(friendId);
+  if (!normalizedFriendId) {
+    return loadData();
+  }
+
+  const state = await loadState();
+  if (!hasUser(state)) {
+    return null;
+  }
+
+  const userConnection = getUserConnection(state, normalizedFriendId);
+  if (!userConnection || userConnection.pending_credit_limit_is_incoming !== "lowered") {
+    return loadData();
+  }
+
+  userConnection.pending_credit_limit_eur = null;
+  userConnection.pending_credit_limit_is_incoming = null;
+
+  return persistAndBuildView(state);
+};
+
+// ---------------------------------------------------------------------------
+// Transactions
+// ---------------------------------------------------------------------------
 
 export const createTransaction = async ({ friendId, amount, message }) => {
   const normalizedFriendId = asTrimmedString(friendId);
@@ -1083,6 +615,10 @@ export const createTransaction = async ({ friendId, amount, message }) => {
   return persistAndBuildView(state);
 };
 
+// ---------------------------------------------------------------------------
+// Peer message transport interface
+// ---------------------------------------------------------------------------
+
 export const markPeerMessageReceived = async (messageId) => {
   const normalizedMessageId = asTrimmedString(messageId);
   if (!normalizedMessageId) {
@@ -1113,55 +649,17 @@ export const applyInboundPeerMessage = async (incomingMessage) => {
     return createInboundProcessingResult(null);
   }
 
-  if (message.to_user_id && message.to_user_id !== state.user.id) {
-    return createInboundProcessingResult(buildView(state));
-  }
+  const result = routeInboundMessage(state, message);
 
-  if (hasProcessedPeerMessage(state, message.id)) {
+  if (!result.applied && !result.persisted) {
     return createInboundProcessingResult(
       buildView(state),
-      PEER_RECEIPT_RESULT_PROCESSED
+      result.acknowledgeResult
     );
   }
 
-  let didApplyMessage = false;
-  switch (message.type) {
-    case PEER_MESSAGE_TYPE_FRIEND_REQUEST:
-      didApplyMessage = applyFriendRequestMessage(state, message);
-      break;
-    case PEER_MESSAGE_TYPE_FRIEND_ACCEPT:
-      didApplyMessage = applyFriendAcceptMessage(state, message);
-      break;
-    case PEER_MESSAGE_TYPE_FRIEND_REJECT:
-      didApplyMessage = applyFriendRejectMessage(state, message);
-      break;
-    case PEER_MESSAGE_TYPE_CREDIT_LIMIT_UPDATE:
-      didApplyMessage = applyCreditLimitUpdateMessage(state, message);
-      break;
-    case PEER_MESSAGE_TYPE_TRANSACTION_CREATED:
-      didApplyMessage = applyTransactionCreatedMessage(state, message);
-      break;
-    case PEER_MESSAGE_TYPE_RECEIVED:
-      return createInboundProcessingResult(buildView(state));
-    default:
-      appendIllegalPeerMessageLog(state, message);
-      return createInboundProcessingResult(
-        await persistAndBuildView(state),
-        PEER_RECEIPT_RESULT_IGNORED
-      );
-  }
-
-  if (!didApplyMessage) {
-    appendIllegalPeerMessageLog(state, message);
-    return createInboundProcessingResult(
-      await persistAndBuildView(state),
-      PEER_RECEIPT_RESULT_IGNORED
-    );
-  }
-
-  markProcessedPeerMessage(state, message.id);
   return createInboundProcessingResult(
     await persistAndBuildView(state),
-    PEER_RECEIPT_RESULT_PROCESSED
+    result.acknowledgeResult
   );
 };

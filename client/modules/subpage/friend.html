@@ -1,4 +1,25 @@
 <div class="friend-content">
+  <div class="credit-suggestion surface-box" data-section="credit-suggestion" hidden>
+    <div class="credit-suggestion-label" data-bind="credit-suggestion-label"></div>
+    <div class="credit-suggestion-actions" data-section="credit-suggestion-actions" hidden>
+      <button class="friend-inline-action friend-inline-action--primary surface-box" type="button" data-action="agree-credit">
+        Agree
+      </button>
+      <button class="friend-inline-action surface-box" type="button" data-action="disagree-credit">
+        Disagree
+      </button>
+    </div>
+    <div class="credit-suggestion-actions" data-section="credit-cancel-actions" hidden>
+      <button class="friend-inline-action surface-box" type="button" data-action="cancel-credit">
+        Cancel suggestion
+      </button>
+    </div>
+    <div class="credit-suggestion-actions" data-section="credit-ok-actions" hidden>
+      <button class="friend-inline-action friend-inline-action--primary surface-box" type="button" data-action="dismiss-credit">
+        OK
+      </button>
+    </div>
+  </div>
   <div class="friend-stats" aria-label="Debt and credit">
     <div class="friend-stat surface-box" data-section="friend-debt">
       <div class="friend-stat-label" data-bind="debt-label">owes you</div>
@@ -19,6 +40,14 @@
   <div class="balance-hero trust-hero friend-card" data-section="friend-body">
     <div class="hero-label" data-bind="friend-label">Transactions</div>
     <ul class="tx-list" data-list="friend-transactions"></ul>
+  </div>
+  <div class="send-explainer-card surface-box" data-section="credit-suggestion-explainer" hidden>
+    * <strong>Credit agreements</strong> are used when sending IOU's between people who don't know
+    each other. Credit agreements <strong>won't change your total IOU balance</strong>, but they can
+    exchange IOU's you have with one of your friend to IOU's with another one of your friends. With
+    the help of credit agreements you can
+    <strong>trade with friends friends friend, without knowing or having to trust that person
+    yourself</strong>.
   </div>
 </div>
 

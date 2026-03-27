@@ -4,7 +4,14 @@ This module binds the friend detail subpage. It renders debt/credit summary card
 It also exposes navigation triggers to related subpages by wiring the credit tile click target from the current friend context.
 */
 
-import { acceptFriend, rejectFriend, removeFriendRequest } from "../../js/data.js";
+import {
+  acceptFriend,
+  cancelCreditLimitSuggestion,
+  dismissCreditLimitNotification,
+  rejectFriend,
+  removeFriendRequest,
+  respondToCreditLimitSuggestion,
+} from "../../js/data.js";
 import {
   FRIENDSHIP_STATUS_ACCEPTED,
   FRIENDSHIP_STATUS_PENDING_INCOMING,
@@ -26,6 +33,12 @@ export const bindFriendDetail = (root, data, friendId) => {
   const creditButton = root.querySelector('[data-section="credit-limit"]');
   const listEl = root.querySelector('[data-list="friend-transactions"]');
   const txTemplate = root.querySelector('[data-template="tx-item"]');
+  const suggestionEl = root.querySelector('[data-section="credit-suggestion"]');
+  const suggestionLabelEl = root.querySelector('[data-bind="credit-suggestion-label"]');
+  const suggestionActionsEl = root.querySelector('[data-section="credit-suggestion-actions"]');
+  const suggestionCancelActionsEl = root.querySelector('[data-section="credit-cancel-actions"]');
+  const suggestionOkActionsEl = root.querySelector('[data-section="credit-ok-actions"]');
+  const suggestionExplainerEl = root.querySelector('[data-section="credit-suggestion-explainer"]');
 
   const connection = data.connections.find((entry) => entry.person_id === friendId);
   const friendName = connection?.person_name || "Friend";
@@ -136,6 +149,58 @@ export const bindFriendDetail = (root, data, friendId) => {
     removeRequestButton.addEventListener("click", async () => {
       await removeFriendRequest(friendId);
       window.location.hash = "friends";
+    });
+  }
+
+  const pendingLimit = connection?.pending_credit_limit_eur;
+  const isIncoming = connection?.pending_credit_limit_is_incoming;
+  const hasPendingSuggestion = Number.isFinite(pendingLimit) && pendingLimit >= 0;
+
+  if (suggestionEl && hasPendingSuggestion) {
+    suggestionEl.hidden = false;
+    if (isIncoming === "lowered") {
+      const amountText = `${friendFirstName} lowered credit limit to ${formatCurrency(pendingLimit)}`;
+      if (suggestionLabelEl) suggestionLabelEl.textContent = amountText;
+      if (suggestionOkActionsEl) suggestionOkActionsEl.hidden = false;
+    } else {
+      if (suggestionExplainerEl) suggestionExplainerEl.hidden = false;
+      const amountText = `Suggested credit limit of ${formatCurrency(pendingLimit)}`;
+      if (suggestionLabelEl) suggestionLabelEl.textContent = amountText;
+      if (isIncoming === true && suggestionActionsEl) suggestionActionsEl.hidden = false;
+      if (isIncoming === false && suggestionCancelActionsEl) suggestionCancelActionsEl.hidden = false;
+    }
+  }
+
+  const agreeCreditButton = root.querySelector('[data-action="agree-credit"]');
+  if (agreeCreditButton && friendId) {
+    agreeCreditButton.addEventListener("click", async () => {
+      if (suggestionEl) suggestionEl.hidden = true;
+      if (suggestionExplainerEl) suggestionExplainerEl.hidden = true;
+      await respondToCreditLimitSuggestion(friendId, true);
+    });
+  }
+  const disagreeCreditButton = root.querySelector('[data-action="disagree-credit"]');
+  if (disagreeCreditButton && friendId) {
+    disagreeCreditButton.addEventListener("click", async () => {
+      if (suggestionEl) suggestionEl.hidden = true;
+      if (suggestionExplainerEl) suggestionExplainerEl.hidden = true;
+      await respondToCreditLimitSuggestion(friendId, false);
+    });
+  }
+  const cancelCreditButton = root.querySelector('[data-action="cancel-credit"]');
+  if (cancelCreditButton && friendId) {
+    cancelCreditButton.addEventListener("click", async () => {
+      if (suggestionEl) suggestionEl.hidden = true;
+      if (suggestionExplainerEl) suggestionExplainerEl.hidden = true;
+      await cancelCreditLimitSuggestion(friendId);
+    });
+  }
+
+  const dismissCreditButton = root.querySelector('[data-action="dismiss-credit"]');
+  if (dismissCreditButton && friendId) {
+    dismissCreditButton.addEventListener("click", async () => {
+      if (suggestionEl) suggestionEl.hidden = true;
+      await dismissCreditLimitNotification(friendId);
     });
   }
 

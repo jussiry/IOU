@@ -86,6 +86,16 @@ export const createConnectionModel = (input = {}) => {
     ),
     debt_eur: asNumberOrDefault(input.debt_eur, 0),
     trust_credit_limit_eur: asNumberOrDefault(input.trust_credit_limit_eur, 0),
+    pending_credit_limit_eur: Number.isFinite(input.pending_credit_limit_eur) && input.pending_credit_limit_eur >= 0
+      ? input.pending_credit_limit_eur
+      : null,
+    pending_credit_limit_is_incoming: input.pending_credit_limit_is_incoming === true
+      ? true
+      : input.pending_credit_limit_is_incoming === false
+      ? false
+      : input.pending_credit_limit_is_incoming === "lowered"
+      ? "lowered"
+      : null,
     recent_transactions: transactions,
   };
 };
