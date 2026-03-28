@@ -1,7 +1,7 @@
 /*
 Derives a read-only view model from persisted app state.
 
-The view model aggregates balance totals, credit agreements, and connection
+The view model aggregates balance totals, trust agreements, and connection
 data so that page binders never need to compute these values themselves.
 */
 
@@ -25,7 +25,7 @@ export const buildView = (state) => {
     isAcceptedFriendshipStatus(connection.friendship_status)
   );
 
-  const creditAgreements = acceptedConnections.reduce((sum, connection) => {
+  const trustAgreements = acceptedConnections.reduce((sum, connection) => {
     return sum + (connection.trust_credit_limit_eur || 0);
   }, 0);
 
@@ -37,10 +37,10 @@ export const buildView = (state) => {
   }, 0);
   const netBalance = friendsOweTotal - youOweTotal;
 
-  const availableCredit = acceptedConnections.reduce((sum, connection) => {
-    const creditLimit = connection.trust_credit_limit_eur || 0;
+  const availableTrust = acceptedConnections.reduce((sum, connection) => {
+    const trustLimit = connection.trust_credit_limit_eur || 0;
     const debt = connection.debt_eur || 0;
-    return sum + Math.max(creditLimit + debt, 0);
+    return sum + Math.max(trustLimit + debt, 0);
   }, 0);
 
   return {
@@ -50,8 +50,8 @@ export const buildView = (state) => {
       netBalance,
       friendsOweTotal,
       youOweTotal,
-      creditAgreements,
-      availableCredit,
+      trustAgreements,
+      availableTrust,
     },
     logs: Array.isArray(state.logs) ? state.logs : [],
   };

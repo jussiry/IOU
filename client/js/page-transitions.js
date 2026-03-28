@@ -85,7 +85,7 @@ export const getSlideDirection = (fromRoute, toRoute, navOrder) => {
     if (!route) return 0;
     if (route.type === "page") return 0;
     if (route.type === "friend" || route.type === "add-friend") return 1;
-    if (route.type === "send" || route.type === "credit") return 2;
+    if (route.type === "send" || route.type === "trust") return 2;
     return 1;
   };
 

@@ -1,6 +1,6 @@
 I. Foundational Principles
 ✅ Decentralization
-➔ No central issuer or repository. Each user issues their own credit based on trust.
+➔ No central issuer or repository. Each user issues their own IOUs based on trust.
 
 ✅ Trust-Based Creation
 ➔ Money = personal IOUs backed by direct social reputation and relational trust.

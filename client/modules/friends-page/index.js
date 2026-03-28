@@ -1,5 +1,5 @@
 /*
-This module renders the friends list page. It sorts friendship rows, formats debt and credit summaries, and binds navigation to each friend's detail view.
+This module renders the friends list page. It sorts friendship rows, formats debt and trust summaries, and binds navigation to each friend's detail view.
 
 It also owns the add-friend button behavior and keeps accepted, pending, and rejected friendships visually distinct so the list remains useful after realtime friend requests are introduced.
 */
@@ -14,10 +14,10 @@ import {
   isAcceptedFriendshipStatus,
 } from "../../js/utils/friendships.js";
 
-const formatDebtWithLimit = (debtValue, creditLimitValue) => {
+const formatDebtWithLimit = (debtValue, trustLimitValue) => {
   const formattedDebt = formatSigned(debtValue).replace("€", "");
-  const creditLimit = Math.round(creditLimitValue || 0);
-  return `${formattedDebt} <span class="credit-limit">/ ${creditLimit} €</span>`;
+  const trustLimit = Math.round(trustLimitValue || 0);
+  return `${formattedDebt} <span class="trust-limit">/ ${trustLimit} €</span>`;
 };
 
 const FLOATING_BUTTON_ID = "friends-add-button-floating";
@@ -38,7 +38,7 @@ const getFriendSortWeight = (connection) => {
   return FRIENDSHIP_SORT_ORDER[connection.friendship_status] ?? 99;
 };
 
-const getPendingCreditLimit = (connection) => {
+const getPendingTrustLimit = (connection) => {
   if (
     connection.friendship_status === FRIENDSHIP_STATUS_PENDING_INCOMING ||
     connection.friendship_status === FRIENDSHIP_STATUS_PENDING_OUTGOING
@@ -62,24 +62,24 @@ const getFriendRowState = (connection) => {
   }
 
   if (connection.friendship_status === FRIENDSHIP_STATUS_PENDING_INCOMING) {
-    const suggestedCreditLimit = getPendingCreditLimit(connection);
+    const suggestedTrustLimit = getPendingTrustLimit(connection);
     return {
       badge: "incoming",
       amountHtml:
-        suggestedCreditLimit > 0
-          ? `${formatCurrency(suggestedCreditLimit)} <span class="credit-limit">suggested</span>`
+        suggestedTrustLimit > 0
+          ? `${formatCurrency(suggestedTrustLimit)} <span class="trust-limit">suggested</span>`
           : "Pending",
       amountClassName: "amount--muted",
     };
   }
 
   if (connection.friendship_status === FRIENDSHIP_STATUS_PENDING_OUTGOING) {
-    const suggestedCreditLimit = getPendingCreditLimit(connection);
+    const suggestedTrustLimit = getPendingTrustLimit(connection);
     return {
       badge: "pending",
       amountHtml:
-        suggestedCreditLimit > 0
-          ? `${formatCurrency(suggestedCreditLimit)} <span class="credit-limit">suggested</span>`
+        suggestedTrustLimit > 0
+          ? `${formatCurrency(suggestedTrustLimit)} <span class="trust-limit">suggested</span>`
           : "Pending",
       amountClassName: "amount--muted",
     };

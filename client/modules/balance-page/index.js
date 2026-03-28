@@ -1,5 +1,5 @@
 /*
-This module binds the balance page UI. It renders totals, populates list sections for debts and credit agreements, and controls expandable detail pills.
+This module binds the balance page UI. It renders totals, populates list sections for debts and trust agreements, and controls expandable detail pills.
 
 It keeps all balance-page specific rendering logic local to this module so the app shell can treat the page as a simple binder callback.
 */
@@ -110,15 +110,15 @@ export const bindBalance = (root, data) => {
   root.querySelector('[data-bind="you-owe-total"]').textContent = formatSigned(
     -data.totals.youOweTotal
   );
-  const creditAgreementsTotalEl = root.querySelector(
-    '[data-bind="credit-agreements-total"]'
+  const trustAgreementsTotalEl = root.querySelector(
+    '[data-bind="trust-agreements-total"]'
   );
-  if (creditAgreementsTotalEl) {
-    const total = data.totals.creditAgreements || 0;
-    creditAgreementsTotalEl.textContent = formatCurrency(total);
+  if (trustAgreementsTotalEl) {
+    const total = data.totals.trustAgreements || 0;
+    trustAgreementsTotalEl.textContent = formatCurrency(total);
   }
-  root.querySelector('[data-bind="available-credit"]').textContent = formatCurrency(
-    data.totals.availableCredit
+  root.querySelector('[data-bind="available-trust"]').textContent = formatCurrency(
+    data.totals.availableTrust
   );
 
   const acceptedConnections = data.connections.filter((connection) =>
@@ -135,27 +135,27 @@ export const bindBalance = (root, data) => {
 
   renderInlineList(root, friendsOwe, {
     list: '[data-list="friends-owe"]',
-    template: '[data-template="credit-item"]',
+    template: '[data-template="trust-item"]',
   }, {
     skipSignClass: true,
   });
   renderInlineList(root, youOwe, {
     list: '[data-list="you-owe"]',
-    template: '[data-template="credit-item"]',
+    template: '[data-template="trust-item"]',
   }, {
     skipSignClass: true,
   });
 
-  const creditAgreements = acceptedConnections
+  const trustAgreements = acceptedConnections
     .filter((connection) => (connection.trust_credit_limit_eur || 0) > 0)
     .sort((a, b) => b.trust_credit_limit_eur - a.trust_credit_limit_eur);
 
   renderInlineList(
     root,
-    creditAgreements,
+    trustAgreements,
     {
-      list: '[data-list="credit-agreements"]',
-      template: '[data-template="credit-item"]',
+      list: '[data-list="trust-agreements"]',
+      template: '[data-template="trust-item"]',
     },
     {
       formatAmount: (entry) => formatCurrency(entry.trust_credit_limit_eur || 0),

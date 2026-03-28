@@ -135,7 +135,7 @@
   margin-top: 10px;
 }
 
-.credit-item {
+.trust-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -147,13 +147,13 @@
   font-weight: 500;
 }
 
-.credit-item .amount {
+.trust-item .amount {
   font-weight: 500;
   font-size: 13px;
   font-variant-numeric: tabular-nums;
 }
 
-.credit-item .amount .used-of {
+.trust-item .amount .used-of {
   font-size: 11px;
   color: var(--muted);
   margin-right: 4px;

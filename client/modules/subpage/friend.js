@@ -1,16 +1,16 @@
 /*
-This module binds the friend detail subpage. It renders debt/credit summary cards, injects friend-specific labels, and lists recent transactions.
+This module binds the friend detail subpage. It renders debt/trust summary cards, injects friend-specific labels, and lists recent transactions.
 
-It also exposes navigation triggers to related subpages by wiring the credit tile click target from the current friend context.
+It also exposes navigation triggers to related subpages by wiring the trust tile click target from the current friend context.
 */
 
 import {
   acceptFriend,
-  cancelCreditLimitSuggestion,
-  dismissCreditLimitNotification,
+  cancelTrustLimitSuggestion,
+  dismissTrustLimitNotification,
   rejectFriend,
   removeFriendRequest,
-  respondToCreditLimitSuggestion,
+  respondToTrustLimitSuggestion,
 } from "../../js/data.js";
 import {
   FRIENDSHIP_STATUS_ACCEPTED,
@@ -28,17 +28,17 @@ export const bindFriendDetail = (root, data, friendId) => {
   const bodyEl = root.querySelector('[data-section="friend-body"]');
   const debtLabelEl = root.querySelector('[data-bind="debt-label"]');
   const debtAmountEl = root.querySelector('[data-bind="debt-amount"]');
-  const creditTitleEl = root.querySelector('[data-bind="credit-title"]');
-  const creditAmountEl = root.querySelector('[data-bind="credit-amount"]');
-  const creditButton = root.querySelector('[data-section="credit-limit"]');
+  const trustTitleEl = root.querySelector('[data-bind="trust-title"]');
+  const trustAmountEl = root.querySelector('[data-bind="trust-amount"]');
+  const trustButton = root.querySelector('[data-section="trust-limit"]');
   const listEl = root.querySelector('[data-list="friend-transactions"]');
   const txTemplate = root.querySelector('[data-template="tx-item"]');
-  const suggestionEl = root.querySelector('[data-section="credit-suggestion"]');
-  const suggestionLabelEl = root.querySelector('[data-bind="credit-suggestion-label"]');
-  const suggestionActionsEl = root.querySelector('[data-section="credit-suggestion-actions"]');
-  const suggestionCancelActionsEl = root.querySelector('[data-section="credit-cancel-actions"]');
-  const suggestionOkActionsEl = root.querySelector('[data-section="credit-ok-actions"]');
-  const suggestionExplainerEl = root.querySelector('[data-section="credit-suggestion-explainer"]');
+  const suggestionEl = root.querySelector('[data-section="trust-suggestion"]');
+  const suggestionLabelEl = root.querySelector('[data-bind="trust-suggestion-label"]');
+  const suggestionActionsEl = root.querySelector('[data-section="trust-suggestion-actions"]');
+  const suggestionCancelActionsEl = root.querySelector('[data-section="trust-cancel-actions"]');
+  const suggestionOkActionsEl = root.querySelector('[data-section="trust-ok-actions"]');
+  const suggestionExplainerEl = root.querySelector('[data-section="trust-suggestion-explainer"]');
 
   const connection = data.connections.find((entry) => entry.person_id === friendId);
   const friendName = connection?.person_name || "Friend";
@@ -82,29 +82,29 @@ export const bindFriendDetail = (root, data, friendId) => {
       `;
     }
   }
-  if (creditTitleEl) {
-    creditTitleEl.textContent =
+  if (trustTitleEl) {
+    trustTitleEl.textContent =
       friendshipStatus === FRIENDSHIP_STATUS_PENDING_OUTGOING ||
       friendshipStatus === FRIENDSHIP_STATUS_PENDING_INCOMING
-        ? "Suggested credit limit"
-        : "Credit limit";
+        ? "Suggested trust limit"
+        : "Trust limit";
   }
-  if (creditAmountEl) {
-    const creditLimit = connection?.trust_credit_limit_eur ?? 0;
-    creditAmountEl.textContent = formatCurrency(creditLimit);
+  if (trustAmountEl) {
+    const trustLimit = connection?.trust_credit_limit_eur ?? 0;
+    trustAmountEl.textContent = formatCurrency(trustLimit);
   }
   if (
-    creditButton &&
+    trustButton &&
     friendId &&
     (friendshipStatus === FRIENDSHIP_STATUS_ACCEPTED ||
       friendshipStatus === FRIENDSHIP_STATUS_PENDING_OUTGOING)
   ) {
-    creditButton.addEventListener("click", () => {
-      window.location.hash = `credit/${friendId}`;
+    trustButton.addEventListener("click", () => {
+      window.location.hash = `trust/${friendId}`;
     });
-  } else if (creditButton) {
-    creditButton.classList.add("friend-stat--disabled");
-    creditButton.setAttribute("aria-disabled", "true");
+  } else if (trustButton) {
+    trustButton.classList.add("friend-stat--disabled");
+    trustButton.setAttribute("aria-disabled", "true");
   }
   const debt = connection?.debt_eur || 0;
   if (debtLabelEl) {
@@ -159,48 +159,48 @@ export const bindFriendDetail = (root, data, friendId) => {
   if (suggestionEl && hasPendingSuggestion) {
     suggestionEl.hidden = false;
     if (isIncoming === "lowered") {
-      const amountText = `${friendFirstName} lowered credit limit to ${formatCurrency(pendingLimit)}`;
+      const amountText = `${friendFirstName} lowered trust limit to ${formatCurrency(pendingLimit)}`;
       if (suggestionLabelEl) suggestionLabelEl.textContent = amountText;
       if (suggestionOkActionsEl) suggestionOkActionsEl.hidden = false;
     } else {
       if (suggestionExplainerEl) suggestionExplainerEl.hidden = false;
-      const amountText = `Suggested credit limit of ${formatCurrency(pendingLimit)}`;
+      const amountText = `Suggested trust limit of ${formatCurrency(pendingLimit)}`;
       if (suggestionLabelEl) suggestionLabelEl.textContent = amountText;
       if (isIncoming === true && suggestionActionsEl) suggestionActionsEl.hidden = false;
       if (isIncoming === false && suggestionCancelActionsEl) suggestionCancelActionsEl.hidden = false;
     }
   }
 
-  const agreeCreditButton = root.querySelector('[data-action="agree-credit"]');
-  if (agreeCreditButton && friendId) {
-    agreeCreditButton.addEventListener("click", async () => {
+  const agreeTrustButton = root.querySelector('[data-action="agree-trust"]');
+  if (agreeTrustButton && friendId) {
+    agreeTrustButton.addEventListener("click", async () => {
       if (suggestionEl) suggestionEl.hidden = true;
       if (suggestionExplainerEl) suggestionExplainerEl.hidden = true;
-      await respondToCreditLimitSuggestion(friendId, true);
+      await respondToTrustLimitSuggestion(friendId, true);
     });
   }
-  const disagreeCreditButton = root.querySelector('[data-action="disagree-credit"]');
-  if (disagreeCreditButton && friendId) {
-    disagreeCreditButton.addEventListener("click", async () => {
+  const disagreeTrustButton = root.querySelector('[data-action="disagree-trust"]');
+  if (disagreeTrustButton && friendId) {
+    disagreeTrustButton.addEventListener("click", async () => {
       if (suggestionEl) suggestionEl.hidden = true;
       if (suggestionExplainerEl) suggestionExplainerEl.hidden = true;
-      await respondToCreditLimitSuggestion(friendId, false);
+      await respondToTrustLimitSuggestion(friendId, false);
     });
   }
-  const cancelCreditButton = root.querySelector('[data-action="cancel-credit"]');
-  if (cancelCreditButton && friendId) {
-    cancelCreditButton.addEventListener("click", async () => {
+  const cancelTrustButton = root.querySelector('[data-action="cancel-trust"]');
+  if (cancelTrustButton && friendId) {
+    cancelTrustButton.addEventListener("click", async () => {
       if (suggestionEl) suggestionEl.hidden = true;
       if (suggestionExplainerEl) suggestionExplainerEl.hidden = true;
-      await cancelCreditLimitSuggestion(friendId);
+      await cancelTrustLimitSuggestion(friendId);
     });
   }
 
-  const dismissCreditButton = root.querySelector('[data-action="dismiss-credit"]');
-  if (dismissCreditButton && friendId) {
-    dismissCreditButton.addEventListener("click", async () => {
+  const dismissTrustButton = root.querySelector('[data-action="dismiss-trust"]');
+  if (dismissTrustButton && friendId) {
+    dismissTrustButton.addEventListener("click", async () => {
       if (suggestionEl) suggestionEl.hidden = true;
-      await dismissCreditLimitNotification(friendId);
+      await dismissTrustLimitNotification(friendId);
     });
   }
 

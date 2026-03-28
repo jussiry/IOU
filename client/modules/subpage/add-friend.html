@@ -41,21 +41,21 @@
         Add friends public key in correct format
       </p>
       <div class="form-field form-field-inline form-field-inline-full add-friend-toggle-row">
-        <span class="form-label">Suggest credit agreement</span>
+        <span class="form-label">Suggest trust agreement</span>
         <button
           class="check-toggle"
           type="button"
-          data-bind="suggest-credit-toggle"
+          data-bind="suggest-trust-toggle"
           aria-pressed="false"
-          aria-label="Suggest credit limit"
+          aria-label="Suggest trust limit"
         >
           <span class="check-toggle-track">
             <span class="check-toggle-thumb"></span>
           </span>
         </button>
       </div>
-      <div class="add-friend-credit-panel" data-section="suggest-credit-panel" hidden>
-        <div data-slot="credit-limit-field"></div>
+      <div class="add-friend-trust-panel" data-section="suggest-trust-panel" hidden>
+        <div data-slot="trust-limit-field"></div>
       </div>
       <button class="primary-button" type="button" data-bind="add-friend-submit" aria-disabled="true">
         <svg class="primary-button-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -65,7 +65,7 @@
       </button>
     </form>
   </div>
-  <div class="add-friend-credit-explainer" data-section="suggest-credit-explainer" hidden>
-    <div data-slot="credit-explainer"></div>
+  <div class="add-friend-trust-explainer" data-section="suggest-trust-explainer" hidden>
+    <div data-slot="trust-explainer"></div>
   </div>
 </div>

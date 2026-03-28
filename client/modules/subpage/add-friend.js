@@ -1,5 +1,5 @@
 /*
-This module binds the add-friend subpage. It manages the public-key form, the self-key copy field, the credit-limit toggle, and the dynamic visibility of the optional credit-limit input.
+This module binds the add-friend subpage. It manages the public-key form, the self-key copy field, the trust-limit toggle, and the dynamic visibility of the optional trust-limit input.
 
 It keeps the add-friend form state local to the page, validates the entered public key, and handles lightweight clipboard/select interactions so routing code can handle persistence and navigation without duplicating DOM queries.
 */
@@ -48,10 +48,10 @@ export const bindAddFriend = (root, data) => {
   const copyMyKeyButtonEl = root.querySelector('[data-action="copy-my-key"]');
   const friendKeyEl = root.querySelector('[data-bind="friend-key"]');
   const friendKeyErrorEl = root.querySelector('[data-bind="friend-key-error"]');
-  const toggleEl = root.querySelector('[data-bind="suggest-credit-toggle"]');
-  const creditPanelEl = root.querySelector('[data-section="suggest-credit-panel"]');
-  const creditExplainerEl = root.querySelector('[data-section="suggest-credit-explainer"]');
-  const creditLimitEl = root.querySelector('[data-bind="credit-limit"]');
+  const toggleEl = root.querySelector('[data-bind="suggest-trust-toggle"]');
+  const trustPanelEl = root.querySelector('[data-section="suggest-trust-panel"]');
+  const trustExplainerEl = root.querySelector('[data-section="suggest-trust-explainer"]');
+  const trustLimitEl = root.querySelector('[data-bind="trust-limit"]');
   const submitEl = root.querySelector('[data-bind="add-friend-submit"]');
   const userPublicKey = data?.you?.id || "";
   let hasAttemptedInvalidSubmit = false;
@@ -76,21 +76,21 @@ export const bindAddFriend = (root, data) => {
     setFriendKeyErrorVisible(!isValid && hasAttemptedInvalidSubmit);
   };
 
-  const setCreditSuggestionEnabled = (isEnabled) => {
-    if (creditPanelEl) {
-      creditPanelEl.hidden = !isEnabled;
+  const setTrustSuggestionEnabled = (isEnabled) => {
+    if (trustPanelEl) {
+      trustPanelEl.hidden = !isEnabled;
     }
-    if (creditExplainerEl) {
-      creditExplainerEl.hidden = !isEnabled;
+    if (trustExplainerEl) {
+      trustExplainerEl.hidden = !isEnabled;
     }
     if (isEnabled) {
-      creditLimitEl?.focus();
+      trustLimitEl?.focus();
     }
   };
 
-  const creditToggle = initCheckToggle(toggleEl, {
+  const trustToggle = initCheckToggle(toggleEl, {
     checked: false,
-    onChange: setCreditSuggestionEnabled,
+    onChange: setTrustSuggestionEnabled,
   });
 
   myKeyEl?.addEventListener("click", () => {
@@ -119,12 +119,12 @@ export const bindAddFriend = (root, data) => {
   return {
     submitEl,
     getPayload: () => {
-      const isSuggestingCredit = creditToggle.isChecked();
-      const creditLimit = isSuggestingCredit ? parseFloat(creditLimitEl?.value || "") : NaN;
+      const isSuggestingTrust = trustToggle.isChecked();
+      const trustLimit = isSuggestingTrust ? parseFloat(trustLimitEl?.value || "") : NaN;
       const friendId = friendKeyEl?.value?.trim?.() || "";
       return {
         friendId: isValidNpub(friendId) ? friendId : "",
-        creditLimit,
+        trustLimit,
       };
     },
   };

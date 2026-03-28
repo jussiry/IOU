@@ -7,7 +7,7 @@ By keeping transport message names and envelope helpers together, the data layer
 export const PEER_MESSAGE_TYPE_FRIEND_REQUEST = "friend_request";
 export const PEER_MESSAGE_TYPE_FRIEND_ACCEPT = "friend_accept";
 export const PEER_MESSAGE_TYPE_FRIEND_REJECT = "friend_reject";
-export const PEER_MESSAGE_TYPE_CREDIT_LIMIT_SUGGESTION = "credit_limit_suggestion";
+export const PEER_MESSAGE_TYPE_TRUST_LIMIT_SUGGESTION = "credit_limit_suggestion";
 export const PEER_MESSAGE_TYPE_TRANSACTION_CREATED = "transaction_created";
 export const PEER_MESSAGE_TYPE_RECEIVED = "received";
 export const PEER_RECEIPT_RESULT_PROCESSED = "peer_processed";

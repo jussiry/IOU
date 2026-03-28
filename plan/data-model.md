@@ -98,6 +98,6 @@ Current peer message types:
 - `friend_request`
 - `friend_accept`
 - `friend_reject`
-- `credit_limit_update`
+- `trust_limit_suggestion`
 - `transaction_created`
 - `received`

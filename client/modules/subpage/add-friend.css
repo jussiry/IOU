@@ -51,12 +51,12 @@
   align-items: center;
 }
 
-.add-friend-credit-panel {
+.add-friend-trust-panel {
   display: grid;
   gap: 16px;
 }
 
-.add-friend-credit-panel[hidden],
-.add-friend-credit-explainer[hidden] {
+.add-friend-trust-panel[hidden],
+.add-friend-trust-explainer[hidden] {
   display: none;
 }

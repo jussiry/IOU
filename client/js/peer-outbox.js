@@ -6,7 +6,7 @@ by the caller (data.js).
 */
 
 import { createPeerMessageModel } from "./models/data-model.js";
-import { PEER_MESSAGE_TYPE_CREDIT_LIMIT_SUGGESTION } from "./realtime/peer-messages.js";
+import { PEER_MESSAGE_TYPE_TRUST_LIMIT_SUGGESTION } from "./realtime/peer-messages.js";
 import { asTrimmedString, createId, hasUser } from "./state-utils.js";
 
 const PROCESSED_MESSAGE_ID_LIMIT = 500;
@@ -101,16 +101,16 @@ export const hasQueuedPeerMessage = (state, { toUserId = "", type = "" } = {}) =
   });
 };
 
-export const queueCreditLimitSuggestion = (state, friendId, creditLimit) => {
-  if (!Number.isFinite(creditLimit) || creditLimit < 0) {
+export const queueTrustLimitSuggestion = (state, friendId, trustLimit) => {
+  if (!Number.isFinite(trustLimit) || trustLimit < 0) {
     return null;
   }
 
   return queuePeerMessage(state, {
     toUserId: friendId,
-    type: PEER_MESSAGE_TYPE_CREDIT_LIMIT_SUGGESTION,
+    type: PEER_MESSAGE_TYPE_TRUST_LIMIT_SUGGESTION,
     payload: {
-      credit_limit_eur: creditLimit,
+      credit_limit_eur: trustLimit,
     },
   });
 };

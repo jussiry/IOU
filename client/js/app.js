@@ -12,7 +12,7 @@ import {
   hasUserData,
   loadData,
   subscribeToDataChanges,
-  updateCreditLimit,
+  updateTrustLimit,
 } from "./data.js";
 import { bindBalance, initBalanceToggles } from "../modules/balance-page/index.js";
 import { bindFriends } from "../modules/friends-page/index.js";
@@ -23,7 +23,7 @@ import { bindFriendDetail } from "../modules/subpage/friend.js";
 import { bindAddFriend } from "../modules/subpage/add-friend.js";
 import { initIouActions } from "../modules/components/iou-actions.js";
 import { bindSend } from "../modules/subpage/send.js";
-import { bindCredit } from "../modules/subpage/credit.js";
+import { bindTrust } from "../modules/subpage/trust.js";
 import { createRealtimeClient } from "./realtime/client.js";
 import { subscribeToPeerStatusChanges } from "./realtime/peer-status.js";
 import { ensureIconSprite } from "./utils/icons.js";
@@ -53,9 +53,9 @@ const templatePaths = {
   friend: "modules/subpage/friend.html",
   addFriend: "modules/subpage/add-friend.html",
   send: "modules/subpage/send.html",
-  credit: "modules/subpage/credit.html",
-  creditLimitField: "modules/subpage/credit-limit-field.html",
-  creditExplainer: "modules/subpage/credit-explainer.html",
+  trust: "modules/subpage/trust.html",
+  trustLimitField: "modules/subpage/trust-limit-field.html",
+  trustExplainer: "modules/subpage/trust-explainer.html",
   iouActions: "modules/components/iou-actions.html",
 };
 
@@ -175,9 +175,9 @@ const parseRoute = () => {
     const parts = hash.split("/");
     return createSubpageRoute("send", parts[1] || null);
   }
-  if (hash.startsWith("credit/")) {
-    const friendId = hash.replace("credit/", "");
-    return createSubpageRoute("credit", friendId);
+  if (hash.startsWith("trust/")) {
+    const friendId = hash.replace("trust/", "");
+    return createSubpageRoute("trust", friendId);
   }
   return pageTitles[hash] ? { type: "page", page: hash } : { type: "page", page: "balance" };
 };
@@ -242,12 +242,12 @@ const loadPage = async (route) => {
         window.location.hash = "friends";
         return;
       }
-      const [friendHtml, creditExplainerHtml] = await Promise.all([
+      const [friendHtml, trustExplainerHtml] = await Promise.all([
         fetchTemplate(templatePaths.friend),
-        fetchTemplate(templatePaths.creditExplainer),
+        fetchTemplate(templatePaths.trustExplainer),
       ]);
       renderSubpageContent(pageView, friendHtml);
-      renderTemplateIntoSlots(pageView, "credit-explainer", creditExplainerHtml);
+      renderTemplateIntoSlots(pageView, "trust-explainer", trustExplainerHtml);
 
       bindFriendDetail(pageView, data, route.friendId);
       if (friend?.person_name) {
@@ -258,14 +258,14 @@ const loadPage = async (route) => {
       initIouActions(pageView, route.friendId);
       setFallbackBackNavigation(pageView);
     } else if (route.type === "add-friend") {
-      const [addFriendHtml, creditLimitFieldHtml, creditExplainerHtml] = await Promise.all([
+      const [addFriendHtml, trustLimitFieldHtml, trustExplainerHtml] = await Promise.all([
         fetchTemplate(templatePaths.addFriend),
-        fetchTemplate(templatePaths.creditLimitField),
-        fetchTemplate(templatePaths.creditExplainer),
+        fetchTemplate(templatePaths.trustLimitField),
+        fetchTemplate(templatePaths.trustExplainer),
       ]);
       renderSubpageContent(pageView, addFriendHtml);
-      renderTemplateIntoSlots(pageView, "credit-limit-field", creditLimitFieldHtml);
-      renderTemplateIntoSlots(pageView, "credit-explainer", creditExplainerHtml);
+      renderTemplateIntoSlots(pageView, "trust-limit-field", trustLimitFieldHtml);
+      renderTemplateIntoSlots(pageView, "trust-explainer", trustExplainerHtml);
 
       const addFriendHandlers = bindAddFriend(pageView, data);
       document.title = "IOU — Add a friend";
@@ -296,27 +296,27 @@ const loadPage = async (route) => {
           window.location.hash = `friend/${payload.friendId}`;
         });
       }
-    } else if (route.type === "credit") {
-      const [creditHtml, creditLimitFieldHtml, creditExplainerHtml] = await Promise.all([
-        fetchTemplate(templatePaths.credit),
-        fetchTemplate(templatePaths.creditLimitField),
-        fetchTemplate(templatePaths.creditExplainer),
+    } else if (route.type === "trust") {
+      const [trustHtml, trustLimitFieldHtml, trustExplainerHtml] = await Promise.all([
+        fetchTemplate(templatePaths.trust),
+        fetchTemplate(templatePaths.trustLimitField),
+        fetchTemplate(templatePaths.trustExplainer),
       ]);
-      renderSubpageContent(pageView, creditHtml);
-      renderTemplateIntoSlots(pageView, "credit-limit-field", creditLimitFieldHtml);
-      renderTemplateIntoSlots(pageView, "credit-explainer", creditExplainerHtml);
-      const creditHandlers = bindCredit(pageView, data, route.friendId);
-      document.title = "IOU — Credit";
+      renderSubpageContent(pageView, trustHtml);
+      renderTemplateIntoSlots(pageView, "trust-limit-field", trustLimitFieldHtml);
+      renderTemplateIntoSlots(pageView, "trust-explainer", trustExplainerHtml);
+      const trustHandlers = bindTrust(pageView, data, route.friendId);
+      document.title = "IOU — Trust";
       setFallbackBackNavigation(pageView);
-      if (creditHandlers?.submitEl && route.friendId) {
-        creditHandlers.submitEl.addEventListener("click", async () => {
-          const limit = creditHandlers.limitInput
-            ? parseFloat(creditHandlers.limitInput.value)
+      if (trustHandlers?.submitEl && route.friendId) {
+        trustHandlers.submitEl.addEventListener("click", async () => {
+          const limit = trustHandlers.limitInput
+            ? parseFloat(trustHandlers.limitInput.value)
             : NaN;
           if (!Number.isFinite(limit) || limit < 0) {
             return;
           }
-          await updateCreditLimit(route.friendId, limit);
+          await updateTrustLimit(route.friendId, limit);
           window.location.hash = `friend/${route.friendId}`;
         });
       }

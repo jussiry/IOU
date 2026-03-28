@@ -27,7 +27,7 @@ Everyday analogies: borrowing lunch money, informal tab systems
 
 B. What is a Trustline?
 
-Definition: A credit limit between two people based on mutual trust
+Definition: A trust limit between two people based on mutual trust
 
 How it forms the building block of a monetary network
 

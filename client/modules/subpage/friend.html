@@ -1,36 +1,36 @@
 <div class="friend-content">
-  <div class="credit-suggestion surface-box" data-section="credit-suggestion" hidden>
-    <div class="credit-suggestion-label" data-bind="credit-suggestion-label"></div>
-    <div class="credit-suggestion-actions" data-section="credit-suggestion-actions" hidden>
-      <button class="friend-inline-action friend-inline-action--primary surface-box" type="button" data-action="agree-credit">
+  <div class="trust-suggestion surface-box" data-section="trust-suggestion" hidden>
+    <div class="trust-suggestion-label" data-bind="trust-suggestion-label"></div>
+    <div class="trust-suggestion-actions" data-section="trust-suggestion-actions" hidden>
+      <button class="friend-inline-action friend-inline-action--primary surface-box" type="button" data-action="agree-trust">
         Agree
       </button>
-      <button class="friend-inline-action surface-box" type="button" data-action="disagree-credit">
+      <button class="friend-inline-action surface-box" type="button" data-action="disagree-trust">
         Disagree
       </button>
     </div>
-    <div class="credit-suggestion-actions" data-section="credit-cancel-actions" hidden>
-      <button class="friend-inline-action surface-box" type="button" data-action="cancel-credit">
+    <div class="trust-suggestion-actions" data-section="trust-cancel-actions" hidden>
+      <button class="friend-inline-action surface-box" type="button" data-action="cancel-trust">
         Cancel suggestion
       </button>
     </div>
-    <div class="credit-suggestion-actions" data-section="credit-ok-actions" hidden>
-      <button class="friend-inline-action friend-inline-action--primary surface-box" type="button" data-action="dismiss-credit">
+    <div class="trust-suggestion-actions" data-section="trust-ok-actions" hidden>
+      <button class="friend-inline-action friend-inline-action--primary surface-box" type="button" data-action="dismiss-trust">
         OK
       </button>
     </div>
   </div>
-  <div class="friend-stats" aria-label="Debt and credit">
+  <div class="friend-stats" aria-label="Debt and trust">
     <div class="friend-stat surface-box" data-section="friend-debt">
       <div class="friend-stat-label" data-bind="debt-label">owes you</div>
       <div class="friend-stat-value">
         <span class="friend-stat-amount" data-bind="debt-amount">+€0.00</span>
       </div>
     </div>
-    <button class="friend-stat friend-stat--credit surface-box" type="button" data-section="credit-limit">
-      <div class="friend-stat-label" data-bind="credit-title">Credit limit</div>
+    <button class="friend-stat friend-stat--trust surface-box" type="button" data-section="trust-limit">
+      <div class="friend-stat-label" data-bind="trust-title">Trust limit</div>
       <div class="friend-stat-value friend-stat-value--small">
-        <span class="friend-stat-amount" data-bind="credit-amount">€0.00</span>
+        <span class="friend-stat-amount" data-bind="trust-amount">€0.00</span>
         <svg class="friend-stat-edit-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
           <use href="#icon-edit" />
         </svg>
@@ -41,7 +41,7 @@
     <div class="hero-label" data-bind="friend-label">Transactions</div>
     <ul class="tx-list" data-list="friend-transactions"></ul>
   </div>
-  <div data-section="credit-suggestion-explainer" data-slot="credit-explainer" hidden></div>
+  <div data-section="trust-suggestion-explainer" data-slot="trust-explainer" hidden></div>
 </div>
 
 <template data-template="tx-item">

@@ -38,7 +38,7 @@ import { appendLog, asTrimmedString, createId, hasUser } from "./state-utils.js"
 import { buildView } from "./view-model.js";
 import {
   ensureOutbox,
-  queueCreditLimitSuggestion,
+  queueTrustLimitSuggestion,
   queuePeerMessage,
   removeQueuedPeerMessage,
 } from "./peer-outbox.js";
@@ -219,7 +219,7 @@ export const resetState = async () => {
 // Friend lifecycle
 // ---------------------------------------------------------------------------
 
-export const createFriend = async ({ friendId, creditLimit }) => {
+export const createFriend = async ({ friendId, trustLimit }) => {
   const normalizedFriendId = asTrimmedString(friendId);
   if (!normalizedFriendId) {
     return loadData();
@@ -241,9 +241,9 @@ export const createFriend = async ({ friendId, creditLimit }) => {
     return loadData();
   }
 
-  const normalizedCreditLimit = normalizeCurrencyAmount(creditLimit, NaN);
-  if (Number.isFinite(normalizedCreditLimit) && normalizedCreditLimit >= 0) {
-    userConnection.trust_credit_limit_eur = normalizedCreditLimit;
+  const normalizedTrustLimit = normalizeCurrencyAmount(trustLimit, NaN);
+  if (Number.isFinite(normalizedTrustLimit) && normalizedTrustLimit >= 0) {
+    userConnection.trust_credit_limit_eur = normalizedTrustLimit;
   }
 
   if (existingStatus === FRIENDSHIP_STATUS_PENDING_INCOMING) {
@@ -277,8 +277,8 @@ export const createFriend = async ({ friendId, creditLimit }) => {
     payload: {
       requester_name: state.user.name,
       suggested_credit_limit_eur:
-        Number.isFinite(normalizedCreditLimit) && normalizedCreditLimit >= 0
-          ? normalizedCreditLimit
+        Number.isFinite(normalizedTrustLimit) && normalizedTrustLimit >= 0
+          ? normalizedTrustLimit
           : 0,
     },
   });
@@ -387,13 +387,13 @@ export const removeFriendRequest = async (friendId) => {
 };
 
 // ---------------------------------------------------------------------------
-// Credit limit management
+// Trust limit management
 // ---------------------------------------------------------------------------
 
-export const updateCreditLimit = async (friendId, creditLimit) => {
+export const updateTrustLimit = async (friendId, trustLimit) => {
   const normalizedFriendId = asTrimmedString(friendId);
-  const normalizedCreditLimit = normalizeCurrencyAmount(creditLimit, NaN);
-  if (!normalizedFriendId || !Number.isFinite(normalizedCreditLimit) || normalizedCreditLimit < 0) {
+  const normalizedTrustLimit = normalizeCurrencyAmount(trustLimit, NaN);
+  if (!normalizedFriendId || !Number.isFinite(normalizedTrustLimit) || normalizedTrustLimit < 0) {
     return loadData();
   }
 
@@ -417,41 +417,41 @@ export const updateCreditLimit = async (friendId, creditLimit) => {
   userConnection.person_name = displayName;
   const existingLimit = userConnection.trust_credit_limit_eur || 0;
 
-  if (normalizedCreditLimit === existingLimit) {
+  if (normalizedTrustLimit === existingLimit) {
     return buildView(state);
   }
 
-  if (existingLimit > 0 && normalizedCreditLimit < existingLimit) {
+  if (existingLimit > 0 && normalizedTrustLimit < existingLimit) {
     // Lowering existing limit: apply locally immediately, peer auto-applies on receive
-    userConnection.trust_credit_limit_eur = normalizedCreditLimit;
+    userConnection.trust_credit_limit_eur = normalizedTrustLimit;
     userConnection.pending_credit_limit_eur = null;
     userConnection.pending_credit_limit_is_incoming = null;
     if (isPeerEligibleFriendshipStatus(userConnection.friendship_status)) {
-      queueCreditLimitSuggestion(state, normalizedFriendId, normalizedCreditLimit);
+      queueTrustLimitSuggestion(state, normalizedFriendId, normalizedTrustLimit);
     }
     appendLog(state, {
-      text: `You lowered the credit limit for **${displayName}** to ${normalizedCreditLimit.toFixed(2)}€`,
+      text: `You lowered the trust limit for **${displayName}** to ${normalizedTrustLimit.toFixed(2)}€`,
       friendId: normalizedFriendId,
-      amount: normalizedCreditLimit,
+      amount: normalizedTrustLimit,
     });
   } else {
     // New or higher limit: don't apply locally yet, wait for peer to accept
-    userConnection.pending_credit_limit_eur = normalizedCreditLimit;
+    userConnection.pending_credit_limit_eur = normalizedTrustLimit;
     userConnection.pending_credit_limit_is_incoming = false;
     if (isPeerEligibleFriendshipStatus(userConnection.friendship_status)) {
-      queueCreditLimitSuggestion(state, normalizedFriendId, normalizedCreditLimit);
+      queueTrustLimitSuggestion(state, normalizedFriendId, normalizedTrustLimit);
     }
     appendLog(state, {
-      text: `You suggested a credit limit of ${normalizedCreditLimit.toFixed(2)}€ to **${displayName}**`,
+      text: `You suggested a trust limit of ${normalizedTrustLimit.toFixed(2)}€ to **${displayName}**`,
       friendId: normalizedFriendId,
-      amount: normalizedCreditLimit,
+      amount: normalizedTrustLimit,
     });
   }
 
   return persistAndBuildView(state);
 };
 
-export const respondToCreditLimitSuggestion = async (friendId, accepted) => {
+export const respondToTrustLimitSuggestion = async (friendId, accepted) => {
   const normalizedFriendId = asTrimmedString(friendId);
   if (!normalizedFriendId) {
     return loadData();
@@ -478,13 +478,13 @@ export const respondToCreditLimitSuggestion = async (friendId, accepted) => {
   if (accepted) {
     userConnection.trust_credit_limit_eur = pendingLimit;
     appendLog(state, {
-      text: `You accepted the credit limit of ${pendingLimit.toFixed(2)}€ with **${displayName}**`,
+      text: `You accepted the trust limit of ${pendingLimit.toFixed(2)}€ with **${displayName}**`,
       friendId: normalizedFriendId,
       amount: pendingLimit,
     });
   } else {
     appendLog(state, {
-      text: `You declined the credit limit suggestion from **${displayName}**`,
+      text: `You declined the trust limit suggestion from **${displayName}**`,
       friendId: normalizedFriendId,
     });
   }
@@ -493,13 +493,13 @@ export const respondToCreditLimitSuggestion = async (friendId, accepted) => {
   userConnection.pending_credit_limit_is_incoming = null;
 
   if (isPeerEligibleFriendshipStatus(userConnection.friendship_status)) {
-    queueCreditLimitSuggestion(state, normalizedFriendId, responseLimit);
+    queueTrustLimitSuggestion(state, normalizedFriendId, responseLimit);
   }
 
   return persistAndBuildView(state);
 };
 
-export const cancelCreditLimitSuggestion = async (friendId) => {
+export const cancelTrustLimitSuggestion = async (friendId) => {
   const normalizedFriendId = asTrimmedString(friendId);
   if (!normalizedFriendId) {
     return loadData();
@@ -521,18 +521,18 @@ export const cancelCreditLimitSuggestion = async (friendId) => {
   userConnection.pending_credit_limit_is_incoming = null;
 
   appendLog(state, {
-    text: `You cancelled your credit limit suggestion to **${displayName}**`,
+    text: `You cancelled your trust limit suggestion to **${displayName}**`,
     friendId: normalizedFriendId,
   });
 
   if (isPeerEligibleFriendshipStatus(userConnection.friendship_status)) {
-    queueCreditLimitSuggestion(state, normalizedFriendId, currentLimit);
+    queueTrustLimitSuggestion(state, normalizedFriendId, currentLimit);
   }
 
   return persistAndBuildView(state);
 };
 
-export const dismissCreditLimitNotification = async (friendId) => {
+export const dismissTrustLimitNotification = async (friendId) => {
   const normalizedFriendId = asTrimmedString(friendId);
   if (!normalizedFriendId) {
     return loadData();

@@ -6,7 +6,7 @@ Runtime user data is persisted in IndexedDB. Seed person fixtures used for tests
 - `debt_eur` is from the perspective of the file owner.
   - Positive means the other person owes the owner.
   - Negative means the owner owes the other person.
-- `trust_credit_limit_eur` is the maximum trusted credit the owner extends to that person.
+- `trust_credit_limit_eur` is the maximum trust limit the owner extends to that person.
 - `recent_transactions` (optional) is an array of the most recent transactions between the owner and the connected person.
 
 ## Logs
@@ -20,5 +20,5 @@ Runtime user data is persisted in IndexedDB. Seed person fixtures used for tests
 ## Example fields
 - `id`: stable identifier for the person. Runtime records use the Nostr `npub` public key as the canonical ID.
 - `name`: display name.
-- `connections`: array of connected people and the current debt/credit limits between them.
+- `connections`: array of connected people and the current debt/trust limits between them.
 - Only the local user record stores private key material. Contact records keep public identity data only.

@@ -136,7 +136,7 @@ summary::-webkit-details-marker {
   text-align: right;
 }
 
-.amount .credit-limit {
+.amount .trust-limit {
   color: var(--muted);
   font-weight: 400;
 }

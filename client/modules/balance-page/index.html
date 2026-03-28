@@ -40,29 +40,29 @@
     </button>
   </div>
 </div>
-<div class="balance-hero trust-hero" aria-label="Credit agreements">
-  <div class="hero-label">Credit agreements</div>
-  <div class="hero-amount"><span class="hero-number" data-bind="available-credit"></span> <span>theoretical limit when sending IOU's to someone you don't know</span></div>
+<div class="balance-hero trust-hero" aria-label="Trust agreements">
+  <div class="hero-label">Trust agreements</div>
+  <div class="hero-amount"><span class="hero-number" data-bind="available-trust"></span> <span>theoretical limit when sending IOU's to someone you don't know</span></div>
   <div class="hero-sub">
     <button class="pill toggle" type="button" aria-expanded="false">
       <div class="pill-row">
         <div class="pill-label">
           <svg class="pill-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-            <use href="#icon-credit" />
+            <use href="#icon-trust" />
           </svg>
-          <div class="pill-text"><strong>Credit</strong> agreements</div>
+          <div class="pill-text"><strong>Trust</strong> agreements</div>
         </div>
-        <strong data-bind="credit-agreements-total"></strong>
+        <strong data-bind="trust-agreements-total"></strong>
       </div>
-      <div class="sub-card" aria-label="Credit agreements">
-        <div class="inline-list" data-list="credit-agreements"></div>
+      <div class="sub-card" aria-label="Trust agreements">
+        <div class="inline-list" data-list="trust-agreements"></div>
       </div>
     </button>
   </div>
 </div>
 
-<template data-template="credit-item">
-  <div class="credit-item">
+<template data-template="trust-item">
+  <div class="trust-item">
     <div data-bind="name"></div>
     <div class="amount" data-bind="amount"></div>
   </div>

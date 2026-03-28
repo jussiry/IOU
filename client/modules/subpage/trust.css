@@ -1,4 +1,4 @@
-.send-form [data-bind="credit-limit"] {
+.send-form [data-bind="trust-limit"] {
   text-align: left;
   font-size: 20px;
   color: var(--ink);

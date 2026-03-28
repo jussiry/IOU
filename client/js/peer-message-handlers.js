@@ -28,7 +28,7 @@ import {
   queuePeerMessage,
 } from "./peer-outbox.js";
 import {
-  PEER_MESSAGE_TYPE_CREDIT_LIMIT_SUGGESTION,
+  PEER_MESSAGE_TYPE_TRUST_LIMIT_SUGGESTION,
   PEER_MESSAGE_TYPE_FRIEND_ACCEPT,
   PEER_MESSAGE_TYPE_FRIEND_REJECT,
   PEER_MESSAGE_TYPE_FRIEND_REQUEST,
@@ -47,13 +47,13 @@ import {
   isPeerEligibleFriendshipStatus,
 } from "./utils/friendships.js";
 
-const getIncomingCreditLimitFromPayload = (payload) => {
-  const suggestedCreditLimit = normalizeCurrencyAmount(
+const getIncomingTrustLimitFromPayload = (payload) => {
+  const suggestedTrustLimit = normalizeCurrencyAmount(
     payload?.suggested_credit_limit_eur,
     NaN
   );
-  return Number.isFinite(suggestedCreditLimit) && suggestedCreditLimit >= 0
-    ? suggestedCreditLimit
+  return Number.isFinite(suggestedTrustLimit) && suggestedTrustLimit >= 0
+    ? suggestedTrustLimit
     : null;
 };
 
@@ -114,9 +114,9 @@ const applyFriendRequestMessage = (state, message) => {
   }
 
   ensureContactBackLink(state, message.from_user_id, requesterName);
-  const suggestedCreditLimit = getIncomingCreditLimitFromPayload(message.payload);
-  if (suggestedCreditLimit !== null) {
-    userConnection.trust_credit_limit_eur = suggestedCreditLimit;
+  const suggestedTrustLimit = getIncomingTrustLimitFromPayload(message.payload);
+  if (suggestedTrustLimit !== null) {
+    userConnection.trust_credit_limit_eur = suggestedTrustLimit;
   }
 
   userConnection.friendship_status = FRIENDSHIP_STATUS_PENDING_INCOMING;
@@ -159,9 +159,9 @@ const applyFriendRejectMessage = (state, message) => {
   return notification(`${displayName} rejected your friend request`, message.from_user_id, "friends");
 };
 
-const applyCreditLimitSuggestionMessage = (state, message) => {
-  const creditLimit = normalizeCurrencyAmount(message.payload?.credit_limit_eur, NaN);
-  if (!Number.isFinite(creditLimit) || creditLimit < 0) {
+const applyTrustLimitSuggestionMessage = (state, message) => {
+  const trustLimit = normalizeCurrencyAmount(message.payload?.credit_limit_eur, NaN);
+  if (!Number.isFinite(trustLimit) || trustLimit < 0) {
     return null;
   }
 
@@ -180,48 +180,48 @@ const applyCreditLimitSuggestionMessage = (state, message) => {
     : null;
   const wasIncoming = userConnection.pending_credit_limit_is_incoming === true;
 
-  if (Number.isFinite(pendingOutgoing) && creditLimit === pendingOutgoing) {
+  if (Number.isFinite(pendingOutgoing) && trustLimit === pendingOutgoing) {
     // Peer accepted our suggestion — apply it locally now
-    userConnection.trust_credit_limit_eur = creditLimit;
+    userConnection.trust_credit_limit_eur = trustLimit;
     userConnection.pending_credit_limit_eur = null;
     userConnection.pending_credit_limit_is_incoming = null;
     return friendNotification(
-      `${displayName} agreed on credit limit of ${formatCurrency(creditLimit)}`,
+      `${displayName} agreed on trust limit of ${formatCurrency(trustLimit)}`,
       message.from_user_id,
     );
   }
 
-  if (creditLimit === existingLimit && userConnection.pending_credit_limit_eur !== null) {
+  if (trustLimit === existingLimit && userConnection.pending_credit_limit_eur !== null) {
     // Peer cancelled or declined — clear pending
     userConnection.pending_credit_limit_eur = null;
     userConnection.pending_credit_limit_is_incoming = null;
     if (wasIncoming) {
-      return friendNotification(`${displayName} cancelled credit limit suggestion`, message.from_user_id);
+      return friendNotification(`${displayName} cancelled trust limit suggestion`, message.from_user_id);
     }
-    return friendNotification(`${displayName} rejected credit limit suggestion`, message.from_user_id);
+    return friendNotification(`${displayName} rejected trust limit suggestion`, message.from_user_id);
   }
 
-  if (creditLimit < existingLimit) {
+  if (trustLimit < existingLimit) {
     // Lower: apply automatically, show notification
-    userConnection.trust_credit_limit_eur = creditLimit;
-    userConnection.pending_credit_limit_eur = creditLimit;
+    userConnection.trust_credit_limit_eur = trustLimit;
+    userConnection.pending_credit_limit_eur = trustLimit;
     userConnection.pending_credit_limit_is_incoming = "lowered";
     return friendNotification(
-      `${displayName} lowered credit limit to ${formatCurrency(creditLimit)}`,
+      `${displayName} lowered trust limit to ${formatCurrency(trustLimit)}`,
       message.from_user_id,
     );
   }
 
-  if (creditLimit === existingLimit) {
+  if (trustLimit === existingLimit) {
     // Same as current with no pending: no-op
     return null;
   }
 
   // Higher than current: let user decide
-  userConnection.pending_credit_limit_eur = creditLimit;
+  userConnection.pending_credit_limit_eur = trustLimit;
   userConnection.pending_credit_limit_is_incoming = true;
   return friendNotification(
-    `${displayName} suggested credit limit of ${formatCurrency(creditLimit)}`,
+    `${displayName} suggested trust limit of ${formatCurrency(trustLimit)}`,
     message.from_user_id,
   );
 };
@@ -296,8 +296,8 @@ export const routeInboundMessage = (state, message) => {
     case PEER_MESSAGE_TYPE_FRIEND_REJECT:
       result = applyFriendRejectMessage(state, message);
       break;
-    case PEER_MESSAGE_TYPE_CREDIT_LIMIT_SUGGESTION:
-      result = applyCreditLimitSuggestionMessage(state, message);
+    case PEER_MESSAGE_TYPE_TRUST_LIMIT_SUGGESTION:
+      result = applyTrustLimitSuggestionMessage(state, message);
       break;
     case PEER_MESSAGE_TYPE_TRANSACTION_CREATED:
       result = applyTransactionCreatedMessage(state, message);
