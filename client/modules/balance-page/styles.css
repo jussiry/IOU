@@ -10,15 +10,21 @@
 
 .trust-hero .hero-amount {
   font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .trust-hero .hero-number {
   font-size: 32px;
   color: var(--muted);
+  flex-shrink: 0;
 }
 
 .trust-hero .hero-amount span:not(.hero-number) {
-  font-size: 14px;
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--muted);
 }
 
 .trust-hero .pill {

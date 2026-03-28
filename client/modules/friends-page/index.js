@@ -39,10 +39,10 @@ const getFriendSortWeight = (connection) => {
 };
 
 const getPendingCreditLimit = (connection) => {
-  if (connection.friendship_status === FRIENDSHIP_STATUS_PENDING_INCOMING) {
-    return connection.inbound_credit_limit_eur || 0;
-  }
-  if (connection.friendship_status === FRIENDSHIP_STATUS_PENDING_OUTGOING) {
+  if (
+    connection.friendship_status === FRIENDSHIP_STATUS_PENDING_INCOMING ||
+    connection.friendship_status === FRIENDSHIP_STATUS_PENDING_OUTGOING
+  ) {
     return connection.trust_credit_limit_eur || 0;
   }
   return 0;

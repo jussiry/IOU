@@ -9,6 +9,7 @@
   grid-area: 1 / 1;
   width: 100%;
   transform: translateX(0%);
+  padding-bottom: calc(95px + env(safe-area-inset-bottom, 0px));
 }
 
 .page-stack[data-transitioning="true"] > .page-view {

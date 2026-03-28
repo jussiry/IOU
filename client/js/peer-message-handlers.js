@@ -113,14 +113,10 @@ const applyFriendRequestMessage = (state, message) => {
     return null;
   }
 
-  const contactBackLink = ensureContactBackLink(
-    state,
-    message.from_user_id,
-    requesterName
-  );
+  ensureContactBackLink(state, message.from_user_id, requesterName);
   const suggestedCreditLimit = getIncomingCreditLimitFromPayload(message.payload);
-  if (contactBackLink && suggestedCreditLimit !== null) {
-    contactBackLink.trust_credit_limit_eur = suggestedCreditLimit;
+  if (suggestedCreditLimit !== null) {
+    userConnection.trust_credit_limit_eur = suggestedCreditLimit;
   }
 
   userConnection.friendship_status = FRIENDSHIP_STATUS_PENDING_INCOMING;

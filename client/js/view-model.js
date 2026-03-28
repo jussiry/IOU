@@ -14,15 +14,10 @@ export const buildView = (state) => {
 
   const connectionsWithInbound = connections.map((connection) => {
     const contact = state.contacts?.[connection.person_id];
-    const backLink = contact?.connections?.find(
-      (entry) => entry.person_id === user.id
-    );
-    const inboundCreditLimit = backLink?.trust_credit_limit_eur || 0;
 
     return {
       ...connection,
       person_name: contact?.name || connection.person_name || connection.person_id,
-      inbound_credit_limit_eur: inboundCreditLimit,
     };
   });
 
@@ -43,10 +38,9 @@ export const buildView = (state) => {
   const netBalance = friendsOweTotal - youOweTotal;
 
   const availableCredit = acceptedConnections.reduce((sum, connection) => {
-    const creditLimit = connection.inbound_credit_limit_eur || 0;
-    const debtUsed = Math.max(connection.debt_eur || 0, 0);
-    const remainingCredit = Math.max(creditLimit - debtUsed, 0);
-    return sum + remainingCredit;
+    const creditLimit = connection.trust_credit_limit_eur || 0;
+    const debt = connection.debt_eur || 0;
+    return sum + Math.max(creditLimit + debt, 0);
   }, 0);
 
   return {
