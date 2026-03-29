@@ -137,7 +137,7 @@
   margin-top: 8px;
 }
 
-.trust-suggestion {
+.actionable-box {
   --surface-radius: 18px;
   margin: 10px 20px 0;
   padding: 16px 18px;
@@ -148,12 +148,12 @@
   text-align: center;
 }
 
-.trust-suggestion[hidden],
-.trust-suggestion-actions[hidden] {
+.actionable-box[hidden],
+.actionable-box-actions[hidden] {
   display: none;
 }
 
-.trust-suggestion-label {
+.actionable-box-label {
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -161,7 +161,7 @@
   color: var(--muted);
 }
 
-.trust-suggestion-actions {
+.actionable-box-actions {
   display: flex;
   gap: 10px;
   justify-content: center;

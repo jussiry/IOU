@@ -48,6 +48,13 @@ const getPendingTrustLimit = (connection) => {
   return 0;
 };
 
+const hasActionableNotification = (connection) => {
+  if (connection.friendship_status === FRIENDSHIP_STATUS_PENDING_INCOMING) return true;
+  if (connection.pending_credit_limit_is_incoming === true) return true;
+  if (connection.pending_credit_limit_is_incoming === "lowered") return true;
+  return false;
+};
+
 const getFriendRowState = (connection) => {
   if (isAcceptedFriendshipStatus(connection.friendship_status)) {
     const debtValue = connection.debt_eur || 0;
@@ -253,6 +260,7 @@ export const bindFriends = (root, data) => {
     const badgeEl = node.querySelector('[data-bind="badge"]');
     const amountEl = node.querySelector('[data-bind="amount"]');
     const iconEl = node.querySelector('[data-bind="friend-icon"]');
+    const actionDotEl = node.querySelector('[data-bind="action-dot"]');
     const rowState = getFriendRowState(connection);
     node.addEventListener("click", () => {
       window.location.hash = `friend/${connection.person_id}`;
@@ -263,6 +271,9 @@ export const bindFriends = (root, data) => {
         "friend-icon--online",
         connectedPeerIds.has(connection.person_id)
       );
+    }
+    if (actionDotEl) {
+      actionDotEl.hidden = !hasActionableNotification(connection);
     }
     if (badgeEl) badgeEl.textContent = rowState.badge;
     if (amountEl) {

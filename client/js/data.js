@@ -430,7 +430,7 @@ export const updateTrustLimit = async (friendId, trustLimit) => {
       queueTrustLimitSuggestion(state, normalizedFriendId, normalizedTrustLimit);
     }
     appendLog(state, {
-      text: `You lowered the trust limit for **${displayName}** to ${normalizedTrustLimit.toFixed(2)}€`,
+      text: `You lowered the trust limit for **${displayName}** to €${normalizedTrustLimit.toFixed(2)}`,
       friendId: normalizedFriendId,
       amount: normalizedTrustLimit,
     });
@@ -442,7 +442,7 @@ export const updateTrustLimit = async (friendId, trustLimit) => {
       queueTrustLimitSuggestion(state, normalizedFriendId, normalizedTrustLimit);
     }
     appendLog(state, {
-      text: `You suggested a trust limit of ${normalizedTrustLimit.toFixed(2)}€ to **${displayName}**`,
+      text: `You suggested a trust limit of €${normalizedTrustLimit.toFixed(2)} to **${displayName}**`,
       friendId: normalizedFriendId,
       amount: normalizedTrustLimit,
     });
@@ -478,7 +478,7 @@ export const respondToTrustLimitSuggestion = async (friendId, accepted) => {
   if (accepted) {
     userConnection.trust_credit_limit_eur = pendingLimit;
     appendLog(state, {
-      text: `You accepted the trust limit of ${pendingLimit.toFixed(2)}€ with **${displayName}**`,
+      text: `You accepted the trust limit of €${pendingLimit.toFixed(2)} with **${displayName}**`,
       friendId: normalizedFriendId,
       amount: pendingLimit,
     });
@@ -594,7 +594,7 @@ export const createTransaction = async ({ friendId, amount, message }) => {
   );
 
   appendLog(state, {
-    text: `You sent ${normalizedAmount.toFixed(2)}€ to **${displayName}**`,
+    text: `You sent €${normalizedAmount.toFixed(2)} to **${displayName}**`,
     message: trimmedMessage,
     friendId: normalizedFriendId,
     amount: normalizedAmount,

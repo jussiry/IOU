@@ -256,7 +256,7 @@ const applyTransactionCreatedMessage = (state, message) => {
     })
   );
 
-  return friendNotification(`${displayName} sent ${amount.toFixed(2)}€ to you`, message.from_user_id);
+  return friendNotification(`${displayName} sent €${amount.toFixed(2)} to you`, message.from_user_id);
 };
 
 const createInboundProcessingResult = (view, acknowledgeResult = null) => {

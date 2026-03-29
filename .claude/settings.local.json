@@ -7,7 +7,17 @@
       "Bash(git commit:*)",
       "Bash(git branch:*)",
       "Bash(git worktree:*)",
-      "Bash(git:*)"
+      "Bash(git:*)",
+      "Bash(grep -rni credit --include=*.css ./client --include=*.css .)",
+      "Bash(grep -rni credit --include=*.md --include=*.json .)",
+      "WebFetch(domain:www.istockphoto.com)",
+      "Bash(xargs cat:*)",
+      "Bash(find /Users/jussi/code/IOU -maxdepth 2 -type f \\\\\\(-name .env* -o -name *.config.* -o -name Dockerfile* -o -name docker-compose* \\\\\\))",
+      "Bash(npm install:*)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(npm run:*)",
+      "Bash(pkill -f \"nodemon.*backend/server.js\")",
+      "Bash(pkill -f \"node backend/server.js\")"
     ]
   }
 }

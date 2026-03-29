@@ -1,7 +1,23 @@
 <div class="friend-content">
-  <div class="trust-suggestion surface-box" data-section="trust-suggestion" hidden>
-    <div class="trust-suggestion-label" data-bind="trust-suggestion-label"></div>
-    <div class="trust-suggestion-actions" data-section="trust-suggestion-actions" hidden>
+  <div class="actionable-box surface-box" data-section="friend-request-notification" hidden>
+    <div class="actionable-box-label" data-bind="friend-request-label"></div>
+    <div class="actionable-box-actions" data-section="friend-accept-actions" hidden>
+      <button class="friend-inline-action friend-inline-action--primary surface-box" type="button" data-action="accept-friend">
+        Accept
+      </button>
+      <button class="friend-inline-action surface-box" type="button" data-action="reject-friend">
+        Reject
+      </button>
+    </div>
+    <div class="actionable-box-actions" data-section="friend-remove-actions" hidden>
+      <button class="friend-inline-action surface-box" type="button" data-action="remove-request">
+        Remove request
+      </button>
+    </div>
+  </div>
+  <div class="actionable-box surface-box" data-section="trust-suggestion" hidden>
+    <div class="actionable-box-label" data-bind="trust-suggestion-label"></div>
+    <div class="actionable-box-actions" data-section="trust-suggestion-actions" hidden>
       <button class="friend-inline-action friend-inline-action--primary surface-box" type="button" data-action="agree-trust">
         Agree
       </button>
@@ -9,12 +25,12 @@
         Disagree
       </button>
     </div>
-    <div class="trust-suggestion-actions" data-section="trust-cancel-actions" hidden>
+    <div class="actionable-box-actions" data-section="trust-cancel-actions" hidden>
       <button class="friend-inline-action surface-box" type="button" data-action="cancel-trust">
         Cancel suggestion
       </button>
     </div>
-    <div class="trust-suggestion-actions" data-section="trust-ok-actions" hidden>
+    <div class="actionable-box-actions" data-section="trust-ok-actions" hidden>
       <button class="friend-inline-action friend-inline-action--primary surface-box" type="button" data-action="dismiss-trust">
         OK
       </button>

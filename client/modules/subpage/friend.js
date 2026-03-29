@@ -33,6 +33,10 @@ export const bindFriendDetail = (root, data, friendId) => {
   const trustButton = root.querySelector('[data-section="trust-limit"]');
   const listEl = root.querySelector('[data-list="friend-transactions"]');
   const txTemplate = root.querySelector('[data-template="tx-item"]');
+  const friendRequestEl = root.querySelector('[data-section="friend-request-notification"]');
+  const friendRequestLabelEl = root.querySelector('[data-bind="friend-request-label"]');
+  const friendAcceptActionsEl = root.querySelector('[data-section="friend-accept-actions"]');
+  const friendRemoveActionsEl = root.querySelector('[data-section="friend-remove-actions"]');
   const suggestionEl = root.querySelector('[data-section="trust-suggestion"]');
   const suggestionLabelEl = root.querySelector('[data-bind="trust-suggestion-label"]');
   const suggestionActionsEl = root.querySelector('[data-section="trust-suggestion-actions"]');
@@ -61,25 +65,21 @@ export const bindFriendDetail = (root, data, friendId) => {
           <span class="friend-send-label">Send</span>
         </button>
       `;
-    } else if (friendshipStatus === FRIENDSHIP_STATUS_PENDING_INCOMING) {
+    } else if (friendshipStatus === FRIENDSHIP_STATUS_REJECTED) {
       headerRight.innerHTML = `
-        <button class="friend-inline-action friend-inline-action--primary surface-box" type="button" data-action="accept-friend">
-          Accept
-        </button>
-        <button class="friend-inline-action surface-box" type="button" data-action="reject-friend">
-          Reject
-        </button>
+        <span class="friend-status-chip surface-box">Rejected</span>
       `;
+    }
+  }
+  if (friendRequestEl) {
+    if (friendshipStatus === FRIENDSHIP_STATUS_PENDING_INCOMING) {
+      friendRequestEl.hidden = false;
+      if (friendRequestLabelEl) friendRequestLabelEl.textContent = `${friendFirstName} wants to be friends`;
+      if (friendAcceptActionsEl) friendAcceptActionsEl.hidden = false;
     } else if (friendshipStatus === FRIENDSHIP_STATUS_PENDING_OUTGOING) {
-      headerRight.innerHTML = `
-        <button class="friend-inline-action surface-box" type="button" data-action="remove-request">
-          Remove request
-        </button>
-      `;
-    } else {
-      headerRight.innerHTML = `
-        <span class="friend-status-chip surface-box">${friendshipStatus === FRIENDSHIP_STATUS_REJECTED ? "Rejected" : "Pending"}</span>
-      `;
+      friendRequestEl.hidden = false;
+      if (friendRequestLabelEl) friendRequestLabelEl.textContent = `Friend request sent to ${friendFirstName}`;
+      if (friendRemoveActionsEl) friendRemoveActionsEl.hidden = false;
     }
   }
   if (trustTitleEl) {
@@ -131,20 +131,20 @@ export const bindFriendDetail = (root, data, friendId) => {
     }
   }
 
-  const acceptButton = headerRight?.querySelector('[data-action="accept-friend"]');
+  const acceptButton = root.querySelector('[data-action="accept-friend"]');
   if (acceptButton && friendId) {
     acceptButton.addEventListener("click", async () => {
       await acceptFriend(friendId);
     });
   }
-  const rejectButton = headerRight?.querySelector('[data-action="reject-friend"]');
+  const rejectButton = root.querySelector('[data-action="reject-friend"]');
   if (rejectButton && friendId) {
     rejectButton.addEventListener("click", async () => {
       await rejectFriend(friendId);
       window.location.hash = "friends";
     });
   }
-  const removeRequestButton = headerRight?.querySelector('[data-action="remove-request"]');
+  const removeRequestButton = root.querySelector('[data-action="remove-request"]');
   if (removeRequestButton && friendId) {
     removeRequestButton.addEventListener("click", async () => {
       await removeFriendRequest(friendId);

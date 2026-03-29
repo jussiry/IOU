@@ -1,17 +1,25 @@
 
-- WebRTC yhteyden muodostus
-- kaverin lisäys
-(- näytä kaveri listassa online kaverit)
-- IOU:n lähetys webRTC:n kautta
+
+- test refreshing browser to find state where friends lose online status (and see how messages get passed when back online)
+- add "user action needed" notifier to nav links with number of available actions
+  * on friends page add highligt friend (yellow bg) when there are actions available on friends page
+- on a friend page highlight latest transaction(s) since the page was last visited
+
+
 - IOU:n lähetys cachettamalla severiin jos kaveri ei online
   * message quet jotka lähetetään kun niiden vastaanottaja on online
   * message quet myös clientteihin, eli kun kaveri tulee online, varmistetaan onko hän saanut viestin (serveristä tai muualta) - ja jos ei ole lähetetään itse
 
-  Joskus myöhemmin:
-  - Currencies sivu
-    * listaa kaikki itse käytetyt ja kaverien käyttämät valuutat
-    * Sama ticker voi olla eri valuutoilla, mutta ei samaa selostusta valuutasta
-    * listaa suosituimmuus järjestyksessä, joten ei haittaa vaikka joku "spämmää" 
+Vastaamattomia kysymyksiä
+- should there be some UI framework to simplify rendering?
+
+
+
+Joskus myöhemmin:
+- Currencies sivu
+  * listaa kaikki itse käytetyt ja kaverien käyttämät valuutat
+  * Sama ticker voi olla eri valuutoilla, mutta ei samaa selostusta valuutasta
+  * listaa suosituimmuus järjestyksessä, joten ei haittaa vaikka joku "spämmää" 
 
 
 

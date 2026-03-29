@@ -98,6 +98,14 @@ summary::-webkit-details-marker {
   overflow: hidden;
 }
 
+.action-dot {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #e5a632;
+}
+
 .friend-icon {
   flex: 0 0 auto;
   width: 18px;
