@@ -183,8 +183,10 @@ nav {
   cursor: pointer;
 }
 
-.nav-item span {
-  font-size: 18px;
+.nav-icon {
+  width: 22px;
+  height: 22px;
+  margin: 0 auto;
 }
 
 .nav-item.active {
@@ -192,7 +194,7 @@ nav {
   color: #fff;
 }
 
-.nav-item.active span {
+.nav-item.active .nav-icon {
   color: var(--accent-2);
 }
 
