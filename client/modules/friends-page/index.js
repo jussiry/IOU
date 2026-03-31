@@ -11,6 +11,7 @@ import {
   FRIENDSHIP_STATUS_PENDING_INCOMING,
   FRIENDSHIP_STATUS_PENDING_OUTGOING,
   FRIENDSHIP_STATUS_REJECTED,
+  hasActionableNotification,
   isAcceptedFriendshipStatus,
 } from "../../js/utils/friendships.js";
 
@@ -46,13 +47,6 @@ const getPendingTrustLimit = (connection) => {
     return connection.trust_credit_limit_eur || 0;
   }
   return 0;
-};
-
-const hasActionableNotification = (connection) => {
-  if (connection.friendship_status === FRIENDSHIP_STATUS_PENDING_INCOMING) return true;
-  if (connection.pending_credit_limit_is_incoming === true) return true;
-  if (connection.pending_credit_limit_is_incoming === "lowered") return true;
-  return false;
 };
 
 const getFriendRowState = (connection) => {

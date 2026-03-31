@@ -14,6 +14,8 @@
   justify-items: center;
   text-align: center;
   width: 100%;
+  min-width: 0;
+  overflow: hidden;
   color: var(--ink);
 }
 
@@ -24,6 +26,10 @@
   text-transform: uppercase;
   color: var(--muted);
   line-height: 1.1;
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .friend-stat-value {
@@ -32,6 +38,8 @@
   justify-content: center;
   gap: 6px;
   line-height: 1.1;
+  min-width: 0;
+  width: 100%;
 }
 
 .friend-stat-value--small {
@@ -42,6 +50,9 @@
   font-size: 22px;
   font-weight: 700;
   color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .friend-stat-value--small .friend-stat-amount {
@@ -137,6 +148,13 @@
   margin-top: 8px;
 }
 
+.friend-card .empty {
+  background: none;
+  border-radius: 0;
+  padding: 0;
+  box-shadow: none;
+}
+
 .actionable-box {
   --surface-radius: 18px;
   margin: 10px 20px 0;
@@ -146,6 +164,7 @@
   display: grid;
   gap: 10px;
   text-align: center;
+  overflow: hidden;
 }
 
 .actionable-box[hidden],
@@ -159,6 +178,9 @@
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .actionable-box-actions {

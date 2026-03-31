@@ -27,7 +27,7 @@ import { bindTrust } from "../modules/subpage/trust.js";
 import { createRealtimeClient } from "./realtime/client.js";
 import { subscribeToPeerStatusChanges } from "./realtime/peer-status.js";
 import { ensureIconSprite } from "./utils/icons.js";
-import { setActiveNav } from "./utils/nav.js";
+import { setActiveNav, updateNavBadges } from "./utils/nav.js";
 import { getSlideDirection, swapPage } from "./page-transitions.js";
 import { getAppVersion } from "./version.js";
 
@@ -228,6 +228,7 @@ const loadPage = async (route) => {
 
     const pageView = createPageView(html);
     setRouteUiState(route);
+    if (data) updateNavBadges(navButtons, data);
 
     if (route.type === "welcome") {
       bindWelcome(pageView, {

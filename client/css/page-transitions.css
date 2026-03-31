@@ -8,6 +8,8 @@
 .page-stack > .page-view {
   grid-area: 1 / 1;
   width: 100%;
+  min-width: 0;
+  overflow: hidden;
   transform: translateX(0%);
   padding-bottom: calc(105px + env(safe-area-inset-bottom, 0px));
 }

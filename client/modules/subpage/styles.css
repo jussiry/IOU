@@ -47,7 +47,9 @@
   border: 1px solid rgba(17, 17, 17, 0.06);
   margin-right: auto;
   min-width: 0;
-  overflow-wrap: anywhere;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .subpage-header-right {
