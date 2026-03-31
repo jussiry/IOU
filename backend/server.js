@@ -132,6 +132,14 @@ const server = http.createServer(async (request, response) => {
 
 createSignalingServer(server);
 
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received, shutting down gracefully...');
+  server.close(() => {
+    console.log('Server closed');
+    process.exit(0);
+  });
+});
+
 server.listen(PORT, HOST, () => {
   console.log(`IOU backend server listening on http://${HOST}:${PORT}`);
 });
