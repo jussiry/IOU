@@ -24,6 +24,7 @@ export const bindWelcome = (root, { onCreateUser } = {}) => {
     checked: false,
     onChange: (isChecked) => {
       if (keyPanel) keyPanel.hidden = !isChecked;
+      createButton.textContent = isChecked ? "Login" : "Create a user";
       if (isChecked && privateKeyInput) {
         setTimeout(() => privateKeyInput.focus(), 0);
       }
@@ -44,7 +45,10 @@ export const bindWelcome = (root, { onCreateUser } = {}) => {
 
   const setBusy = (isBusy) => {
     createButton.disabled = isBusy;
-    createButton.textContent = isBusy ? "Creating user..." : "Create a user";
+    const isLogin = toggle.isChecked();
+    createButton.textContent = isBusy
+      ? isLogin ? "Logging in..." : "Creating user..."
+      : isLogin ? "Login" : "Create a user";
   };
 
   const handleSubmit = async (event) => {
@@ -52,14 +56,16 @@ export const bindWelcome = (root, { onCreateUser } = {}) => {
     setError("");
 
     const enteredName = nameInput.value.trim();
-    if (!enteredName) {
+    const isLogin = toggle.isChecked();
+
+    if (!isLogin && !enteredName) {
       setError("Please choose a name before continuing.");
       nameInput.focus();
       return;
     }
 
     let existingNsec = null;
-    if (toggle.isChecked()) {
+    if (isLogin) {
       const keyValue = privateKeyInput ? privateKeyInput.value.trim() : "";
       if (!keyValue) {
         setError("Please enter your private key.");

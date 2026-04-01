@@ -14,6 +14,10 @@
   padding-bottom: calc(105px + env(safe-area-inset-bottom, 0px));
 }
 
+body.is-welcome .page-stack > .page-view {
+  padding-bottom: 0;
+}
+
 .page-stack[data-transitioning="true"] > .page-view {
   transition: transform var(--page-transition-duration) var(--page-transition-easing);
   will-change: transform;

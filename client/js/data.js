@@ -124,7 +124,6 @@ export const hasUserData = async () => {
 
 export const createUser = async (name, { existingNsec } = {}) => {
   const trimmedName = asTrimmedString(name);
-  const userName = trimmedName || "You";
 
   let privateKeyHex, privateKeyNsec, publicKeyHex, publicKeyNpub;
 
@@ -136,6 +135,8 @@ export const createUser = async (name, { existingNsec } = {}) => {
   } else {
     ({ privateKeyHex, privateKeyNsec, publicKeyHex, publicKeyNpub } = generateNostrKeyPair());
   }
+
+  const userName = trimmedName || publicKeyNpub;
 
   const user = createPersonModel({
     id: publicKeyNpub,
