@@ -4,7 +4,7 @@
     <p class="welcome-copy">
       Money, in its essense, is just book keeping that tracks good deeds that should
       be paid back. IOU (I owe you) returns money to its roots by basing it on personal
-      debts that can be extended to strangers through a trusted chain of friends.
+      loans that can be extended to strangers through a trusted chain of friends.
     </p>
 
     <form class="welcome-form" data-form="welcome">
@@ -17,6 +17,32 @@
         maxlength="40"
         data-bind="welcome-name"
       />
+      <div class="welcome-toggle-row">
+        <span class="welcome-label">Use existing private key</span>
+        <button
+          class="check-toggle"
+          type="button"
+          data-bind="existing-key-toggle"
+          aria-pressed="false"
+          aria-label="Use existing private key"
+        >
+          <span class="check-toggle-track">
+            <span class="check-toggle-thumb"></span>
+          </span>
+        </button>
+      </div>
+      <div data-section="existing-key-panel" hidden>
+        <p class="welcome-key-hint">NOSTR key can be used as identity</p>
+        <textarea
+          class="welcome-input welcome-textarea"
+          placeholder="nsec1..."
+          autocapitalize="off"
+          autocomplete="off"
+          spellcheck="false"
+          rows="3"
+          data-bind="private-key-input"
+        ></textarea>
+      </div>
       <p class="welcome-error" data-bind="welcome-error" hidden></p>
       <button class="welcome-create" type="submit" data-action="create-user">
         Create a user

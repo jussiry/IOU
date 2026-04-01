@@ -232,8 +232,8 @@ const loadPage = async (route) => {
 
     if (route.type === "welcome") {
       bindWelcome(pageView, {
-        onCreateUser: async (name) => {
-          await createUser(name);
+        onCreateUser: async (name, options) => {
+          await createUser(name, options);
           window.location.hash = "balance";
         },
       });

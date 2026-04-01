@@ -344,6 +344,39 @@ const encodeNip19Key = (humanReadablePart, keyHex) => {
   return encodeBech32(humanReadablePart, fiveBitWords);
 };
 
+export const isValidNsec = (encodedValue) => {
+  try {
+    const { humanReadablePart, dataWords } = decodeBech32(encodedValue);
+    if (humanReadablePart !== "nsec") {
+      return false;
+    }
+
+    const decodedBytes = convertBits(dataWords, 5, 8, false);
+    if (decodedBytes.length !== 32) {
+      return false;
+    }
+
+    const scalar = BigInt(`0x${bytesToHex(new Uint8Array(decodedBytes))}`);
+    return scalar > 0n && scalar < GROUP_ORDER;
+  } catch (error) {
+    return false;
+  }
+};
+
+export const decodeNsecToHex = (encodedValue) => {
+  const { humanReadablePart, dataWords } = decodeBech32(encodedValue);
+  if (humanReadablePart !== "nsec") {
+    throw new Error("Expected an nsec-encoded private key.");
+  }
+
+  const decodedBytes = convertBits(dataWords, 5, 8, false);
+  if (decodedBytes.length !== 32) {
+    throw new Error("Invalid nsec payload length.");
+  }
+
+  return bytesToHex(new Uint8Array(decodedBytes));
+};
+
 export const isValidNpub = (encodedValue) => {
   try {
     const { humanReadablePart, dataWords } = decodeBech32(encodedValue);

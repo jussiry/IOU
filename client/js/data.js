@@ -33,7 +33,13 @@ import {
   isAcceptedFriendshipStatus,
   isPeerEligibleFriendshipStatus,
 } from "./utils/friendships.js";
-import { generateNostrKeyPair } from "./utils/nostr-keys.js";
+import {
+  generateNostrKeyPair,
+  decodeNsecToHex,
+  deriveNostrPublicKeyHex,
+  encodeNpubFromPublicKeyHex,
+  encodeNsecFromPrivateKeyHex,
+} from "./utils/nostr-keys.js";
 import { appendLog, asTrimmedString, createId, hasUser } from "./state-utils.js";
 import { buildView } from "./view-model.js";
 import {
@@ -116,15 +122,20 @@ export const hasUserData = async () => {
   return hasUser(state);
 };
 
-export const createUser = async (name) => {
+export const createUser = async (name, { existingNsec } = {}) => {
   const trimmedName = asTrimmedString(name);
   const userName = trimmedName || "You";
-  const {
-    privateKeyHex,
-    privateKeyNsec,
-    publicKeyHex,
-    publicKeyNpub,
-  } = generateNostrKeyPair();
+
+  let privateKeyHex, privateKeyNsec, publicKeyHex, publicKeyNpub;
+
+  if (existingNsec) {
+    privateKeyHex = decodeNsecToHex(existingNsec);
+    privateKeyNsec = existingNsec;
+    publicKeyHex = deriveNostrPublicKeyHex(privateKeyHex);
+    publicKeyNpub = encodeNpubFromPublicKeyHex(publicKeyHex);
+  } else {
+    ({ privateKeyHex, privateKeyNsec, publicKeyHex, publicKeyNpub } = generateNostrKeyPair());
+  }
 
   const user = createPersonModel({
     id: publicKeyNpub,

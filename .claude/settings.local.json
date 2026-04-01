@@ -19,7 +19,9 @@
       "Bash(pkill -f \"nodemon.*backend/server.js\")",
       "Bash(pkill -f \"node backend/server.js\")",
       "Bash(gh search:*)",
-      "Bash(gh issue:*)"
+      "Bash(gh issue:*)",
+      "Bash(ls /Users/jussi/code/IOU/client/*.ico /Users/jussi/code/IOU/client/favicon*)",
+      "Bash(grep -r \"createUser\\\\|user.*creation\\\\|POST.*user\" /Users/jussi/code/IOU/backend --include=*.js)"
     ]
   }
 }

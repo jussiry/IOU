@@ -53,9 +53,32 @@
 }
 
 .welcome-error {
-  margin: 0;
+  margin: -5px 0 0 2px;
   color: var(--danger);
   font-size: 13px;
+}
+
+.welcome-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.welcome-key-hint {
+  margin: -10px 0 5px 2px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.welcome-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  resize: none;
+  font-size: 14px;
+  font-weight: 400;
+  word-break: break-all;
+  font-family: inherit;
 }
 
 .welcome-create {
