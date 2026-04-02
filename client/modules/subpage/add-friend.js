@@ -63,17 +63,30 @@ export const bindAddFriend = (root, data) => {
     myKeyEl.value = userPublicKey;
   }
 
-  const setFriendKeyErrorVisible = (isVisible) => {
+  const setFriendKeyError = (message, isVisible) => {
     if (!friendKeyErrorEl) return;
+    if (message) friendKeyErrorEl.textContent = message;
     friendKeyErrorEl.hidden = !isVisible;
+  };
+
+  const isSelfKey = () => {
+    const value = (friendKeyEl?.value || "").trim();
+    return value && value === userPublicKey;
   };
 
   const syncSubmitState = () => {
     if (!submitEl) return;
     const isValid = isValidNpub(friendKeyEl?.value || "");
-    submitEl.classList.toggle("is-disabled", !isValid);
-    submitEl.setAttribute("aria-disabled", String(!isValid));
-    setFriendKeyErrorVisible(!isValid && hasAttemptedInvalidSubmit);
+    const isSelf = isSelfKey();
+    const canSubmit = isValid && !isSelf;
+    submitEl.classList.toggle("is-disabled", !canSubmit);
+    submitEl.setAttribute("aria-disabled", String(!canSubmit));
+
+    if (isSelf && hasAttemptedInvalidSubmit) {
+      setFriendKeyError("You cannot add yourself as a friend", true);
+    } else {
+      setFriendKeyError("Add friends public key in correct format", !isValid && hasAttemptedInvalidSubmit);
+    }
   };
 
   const setTrustSuggestionEnabled = (isEnabled) => {
@@ -106,7 +119,7 @@ export const bindAddFriend = (root, data) => {
   friendKeyEl?.addEventListener("input", syncSubmitState);
   submitEl?.addEventListener("click", (event) => {
     const isValid = isValidNpub(friendKeyEl?.value || "");
-    if (isValid) return;
+    if (isValid && !isSelfKey()) return;
 
     event.preventDefault();
     event.stopImmediatePropagation();
