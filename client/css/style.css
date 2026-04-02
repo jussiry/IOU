@@ -153,16 +153,13 @@ header {
 
 nav {
   padding: 12px 16px calc(18px + env(safe-area-inset-bottom, 0px));
-  background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  background: rgba(255, 255, 255, 0.92);
   border-top: 1px solid rgba(0, 0, 0, 0.05);
   position: fixed;
   left: 0;
   right: 0;
   bottom: 0;
   z-index: 10;
-  transform: translateZ(0);
 }
 
 .nav-bar {
