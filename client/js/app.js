@@ -30,6 +30,7 @@ import { ensureIconSprite } from "./utils/icons.js";
 import { setActiveNav, updateNavBadges } from "./utils/nav.js";
 import { getSlideDirection, swapPage } from "./page-transitions.js";
 import { getAppVersion } from "./version.js";
+import { initSwipeNavigation } from "./swipe.js";
 
 const navButtons = Array.from(document.querySelectorAll(".nav-item[data-page]"));
 const contentRoot = document.getElementById("page-content");
@@ -363,6 +364,12 @@ navButtons.forEach((button) => {
     if (route.type === "page" && route.page === page) return;
     window.location.hash = page;
   });
+});
+
+initSwipeNavigation(document.body, {
+  navOrder,
+  getIsSubpage: () => appRoot?.classList.contains("is-subpage") ?? false,
+  getCurrentPage: () => lastMainPage,
 });
 
 const loadActiveRoute = async () => {
