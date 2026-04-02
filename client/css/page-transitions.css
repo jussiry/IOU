@@ -1,6 +1,7 @@
 .page-stack {
   position: relative;
   display: grid;
+  isolation: isolate;
   --page-transition-duration: 320ms;
   --page-transition-easing: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
