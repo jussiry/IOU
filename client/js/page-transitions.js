@@ -150,6 +150,10 @@ export const swapPage = async (container, nextPage, { direction } = {}) => {
   const enterStart = enterFromRight ? "100%" : "-100%";
   const exitEnd = enterFromRight ? "-100%" : "100%";
 
+  if (currentPage.contains(document.activeElement)) {
+    document.activeElement.blur();
+  }
+
   currentPage.classList.remove(ACTIVE_CLASS);
   currentPage.classList.add(EXITING_CLASS);
   currentPage.setAttribute("aria-hidden", "true");
