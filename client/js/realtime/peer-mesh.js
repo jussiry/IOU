@@ -7,7 +7,6 @@ Offer/answer negotiation follows the "perfect negotiation" pattern: peers are as
 */
 
 const RTC_CONFIGURATION = {
-  iceTransportPolicy: "relay", // TODO: remove — testing TURN over TCP
   iceServers: [
     { urls: "stun:junction.proxy.rlwy.net:20947" },
     {
