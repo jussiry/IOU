@@ -6,6 +6,8 @@ It keeps the add-friend form state local to the page, validates the entered publ
 
 import { initCheckToggle } from "../components/check-toggle.js";
 import { isValidNpub } from "../../js/utils/nostr-keys.js";
+import { loadVendorScript } from "../../js/utils/vendor-loader.js";
+import { encodeAddFriendUri, parseIouUri } from "../../js/utils/qr-uri.js";
 
 const selectInputText = (inputEl) => {
   if (!inputEl) {
@@ -46,8 +48,13 @@ export const bindAddFriend = (root, data) => {
   const titleEl = root.querySelector('[data-bind="page-title"]');
   const myKeyEl = root.querySelector('[data-bind="my-key"]');
   const copyMyKeyButtonEl = root.querySelector('[data-action="copy-my-key"]');
+  const myKeyQrEl = root.querySelector('[data-bind="my-key-qr"]');
   const friendKeyEl = root.querySelector('[data-bind="friend-key"]');
   const friendKeyErrorEl = root.querySelector('[data-bind="friend-key-error"]');
+  const scanQrButtonEl = root.querySelector('[data-action="scan-qr"]');
+  const scannerSectionEl = root.querySelector('[data-section="qr-scanner"]');
+  const qrReaderEl = root.querySelector('[data-bind="qr-reader"]');
+  const closeScannerButtonEl = root.querySelector('[data-action="close-scanner"]');
   const toggleEl = root.querySelector('[data-bind="suggest-trust-toggle"]');
   const trustPanelEl = root.querySelector('[data-section="suggest-trust-panel"]');
   const trustExplainerEl = root.querySelector('[data-section="suggest-trust-explainer"]');
@@ -128,6 +135,88 @@ export const bindAddFriend = (root, data) => {
     friendKeyEl?.focus();
   });
   syncSubmitState();
+
+  // --- QR code generation ---
+  if (myKeyQrEl && userPublicKey) {
+    loadVendorScript("js/vendor/qrcode.js", "QRCode").then((QRCode) => {
+      const canvas = document.createElement("canvas");
+      QRCode.toCanvas(canvas, encodeAddFriendUri(userPublicKey), {
+        width: 180,
+        margin: 2,
+        color: { dark: "#1b1b1b", light: "#ffffff" },
+      });
+      myKeyQrEl.appendChild(canvas);
+    }).catch(() => {
+      // QR generation failed silently — key can still be copied
+    });
+  }
+
+  // --- QR code scanning ---
+  let html5Qrcode = null;
+
+  const stopScanner = async () => {
+    if (html5Qrcode) {
+      try {
+        await html5Qrcode.stop();
+      } catch {
+        // already stopped
+      }
+      html5Qrcode.clear();
+      html5Qrcode = null;
+    }
+    if (scannerSectionEl) {
+      scannerSectionEl.hidden = true;
+    }
+  };
+
+  const onScanSuccess = (decodedText) => {
+    const parsed = parseIouUri(decodedText);
+    const key = parsed?.key || decodedText.trim();
+    if (friendKeyEl) {
+      friendKeyEl.value = key;
+      friendKeyEl.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+    void stopScanner();
+  };
+
+  scanQrButtonEl?.addEventListener("click", async () => {
+    try {
+      const lib = await loadVendorScript(
+        "js/vendor/html5-qrcode.min.js",
+        "__Html5QrcodeLibrary__"
+      );
+      const Html5Qrcode = lib.Html5Qrcode;
+      if (scannerSectionEl) {
+        scannerSectionEl.hidden = false;
+      }
+
+      const readerId = `qr-reader-${Date.now()}`;
+      qrReaderEl.id = readerId;
+
+      html5Qrcode = new Html5Qrcode(readerId);
+      await html5Qrcode.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: { width: 220, height: 220 } },
+        onScanSuccess,
+      );
+    } catch (error) {
+      console.warn("[QR] Scanner failed to start", error);
+      void stopScanner();
+    }
+  });
+
+  closeScannerButtonEl?.addEventListener("click", () => {
+    void stopScanner();
+  });
+
+  // Clean up scanner when page is removed from DOM
+  const observer = new MutationObserver(() => {
+    if (!root.isConnected) {
+      void stopScanner();
+      observer.disconnect();
+    }
+  });
+  observer.observe(root.parentElement || document.body, { childList: true, subtree: true });
 
   return {
     submitEl,

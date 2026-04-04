@@ -60,3 +60,43 @@
 .add-friend-trust-explainer[hidden] {
   display: none;
 }
+
+.add-friend-qr-display {
+  display: flex;
+  justify-content: center;
+  padding: 4px 0;
+}
+
+.add-friend-qr-display canvas {
+  border-radius: 10px;
+}
+
+.add-friend-scanner[hidden] {
+  display: none;
+}
+
+.add-friend-scanner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.add-friend-scanner-viewport {
+  width: 100%;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.add-friend-scanner-viewport video {
+  border-radius: 10px;
+}
+
+.add-friend-scanner-close {
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 8px 20px;
+}

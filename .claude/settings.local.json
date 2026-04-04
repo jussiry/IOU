@@ -28,7 +28,11 @@
       "Bash(echo $PATH)",
       "Bash(export PATH=\"/Users/jussi/.nvm/versions/node/v24.14.0/bin:$PATH\")",
       "Bash(npm --version)",
-      "Bash(find /Users/jussi/code/IOU/tests -type f -name *.js -o -name *.ts)"
+      "Bash(find /Users/jussi/code/IOU/tests -type f -name *.js -o -name *.ts)",
+      "WebSearch",
+      "WebFetch(domain:unpkg.com)",
+      "WebFetch(domain:app.unpkg.com)",
+      "Bash(npx rollup:*)"
     ]
   }
 }

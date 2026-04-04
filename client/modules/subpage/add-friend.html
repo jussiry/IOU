@@ -24,22 +24,41 @@
           </button>
         </span>
       </label>
+      <div class="add-friend-qr-display" data-bind="my-key-qr"></div>
       <label class="form-field">
         <span class="form-label">Friends key</span>
-        <input
-          class="form-input add-friend-key-input"
-          type="text"
-          inputmode="text"
-          autocapitalize="off"
-          autocomplete="off"
-          spellcheck="false"
-          placeholder="npub1..."
-          data-bind="friend-key"
-        />
+        <span class="add-friend-key-display">
+          <input
+            class="form-input add-friend-key-input"
+            type="text"
+            inputmode="text"
+            autocapitalize="off"
+            autocomplete="off"
+            spellcheck="false"
+            placeholder="npub1..."
+            data-bind="friend-key"
+          />
+          <button
+            class="add-friend-copy-button"
+            type="button"
+            data-action="scan-qr"
+            aria-label="Scan QR code"
+          >
+            <svg class="add-friend-copy-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <use href="#icon-qr-scan" />
+            </svg>
+          </button>
+        </span>
       </label>
       <p class="form-error" data-bind="friend-key-error" hidden>
         Add friends public key in correct format
       </p>
+      <div class="add-friend-scanner" data-section="qr-scanner" hidden>
+        <div class="add-friend-scanner-viewport" data-bind="qr-reader"></div>
+        <button class="add-friend-scanner-close" type="button" data-action="close-scanner">
+          Cancel
+        </button>
+      </div>
       <div class="form-field form-field-inline form-field-inline-full add-friend-toggle-row">
         <span class="form-label">Suggest trust agreement</span>
         <button
