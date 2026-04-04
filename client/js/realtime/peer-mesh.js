@@ -7,7 +7,15 @@ Offer/answer negotiation follows the "perfect negotiation" pattern: peers are as
 */
 
 const RTC_CONFIGURATION = {
-  iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+  iceTransportPolicy: "relay", // TODO: remove — forces TURN relay to test coturn
+  iceServers: [
+    { urls: "stun:junction.proxy.rlwy.net:20947" },
+    {
+      urls: "turn:junction.proxy.rlwy.net:20947",
+      username: "iou",
+      credential: "not-so-secret",
+    },
+  ],
 };
 
 const DATA_CHANNEL_LABEL = "iou-json";
