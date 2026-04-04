@@ -7,7 +7,6 @@ Offer/answer negotiation follows the "perfect negotiation" pattern: peers are as
 */
 
 const RTC_CONFIGURATION = {
-  iceTransportPolicy: "relay", // TODO: remove — forces TURN relay to test coturn
   iceServers: [
     { urls: "stun:junction.proxy.rlwy.net:20947" },
     {
@@ -19,7 +18,7 @@ const RTC_CONFIGURATION = {
 };
 
 const DATA_CHANNEL_LABEL = "iou-json";
-const DISCONNECTED_GRACE_PERIOD_MS = 15000;
+const DISCONNECTED_PEER_GRACE_PERIOD_MS = 15000;
 const REMOTE_INITIATED_PEER_GRACE_PERIOD_MS = 15000;
 
 const safeParseJson = (value) => {
@@ -300,7 +299,7 @@ const createPeerMesh = (
           closePeer(normalizedPeerUserId, {
             reason: "disconnected_timeout",
           });
-        }, DISCONNECTED_GRACE_PERIOD_MS);
+        }, DISCONNECTED_PEER_GRACE_PERIOD_MS);
         return;
       }
 
