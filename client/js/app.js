@@ -73,6 +73,18 @@ let navigationSequence = 0;
 const templateCache = new Map();
 let appVersion = null;
 let routeRefreshTimer = null;
+const hashHistory = [];
+
+const navigateTo = (hash) => {
+  const index = hashHistory.lastIndexOf(hash);
+  if (index !== -1) {
+    const stepsBack = hashHistory.length - 1 - index;
+    hashHistory.length = index + 1;
+    window.history.go(-stepsBack);
+  } else {
+    window.location.hash = hash;
+  }
+};
 
 const scheduleRouteRefresh = () => {
   if (routeRefreshTimer) {
@@ -279,7 +291,7 @@ const loadPage = async (route) => {
             return;
           }
           await createFriend(payload);
-          window.location.hash = `friend/${payload.friendId}`;
+          navigateTo(`friend/${payload.friendId}`);
         });
       }
     } else if (route.type === "send") {
@@ -295,7 +307,7 @@ const loadPage = async (route) => {
             return;
           }
           await createTransaction(payload);
-          window.location.hash = `friend/${payload.friendId}`;
+          navigateTo(`friend/${payload.friendId}`);
         });
       }
     } else if (route.type === "trust") {
@@ -319,7 +331,7 @@ const loadPage = async (route) => {
             return;
           }
           await updateTrustLimit(route.friendId, limit);
-          window.location.hash = `friend/${route.friendId}`;
+          navigateTo(`friend/${route.friendId}`);
         });
       }
     } else {
@@ -380,10 +392,18 @@ const loadActiveRoute = async () => {
 };
 
 window.addEventListener("hashchange", () => {
+  const hash = window.location.hash.replace("#", "") || "balance";
+  const existingIndex = hashHistory.lastIndexOf(hash);
+  if (existingIndex !== -1 && existingIndex < hashHistory.length - 1) {
+    hashHistory.length = existingIndex + 1;
+  } else if (hashHistory[hashHistory.length - 1] !== hash) {
+    hashHistory.push(hash);
+  }
   void loadActiveRoute();
 });
 
 const initApp = async () => {
+  hashHistory.push(window.location.hash.replace("#", "") || "balance");
   await ensureIconSprite();
   appVersion = await getAppVersion();
   await ensureVersion(appVersion);

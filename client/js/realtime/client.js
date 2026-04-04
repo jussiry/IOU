@@ -50,6 +50,10 @@ const createRealtimeClient = () => {
     onPeerConnect: ({ peerUserId, initiator }) => {
       peerMesh.ensurePeer(peerUserId, { initiator });
     },
+    onPeerDisconnect: ({ peerUserId }) => {
+      logRealtimeEvent("Peer disconnected (server)", { peerUserId });
+      peerMesh.closePeer(peerUserId);
+    },
     onPeerSignal: ({ peerUserId, signal }) => {
       void peerMesh.handleSignal(peerUserId, signal);
     },

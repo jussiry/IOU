@@ -45,6 +45,7 @@ const normalizePeerIds = (peerIds) => {
 const createSignalingClient = (
   {
     onPeerConnect = null,
+    onPeerDisconnect = null,
     onPeerSignal = null,
   } = {}
 ) => {
@@ -100,6 +101,13 @@ const createSignalingClient = (
       onPeerConnect({
         peerUserId: payload.peer_user_id,
         initiator: payload.initiator === true,
+      });
+      return;
+    }
+
+    if (payload.type === "peer_disconnect" && typeof onPeerDisconnect === "function") {
+      onPeerDisconnect({
+        peerUserId: payload.peer_user_id,
       });
       return;
     }

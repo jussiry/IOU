@@ -48,11 +48,31 @@ const createSignalingServer = (server) => {
     return clientsBySocket.get(socket) || null;
   };
 
+  const notifyPeersOfDisconnect = (client) => {
+    if (!client?.userId) {
+      return;
+    }
+
+    clientsByUserId.forEach((otherClient) => {
+      if (!otherClient || otherClient === client) {
+        return;
+      }
+
+      if (areClientsEligiblePeers(client, otherClient)) {
+        sendJson(otherClient.socket, {
+          type: "peer_disconnect",
+          peer_user_id: client.userId,
+        });
+      }
+    });
+  };
+
   const unregisterClient = (client) => {
     if (!client) {
       return;
     }
 
+    notifyPeersOfDisconnect(client);
     clientsBySocket.delete(client.socket);
     if (client.userId && clientsByUserId.get(client.userId) === client) {
       clientsByUserId.delete(client.userId);

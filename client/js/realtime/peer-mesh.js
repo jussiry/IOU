@@ -175,7 +175,17 @@ const createPeerMesh = (
     }
 
     if (peers.has(normalizedPeerUserId)) {
-      return peers.get(normalizedPeerUserId);
+      const existingPeer = peers.get(normalizedPeerUserId);
+      const state = existingPeer.connection?.connectionState;
+      if (state === "closed" || state === "failed") {
+        logPeerEvent("Replacing stale peer connection", {
+          peerUserId: normalizedPeerUserId,
+          connectionState: state,
+        });
+        closePeer(normalizedPeerUserId, { reason: "stale_replaced" });
+      } else {
+        return existingPeer;
+      }
     }
 
     const connection = new RTCPeerConnection(RTC_CONFIGURATION);
@@ -368,6 +378,13 @@ const createPeerMesh = (
 
   return {
     ensurePeer,
+    closePeer: (peerUserId) => {
+      const normalizedPeerUserId =
+        typeof peerUserId === "string" ? peerUserId.trim() : "";
+      if (normalizedPeerUserId) {
+        closePeer(normalizedPeerUserId, { reason: "server_disconnect" });
+      }
+    },
     hasPeer: (peerUserId) => {
       const normalizedPeerUserId =
         typeof peerUserId === "string" ? peerUserId.trim() : "";

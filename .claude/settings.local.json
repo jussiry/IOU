@@ -21,7 +21,14 @@
       "Bash(gh search:*)",
       "Bash(gh issue:*)",
       "Bash(ls /Users/jussi/code/IOU/client/*.ico /Users/jussi/code/IOU/client/favicon*)",
-      "Bash(grep -r \"createUser\\\\|user.*creation\\\\|POST.*user\" /Users/jussi/code/IOU/backend --include=*.js)"
+      "Bash(grep -r \"createUser\\\\|user.*creation\\\\|POST.*user\" /Users/jussi/code/IOU/backend --include=*.js)",
+      "Bash(source ~/.zshrc)",
+      "Bash(source ~/.bash_profile)",
+      "Bash(source ~/.profile)",
+      "Bash(echo $PATH)",
+      "Bash(export PATH=\"/Users/jussi/.nvm/versions/node/v24.14.0/bin:$PATH\")",
+      "Bash(npm --version)",
+      "Bash(find /Users/jussi/code/IOU/tests -type f -name *.js -o -name *.ts)"
     ]
   }
 }

@@ -6,6 +6,7 @@ Keeping log-row assembly isolated here allows the data layer to stay transport-f
 
 import { formatMarkdownish } from "../../js/utils/markdownish.js";
 import { getConnectedPeerIds } from "../../js/realtime/peer-status.js";
+import { initInfiniteList } from "../../js/utils/infinite-list.js";
 
 export const bindLogs = (root, data) => {
   const peerConnectionsEl = root.querySelector('[data-bind="peer-connections"]');
@@ -20,7 +21,7 @@ export const bindLogs = (root, data) => {
   listEl.innerHTML = "";
   const logs = Array.isArray(data.logs) ? data.logs : [];
 
-  logs.forEach((log) => {
+  initInfiniteList(listEl, logs, (log) => {
     const node = itemTemplate.content.firstElementChild.cloneNode(true);
     const timeEl = node.querySelector('[data-bind="time"]');
     const textEl = node.querySelector('[data-bind="text"]');
@@ -40,6 +41,6 @@ export const bindLogs = (root, data) => {
       const messageSuffix = message ? ` — ${message}` : "";
       textEl.innerHTML = formatMarkdownish(`${log.text || ""}${messageSuffix}`);
     }
-    listEl.appendChild(node);
+    return node;
   });
 };

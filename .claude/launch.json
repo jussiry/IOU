@@ -3,13 +3,16 @@
   "configurations": [
     {
       "name": "Dev Server (nodemon)",
-      "runtimeExecutable": "npm",
+      "runtimeExecutable": "/Users/jussi/.nvm/versions/node/v24.14.0/bin/npm",
       "runtimeArgs": ["run", "dev"],
+      "env": {
+        "PATH": "/Users/jussi/.nvm/versions/node/v24.14.0/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+      },
       "port": 3000
     },
     {
       "name": "Production Server",
-      "runtimeExecutable": "node",
+      "runtimeExecutable": "/Users/jussi/.nvm/versions/node/v24.14.0/bin/node",
       "runtimeArgs": ["backend/server.js"],
       "port": 3000
     }

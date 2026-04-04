@@ -20,6 +20,7 @@ import {
   isAcceptedFriendshipStatus,
 } from "../../js/utils/friendships.js";
 import { formatCurrency, formatDate, formatSigned } from "../../js/utils/format.js";
+import { initInfiniteList } from "../../js/utils/infinite-list.js";
 
 export const bindFriendDetail = (root, data, friendId) => {
   const titleEl = root.querySelector('[data-bind="page-title"]');
@@ -227,7 +228,7 @@ export const bindFriendDetail = (root, data, friendId) => {
     return;
   }
 
-  transactions.forEach((tx) => {
+  initInfiniteList(listEl, transactions, (tx) => {
     const txNode = txTemplate.content.firstElementChild.cloneNode(true);
     const dateEl = txNode.querySelector('[data-bind="date"]');
     const amountTxEl = txNode.querySelector('[data-bind="amount"]');
@@ -235,6 +236,6 @@ export const bindFriendDetail = (root, data, friendId) => {
     if (dateEl) dateEl.textContent = formatDate(tx.date);
     if (amountTxEl) amountTxEl.textContent = formatSigned(tx.amount_eur);
     if (noteEl) noteEl.textContent = tx.note;
-    listEl.appendChild(txNode);
+    return txNode;
   });
 };

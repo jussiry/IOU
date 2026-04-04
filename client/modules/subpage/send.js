@@ -38,6 +38,14 @@ export const bindSend = (root, data, friendId) => {
 
   if (titleEl) titleEl.textContent = "Send IOU";
 
+  if (messageEl) {
+    const autoGrow = () => {
+      messageEl.style.height = "auto";
+      messageEl.style.height = messageEl.scrollHeight + "px";
+    };
+    messageEl.addEventListener("input", autoGrow);
+  }
+
   const allConnections = Array.isArray(data?.connections) ? data.connections : [];
   const acceptedConnections = allConnections
     .filter((connection) => isAcceptedFriendshipStatus(connection.friendship_status))
