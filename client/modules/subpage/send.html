@@ -1,4 +1,10 @@
 <div class="send-content">
+  <div class="send-scanner" data-section="send-qr-scanner" hidden>
+    <div class="send-scanner-viewport" data-bind="send-qr-reader"></div>
+    <button class="send-scanner-close" type="button" data-action="close-send-scanner">
+      Cancel
+    </button>
+  </div>
   <div class="balance-hero trust-hero send-card">
     <form class="send-form" aria-label="Send IOU form">
       <label class="form-field form-field-inline">

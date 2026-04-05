@@ -12,4 +12,11 @@ export const initIouActions = (root, friendId) => {
       window.location.hash = target;
     });
   }
+
+  const receiveButton = root.querySelector('[data-action="receive"]');
+  if (receiveButton) {
+    receiveButton.addEventListener("click", () => {
+      window.location.hash = "receive";
+    });
+  }
 };

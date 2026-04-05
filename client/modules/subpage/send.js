@@ -5,6 +5,8 @@ Only accepted friendships can be used for transactions, so the binder also owns 
 */
 
 import { isAcceptedFriendshipStatus } from "../../js/utils/friendships.js";
+import { loadVendorScript } from "../../js/utils/vendor-loader.js";
+import { parseIouUri } from "../../js/utils/qr-uri.js";
 
 const renderEmptyState = (contentEl, allConnections) => {
   if (!contentEl) {
@@ -120,6 +122,106 @@ export const bindSend = (root, data, friendId) => {
   } else {
     updateExplainer(null, null);
   }
+
+  // --- QR code scanning ---
+  const headerRightEl = root.querySelector('[data-slot="subpage-header-right"]');
+  if (headerRightEl) {
+    headerRightEl.innerHTML = `
+      <button class="send-scan-button" type="button" data-action="scan-send-qr" aria-label="Scan QR code">
+        <svg class="send-scan-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <use href="#icon-qr-scan" />
+        </svg>
+      </button>
+    `;
+  }
+  const scanQrButtonEl = root.querySelector('[data-action="scan-send-qr"]');
+  const scannerSectionEl = root.querySelector('[data-section="send-qr-scanner"]');
+  const qrReaderEl = root.querySelector('[data-bind="send-qr-reader"]');
+  const closeScannerButtonEl = root.querySelector('[data-action="close-send-scanner"]');
+  let html5Qrcode = null;
+
+  const stopScanner = async () => {
+    if (html5Qrcode) {
+      try { await html5Qrcode.stop(); } catch { /* already stopped */ }
+      html5Qrcode.clear();
+      html5Qrcode = null;
+    }
+    if (scannerSectionEl) scannerSectionEl.hidden = true;
+  };
+
+  const onScanSuccess = (decodedText) => {
+    const parsed = parseIouUri(decodedText);
+    if (!parsed || !parsed.key) {
+      return;
+    }
+
+    // Check if the scanned key is an accepted friend
+    const matchedFriend = acceptedConnections.find(
+      (c) => c.person_id === parsed.key
+    );
+
+    if (matchedFriend) {
+      // Fill form fields
+      if (selectEl) selectEl.value = matchedFriend.person_id;
+      if (parsed.amount && amountEl) amountEl.value = parsed.amount;
+      if (parsed.note && messageEl) {
+        messageEl.value = parsed.note;
+        messageEl.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+      if (selectEl) selectEl.dispatchEvent(new Event("change", { bubbles: true }));
+    } else {
+      // Not a friend — prompt to add them
+      const shouldAdd = window.confirm(
+        "This person is not your friend yet. Would you like to add them?"
+      );
+      if (shouldAdd) {
+        void stopScanner();
+        window.location.hash = `add-friend`;
+        // Pre-fill the friend key after navigation
+        window.__prefillFriendKey = parsed.key;
+        return;
+      }
+    }
+
+    void stopScanner();
+  };
+
+  scanQrButtonEl?.addEventListener("click", async () => {
+    try {
+      const lib = await loadVendorScript(
+        "js/vendor/html5-qrcode.min.js",
+        "__Html5QrcodeLibrary__"
+      );
+      const Html5Qrcode = lib.Html5Qrcode;
+      if (scannerSectionEl) scannerSectionEl.hidden = false;
+
+      const readerId = `send-qr-reader-${Date.now()}`;
+      qrReaderEl.id = readerId;
+
+      html5Qrcode = new Html5Qrcode(readerId);
+      await html5Qrcode.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: { width: 220, height: 220 } },
+        onScanSuccess,
+      );
+    } catch (error) {
+      console.warn("[QR] Scanner failed to start", error);
+      void stopScanner();
+    }
+  });
+
+  closeScannerButtonEl?.addEventListener("click", () => {
+    void stopScanner();
+  });
+
+  // Clean up scanner on page removal
+  const observer = new MutationObserver(() => {
+    if (!root.isConnected) {
+      void stopScanner();
+      observer.disconnect();
+    }
+  });
+  observer.observe(root.parentElement || document.body, { childList: true, subtree: true });
 
   return {
     submitEl,
