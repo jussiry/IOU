@@ -1,16 +1,13 @@
 
- When ws connection on server disconnects make the server send "peer disconnect" message to all client that have previously asked to be connected to the disconnecting client.
 
+- peer viestien (send / add friend) cachetus serverin kautta jos peer ei paikalla
+  (- IOU:n lähetys cachettamalla severiin jos kaveri ei online
+    * message quet jotka lähetetään kun niiden vastaanottaja on online
+    * message quet myös clientteihin, eli kun kaveri tulee online, varmistetaan onko hän saanut viestin (serveristä tai muualta) - ja jos ei ole lähetetään itse)
 
+- manifest.json / taustalle jäävä appi (jääkö kun kännykkä sleep modessa??)
 
-
-
-- test refreshing browser to find state where friends lose online status (and see how messages get passed when back online)
 - on a friend page highlight latest transaction(s) since the page was last visited
-
-- IOU:n lähetys cachettamalla severiin jos kaveri ei online
-  * message quet jotka lähetetään kun niiden vastaanottaja on online
-  * message quet myös clientteihin, eli kun kaveri tulee online, varmistetaan onko hän saanut viestin (serveristä tai muualta) - ja jos ei ole lähetetään itse
 
 - Jos sama käyttäjä on auki kahdella eri laitteella (esim. kun kirjautuu priva avaimella), luo webrtc yhteydet niiden välille ja synkkaa kaikki tiedot / toiminnot
 
