@@ -1,38 +1,26 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git add:*)",
+      "Bash(git *)",
+      "Bash(npm *)",
+      "Bash(ls *)",
+      "Bash(cat *)",
       "Bash(node:*)",
-      "Bash(git status:*)",
-      "Bash(git commit:*)",
-      "Bash(git branch:*)",
-      "Bash(git worktree:*)",
       "Bash(git:*)",
-      "Bash(grep -rni credit --include=*.css ./client --include=*.css .)",
-      "Bash(grep -rni credit --include=*.md --include=*.json .)",
-      "WebFetch(domain:www.istockphoto.com)",
+      "Bash(grep *)",
+      "WebFetch(*)",
       "Bash(xargs cat:*)",
-      "Bash(find /Users/jussi/code/IOU -maxdepth 2 -type f \\\\\\(-name .env* -o -name *.config.* -o -name Dockerfile* -o -name docker-compose* \\\\\\))",
-      "Bash(npm install:*)",
+      "Bash(find *)",
       "mcp__Claude_Preview__preview_start",
-      "Bash(npm run:*)",
-      "Bash(pkill -f \"nodemon.*backend/server.js\")",
-      "Bash(pkill -f \"node backend/server.js\")",
       "Bash(gh search:*)",
       "Bash(gh issue:*)",
-      "Bash(ls /Users/jussi/code/IOU/client/*.ico /Users/jussi/code/IOU/client/favicon*)",
-      "Bash(grep -r \"createUser\\\\|user.*creation\\\\|POST.*user\" /Users/jussi/code/IOU/backend --include=*.js)",
       "Bash(source ~/.zshrc)",
       "Bash(source ~/.bash_profile)",
       "Bash(source ~/.profile)",
-      "Bash(echo $PATH)",
-      "Bash(export PATH=\"/Users/jussi/.nvm/versions/node/v24.14.0/bin:$PATH\")",
-      "Bash(npm --version)",
-      "Bash(find /Users/jussi/code/IOU/tests -type f -name *.js -o -name *.ts)",
+      "Bash(echo *)",
+      "Bash(export *)",
       "WebSearch",
-      "WebFetch(domain:unpkg.com)",
-      "WebFetch(domain:app.unpkg.com)",
-      "Bash(npx rollup:*)"
+      "Bash(npx *)"
     ]
   }
 }
