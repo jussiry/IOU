@@ -23,6 +23,7 @@ import {
 import {
   PEER_MESSAGE_TYPE_FRIEND_ACCEPT,
   PEER_MESSAGE_TYPE_FRIEND_REQUEST,
+  PEER_MESSAGE_TYPE_NAME_CHANGED,
   PEER_MESSAGE_TYPE_TRANSACTION_CREATED,
 } from "./realtime/peer-messages.js";
 import {
@@ -169,18 +170,27 @@ export const getRealtimeSnapshot = async () => {
     return null;
   }
 
-  const relationshipPeerIds = (Array.isArray(state.user.connections) ? state.user.connections : [])
-    .filter((connection) => isPeerEligibleFriendshipStatus(connection.friendship_status))
+  const connections = Array.isArray(state.user.connections) ? state.user.connections : [];
+  const eligibleConnections = connections.filter((connection) => isPeerEligibleFriendshipStatus(connection.friendship_status));
+  const relationshipPeerIds = eligibleConnections
     .map((connection) => connection.person_id)
     .filter(Boolean);
   const queuedPeerIds = (Array.isArray(state.outbox) ? state.outbox : [])
     .map((message) => message.to_user_id)
     .filter(Boolean);
 
+  const peerNames = {};
+  eligibleConnections.forEach((connection) => {
+    if (connection.person_id && connection.person_name) {
+      peerNames[connection.person_id] = connection.person_name;
+    }
+  });
+
   return {
     userId: state.user.id,
     userName: state.user.name,
     peerIds: Array.from(new Set([...relationshipPeerIds, ...queuedPeerIds])),
+    peerNames,
     outbox: Array.isArray(state.outbox) ? state.outbox.map((entry) => createPeerMessageModel(entry)) : [],
   };
 };
@@ -198,6 +208,18 @@ export const updateUserName = async (name) => {
 
   state.user.name = trimmedName;
   syncUserNameAcrossContacts(state);
+
+  const connections = Array.isArray(state.user.connections) ? state.user.connections : [];
+  connections
+    .filter((connection) => isPeerEligibleFriendshipStatus(connection.friendship_status))
+    .forEach((connection) => {
+      queuePeerMessage(state, {
+        toUserId: connection.person_id,
+        type: PEER_MESSAGE_TYPE_NAME_CHANGED,
+        payload: { name: trimmedName },
+      });
+    });
+
   return persistAndBuildView(state);
 };
 

@@ -32,6 +32,7 @@ import {
   PEER_MESSAGE_TYPE_FRIEND_ACCEPT,
   PEER_MESSAGE_TYPE_FRIEND_REJECT,
   PEER_MESSAGE_TYPE_FRIEND_REQUEST,
+  PEER_MESSAGE_TYPE_NAME_CHANGED,
   PEER_MESSAGE_TYPE_RECEIVED,
   PEER_MESSAGE_TYPE_TRANSACTION_CREATED,
   PEER_RECEIPT_RESULT_IGNORED,
@@ -226,6 +227,24 @@ const applyTrustLimitSuggestionMessage = (state, message) => {
   );
 };
 
+const applyNameChangedMessage = (state, message) => {
+  const newName = asTrimmedString(message.payload?.name);
+  if (!newName) return null;
+
+  const displayName = getDisplayName(state, message.from_user_id);
+  const userConnection = getUserConnection(state, message.from_user_id);
+  if (!userConnection || !isPeerEligibleFriendshipStatus(userConnection.friendship_status)) {
+    return null;
+  }
+
+  const oldName = userConnection.person_name || message.from_user_id;
+  userConnection.person_name = newName;
+  ensureContact(state, message.from_user_id, newName);
+
+  if (oldName === newName) return null;
+  return friendNotification(`${oldName} changed their name to ${newName}`, message.from_user_id);
+};
+
 const applyTransactionCreatedMessage = (state, message) => {
   const amount = normalizeCurrencyAmount(message.payload?.amount_eur, NaN);
   if (!Number.isFinite(amount) || amount <= 0) {
@@ -301,6 +320,9 @@ export const routeInboundMessage = (state, message) => {
       break;
     case PEER_MESSAGE_TYPE_TRANSACTION_CREATED:
       result = applyTransactionCreatedMessage(state, message);
+      break;
+    case PEER_MESSAGE_TYPE_NAME_CHANGED:
+      result = applyNameChangedMessage(state, message);
       break;
     default:
       appendIllegalPeerMessageLog(state, message);

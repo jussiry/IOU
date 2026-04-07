@@ -20,7 +20,7 @@ There is no central ledger. Each client stores its own state in IndexedDB and sy
 
 ## Chained transactions
 
-Chained transactions expand trust to people we don't know directly. This works by finding a connection through trusted friends: Alice and Bob trust each other, Bob and Charlie trust each other. With a chained transaction Alice can send an IOU to Charlie that Charlie trusts, even if Alice and Charlie don't trust each other directly.
+Chained transactions expand trust to people are not known directly. This works by finding a connection through trusted friends: Alice and Bob trust each other, Bob and Charlie trust each other. With a chained transaction Alice can send an IOU to Charlie that Charlie trusts, even if Alice and Charlie don't trust each other directly.
 
 ```
 Alice wants to pay Charlie for a table, but they don't know each other.

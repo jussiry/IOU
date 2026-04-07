@@ -18,7 +18,6 @@ export const bindSettings = (root, data, appVersion) => {
       const nextName = window.prompt("Choose a name", currentName);
       if (nextName == null) return;
       await updateUserName(nextName);
-      window.location.reload();
     });
   }
 
