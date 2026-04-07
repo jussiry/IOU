@@ -21,6 +21,7 @@ import {
 } from "../../js/utils/friendships.js";
 import { formatCurrency, formatDate, formatSigned } from "../../js/utils/format.js";
 import { initInfiniteList } from "../../js/utils/infinite-list.js";
+import { getConnectedPeerIds } from "../../js/realtime/peer-status.js";
 
 export const bindFriendDetail = (root, data, friendId) => {
   const titleEl = root.querySelector('[data-bind="page-title"]');
@@ -45,12 +46,52 @@ export const bindFriendDetail = (root, data, friendId) => {
   const suggestionOkActionsEl = root.querySelector('[data-section="trust-ok-actions"]');
   const suggestionExplainerEl = root.querySelector('[data-section="trust-suggestion-explainer"]');
 
+  const syncStatusEl = root.querySelector('[data-bind="sync-status"]');
+
   const connection = data.connections.find((entry) => entry.person_id === friendId);
   const friendName = connection?.person_name || "Friend";
   const friendFirstName = friendName.split(/\s+/)[0] || friendName;
   const friendshipStatus = connection?.friendship_status || FRIENDSHIP_STATUS_ACCEPTED;
+  const isOnline = getConnectedPeerIds().includes(friendId);
 
-  if (titleEl) titleEl.textContent = friendName;
+  if (titleEl) {
+    if (isOnline) {
+      const dot = document.createElement("span");
+      dot.className = "online-dot";
+      titleEl.textContent = friendName;
+      titleEl.prepend(dot);
+    } else {
+      titleEl.textContent = friendName;
+    }
+  }
+
+  if (syncStatusEl && !isOnline) {
+    if (connection?.last_synced_at) {
+      const syncDate = new Date(connection.last_synced_at);
+      if (!Number.isNaN(syncDate.getTime())) {
+        const now = new Date();
+        const diffMs = now - syncDate;
+        const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+        const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+        const diffMinutes = Math.floor(diffMs / (1000 * 60));
+
+        let timeAgo;
+        if (diffDays > 0) {
+          timeAgo = `${diffDays} day${diffDays === 1 ? "" : "s"} ago`;
+        } else if (diffHours > 0) {
+          timeAgo = `${diffHours} hour${diffHours === 1 ? "" : "s"} ago`;
+        } else {
+          timeAgo = `${diffMinutes} minute${diffMinutes === 1 ? "" : "s"} ago`;
+        }
+
+        syncStatusEl.textContent = `Last time both of you were online ${timeAgo}`;
+        syncStatusEl.hidden = false;
+      }
+    } else {
+      syncStatusEl.textContent = `You have never fully synchronised with ${friendFirstName}, since you have never been online at the same time.`;
+      syncStatusEl.hidden = false;
+    }
+  }
   if (labelEl) {
     labelEl.textContent = isAcceptedFriendshipStatus(friendshipStatus)
       ? `My transactions with ${friendFirstName}`

@@ -97,6 +97,7 @@ export const createConnectionModel = (input = {}) => {
       ? "lowered"
       : null,
     recent_transactions: transactions,
+    last_synced_at: asTrimmedStringOrDefault(input.last_synced_at),
   };
 };
 

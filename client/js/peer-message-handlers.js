@@ -335,6 +335,10 @@ export const routeInboundMessage = (state, message) => {
   }
 
   markProcessedPeerMessage(state, message.id);
+  const userConnection = getUserConnection(state, message.from_user_id);
+  if (userConnection) {
+    userConnection.last_synced_at = new Date().toISOString();
+  }
   appendLog(state, {
     text: result.text,
     friendId: result.friendId,

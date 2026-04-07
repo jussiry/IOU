@@ -76,13 +76,14 @@ export const hasProcessedPeerMessage = (state, messageId) => {
 export const removeQueuedPeerMessage = (state, messageId) => {
   const normalizedMessageId = asTrimmedString(messageId);
   if (!normalizedMessageId) {
-    return false;
+    return null;
   }
 
   ensureOutbox(state);
-  const previousLength = state.outbox.length;
+  const removedMessage = state.outbox.find((message) => message.id === normalizedMessageId);
+  if (!removedMessage) return null;
   state.outbox = state.outbox.filter((message) => message.id !== normalizedMessageId);
-  return state.outbox.length !== previousLength;
+  return removedMessage;
 };
 
 export const hasQueuedPeerMessage = (state, { toUserId = "", type = "" } = {}) => {

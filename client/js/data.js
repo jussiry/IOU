@@ -654,6 +654,20 @@ export const createTransaction = async ({ friendId, amount, message }) => {
 // Peer message transport interface
 // ---------------------------------------------------------------------------
 
+export const updateLastSyncedAt = async (peerId) => {
+  const normalizedPeerId = asTrimmedString(peerId);
+  if (!normalizedPeerId) return;
+
+  const state = await loadState();
+  if (!hasUser(state)) return;
+
+  const connection = findConnection(state, normalizedPeerId);
+  if (!connection) return;
+
+  connection.last_synced_at = new Date().toISOString();
+  await persistState(state);
+};
+
 export const markPeerMessageReceived = async (messageId) => {
   const normalizedMessageId = asTrimmedString(messageId);
   if (!normalizedMessageId) {
@@ -665,9 +679,17 @@ export const markPeerMessageReceived = async (messageId) => {
     return null;
   }
 
-  const didRemoveMessage = removeQueuedPeerMessage(state, normalizedMessageId);
-  if (!didRemoveMessage) {
+  const removedMessage = removeQueuedPeerMessage(state, normalizedMessageId);
+  if (!removedMessage) {
     return buildView(state);
+  }
+
+  const peerId = removedMessage.to_user_id;
+  if (peerId) {
+    const connection = findConnection(state, peerId);
+    if (connection) {
+      connection.last_synced_at = new Date().toISOString();
+    }
   }
 
   return persistAndBuildView(state);

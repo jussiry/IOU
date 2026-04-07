@@ -9,6 +9,7 @@ import {
   getRealtimeSnapshot,
   markPeerMessageReceived,
   subscribeToDataChanges,
+  updateLastSyncedAt,
 } from "../data.js";
 import {
   createPeerReceiptMessage,
@@ -37,7 +38,8 @@ const createRealtimeClient = () => {
     sendSignal: (peerUserId, signal) => {
       signalingClient.sendPeerSignal(peerUserId, signal);
     },
-    onPeerReady: () => {
+    onPeerReady: (peerUserId) => {
+      void updateLastSyncedAt(peerUserId);
       void syncRealtimeState();
     },
     onPeerStatusChange: (connectedPeerIds) => {
