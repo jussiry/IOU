@@ -1,13 +1,33 @@
 /*
-This scenario validates that a browser reload can re-establish the peer connection without negotiation exceptions. It creates two users, establishes an accepted friendship, reloads one client, and then inspects both the UI connection indicators and the captured browser errors after reconnect.
-
-The goal is to catch reload-specific WebRTC negotiation bugs such as offer-collision state errors and ICE-restart mismatches. Keeping it as a separate scenario makes it easy to rerun the same reconnect check across Chromium and Firefox from the same harness command.
+This scenario validates that browser reloads re-establish WebRTC peer
+connections without negotiation errors. It covers both a single reload and
+two quick successive reloads to catch stale-description races where a second
+reconnect starts before the previous renegotiation has fully drained.
 */
 
 const NEGOTIATION_ERROR_PATTERN =
-  /have-remote-offer|setLocalDescription|ICE restart|ice-ufrag|ice-pwd|Cannot set local offer/i;
+  /have-remote-offer|setLocalDescription|set remote offer or answer|ICE restart|ice-ufrag|ice-pwd|Cannot set local offer/i;
 
 const ONLINE_ICON_CLASS = "friend-icon friend-icon--online";
+
+const assertReconnected = async (assert, helpers, alice, bob) => {
+  await helpers.waitForPeerConnectionCount(alice, 1);
+  await helpers.waitForPeerConnectionCount(bob, 1);
+
+  const icons = {
+    alice: await helpers.getFriendIconClass(alice),
+    bob: await helpers.getFriendIconClass(bob),
+  };
+  assert.equal(icons.alice, ONLINE_ICON_CLASS);
+  assert.equal(icons.bob, ONLINE_ICON_CLASS);
+
+  const aliceErrors = helpers.getClientErrors(alice, NEGOTIATION_ERROR_PATTERN);
+  const bobErrors = helpers.getClientErrors(bob, NEGOTIATION_ERROR_PATTERN);
+  assert.equal(aliceErrors.length, 0);
+  assert.equal(bobErrors.length, 0);
+
+  return { icons, aliceErrors, bobErrors };
+};
 
 module.exports = {
   name: "reload-reconnect",
@@ -30,37 +50,29 @@ module.exports = {
     assert.equal(await helpers.getPeerConnectionCount(alice), "1");
     assert.equal(await helpers.getPeerConnectionCount(bob), "1");
 
+    // --- Single reload ---
     helpers.clearClientEvents(alice);
     helpers.clearClientEvents(bob);
 
     await helpers.clickNav(bob, "friends", "#page-content");
     await helpers.reloadClient(bob, 'nav [data-page="friends"]');
-    await helpers.waitForPeerConnectionCount(alice, 1);
-    await helpers.waitForPeerConnectionCount(bob, 1);
 
-    const peerCountsAfterReload = {
-      alice: await helpers.getPeerConnectionCount(alice),
-      bob: await helpers.getPeerConnectionCount(bob),
-    };
-    const friendIconsAfterReload = {
-      alice: await helpers.getFriendIconClass(alice),
-      bob: await helpers.getFriendIconClass(bob),
-    };
-    const aliceErrors = helpers.getClientErrors(alice, NEGOTIATION_ERROR_PATTERN);
-    const bobErrors = helpers.getClientErrors(bob, NEGOTIATION_ERROR_PATTERN);
+    const singleReload = await assertReconnected(assert, helpers, alice, bob);
 
-    assert.equal(peerCountsAfterReload.alice, "1");
-    assert.equal(peerCountsAfterReload.bob, "1");
-    assert.equal(friendIconsAfterReload.alice, ONLINE_ICON_CLASS);
-    assert.equal(friendIconsAfterReload.bob, ONLINE_ICON_CLASS);
-    assert.equal(aliceErrors.length, 0);
-    assert.equal(bobErrors.length, 0);
+    // --- Double quick reload ---
+    helpers.clearClientEvents(alice);
+    helpers.clearClientEvents(bob);
+
+    await helpers.clickNav(bob, "friends", "#page-content");
+    await helpers.reloadClient(bob, 'nav [data-page="friends"]');
+    await harness.delay(1500);
+    await helpers.reloadClient(bob, 'nav [data-page="friends"]');
+
+    const doubleReload = await assertReconnected(assert, helpers, alice, bob);
 
     return {
-      peerCountsAfterReload,
-      friendIconsAfterReload,
-      aliceErrors,
-      bobErrors,
+      singleReload,
+      doubleReload,
       aliceTransportTail: helpers.getTransportLogs(alice).slice(-20),
       bobTransportTail: helpers.getTransportLogs(bob).slice(-20),
     };

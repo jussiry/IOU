@@ -39,10 +39,94 @@ const normalizePeerIds = (peerIds) => {
   );
 };
 
+// The server stores opaque ciphertext envelopes for offline recipients so peers
+// can hand off messages without waiting for both sides to be online at once.
+// Envelopes are kept in memory only; on restart any undelivered messages are
+// lost and the senders' client outboxes will eventually re-queue them.
+const PER_RECIPIENT_ENVELOPE_LIMIT = 500;
+
 const createSignalingServer = (server) => {
   const websocketServer = new WebSocketServer({ noServer: true });
   const clientsBySocket = new Map();
   const clientsByUserId = new Map();
+  const envelopesByRecipient = new Map();
+
+  const getStoredEnvelopes = (userId) => {
+    const existing = envelopesByRecipient.get(userId);
+    if (existing) return existing;
+    const created = new Map();
+    envelopesByRecipient.set(userId, created);
+    return created;
+  };
+
+  const storeEnvelopeForRecipient = (recipientUserId, envelope) => {
+    if (!recipientUserId || !envelope?.id) {
+      return;
+    }
+
+    const stored = getStoredEnvelopes(recipientUserId);
+    if (stored.has(envelope.id)) {
+      return;
+    }
+
+    if (stored.size >= PER_RECIPIENT_ENVELOPE_LIMIT) {
+      // Drop the oldest stored envelope to keep the per-recipient queue bounded.
+      const oldestKey = stored.keys().next().value;
+      if (oldestKey) {
+        stored.delete(oldestKey);
+      }
+    }
+
+    stored.set(envelope.id, envelope);
+  };
+
+  const flushStoredEnvelopes = (client) => {
+    if (!client?.userId) {
+      return;
+    }
+
+    const stored = envelopesByRecipient.get(client.userId);
+    if (!stored || stored.size === 0) {
+      return;
+    }
+
+    Array.from(stored.values()).forEach((envelope) => {
+      const delivered = sendJson(client.socket, {
+        type: "peer_envelope",
+        envelope,
+      });
+      if (delivered) {
+        stored.delete(envelope.id);
+      }
+    });
+
+    if (stored.size === 0) {
+      envelopesByRecipient.delete(client.userId);
+    }
+  };
+
+  const handleQueuePeerEnvelope = (sendingClient, envelope) => {
+    if (!sendingClient?.userId || !envelope || typeof envelope !== "object") {
+      return;
+    }
+
+    const recipientUserId =
+      typeof envelope.to_user_id === "string" ? envelope.to_user_id.trim() : "";
+    if (!recipientUserId || recipientUserId === sendingClient.userId) {
+      return;
+    }
+    if (!envelope.id || !envelope.from_user_id || !envelope.ciphertext) {
+      return;
+    }
+
+    const recipientClient = clientsByUserId.get(recipientUserId);
+    const delivered = recipientClient
+      ? sendJson(recipientClient.socket, { type: "peer_envelope", envelope })
+      : false;
+    if (!delivered) {
+      storeEnvelopeForRecipient(recipientUserId, envelope);
+    }
+  };
 
   const getClient = (socket) => {
     return clientsBySocket.get(socket) || null;
@@ -156,6 +240,7 @@ const createSignalingServer = (server) => {
 
     client.userId = normalizedUserId;
     clientsByUserId.set(normalizedUserId, client);
+    flushStoredEnvelopes(client);
     syncClientPeers(client);
   };
 
@@ -241,6 +326,11 @@ const createSignalingServer = (server) => {
 
       if (payload.type === "webrtc_signal") {
         handlePeerSignal(client, payload.peer_user_id, payload.signal);
+        return;
+      }
+
+      if (payload.type === "queue_peer_envelope") {
+        handleQueuePeerEnvelope(client, payload.envelope);
       }
     });
 

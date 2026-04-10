@@ -21,10 +21,15 @@ const BUILT_IN_SCENARIOS = {
     "scenarios",
     "reload-reconnect.cjs"
   ),
-  "reload-reconnect-double-quick": path.join(
+  "server-queue-delivery": path.join(
     __dirname,
     "scenarios",
-    "reload-reconnect-double-quick.cjs"
+    "server-queue-delivery.cjs"
+  ),
+  "turn-relay": path.join(
+    __dirname,
+    "scenarios",
+    "turn-relay.cjs"
   ),
 };
 

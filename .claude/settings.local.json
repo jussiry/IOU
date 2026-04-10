@@ -1,4 +1,7 @@
 {
+  "env": {
+    "PATH": "/Users/jussi/.nvm/versions/node/v24.14.0/bin:${PATH}"
+  },
   "permissions": {
     "allow": [
       "Bash(git *)",
@@ -9,18 +12,35 @@
       "Bash(git:*)",
       "Bash(grep *)",
       "WebFetch(*)",
-      "Bash(xargs cat:*)",
+      "Bash(echo *)",
+      "Bash(lsof *)",
       "Bash(find *)",
-      "mcp__Claude_Preview__preview_start",
+      "Bash(npx *)",
+      "Bash(node *)",
+      "Bash(ps *)",
+      "Bash(curl *)",
+      "Bash(pkill *)",
+      "Bash(kill *)",
+      "Bash(export *)",
+      "Bash(sleep *)",
       "Bash(gh search:*)",
       "Bash(gh issue:*)",
+      "Bash(xargs kill:*)",
+      "mcp__Claude_Preview__preview_start",
       "Bash(source ~/.zshrc)",
       "Bash(source ~/.bash_profile)",
       "Bash(source ~/.profile)",
-      "Bash(echo *)",
-      "Bash(export *)",
       "WebSearch",
-      "Bash(npx *)"
+      "Read(//opt/homebrew/opt/**)",
+      "Read(//Users/jussi/.nvm/versions/node/**)",
+      "Skill(update-config)",
+      "Skill(update-config:*)",
+      "Read(//Users/jussi/.nvm/alias/**)",
+      "Bash(/Users/jussi/.nvm/versions/node/v24.14.0/bin/node tests/two-client-e2e/run.cjs --scenario friend-request-online)",
+      "Bash(/Users/jussi/.nvm/versions/node/v24.14.0/bin/node tests/two-client-e2e/run.cjs --scenario reload-reconnect)",
+      "Bash(/Users/jussi/.nvm/versions/node/v24.14.0/bin/node tests/two-client-e2e/run.cjs --scenario reload-reconnect-double-quick)",
+      "Bash(/Users/jussi/.nvm/versions/node/v24.14.0/bin/node tests/two-client-e2e/run.cjs --scenario server-queue-delivery)",
+      "Bash(/Users/jussi/.nvm/versions/node/v24.14.0/bin/node tests/two-client-e2e/run.cjs --scenario turn-relay)"
     ]
   }
 }

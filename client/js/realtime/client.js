@@ -2,6 +2,8 @@
 This module orchestrates websocket signaling, WebRTC peer sessions, and queued peer-message delivery for the IOU client.
 
 It subscribes to persisted app-state changes so presence, friendship eligibility, and unsent messages stay in sync with the transport layer without requiring page-specific code to know about networking internals.
+
+Application-level peer messages travel inside encrypted envelopes wrapped here so the WebRTC channel and the signaling server's fallback queue see only ciphertext. Transport-only messages (ping/pong/receipts) keep flowing as plaintext over the data channel — they are local to a live WebRTC session and never need to be forwarded by the server.
 */
 
 import {
@@ -17,6 +19,11 @@ import {
   PEER_MESSAGE_TYPE_PONG,
   PEER_MESSAGE_TYPE_RECEIVED,
 } from "./peer-messages.js";
+import {
+  isPeerEnvelope,
+  unwrapPeerEnvelope,
+  wrapPeerMessage,
+} from "./peer-envelope.js";
 import { createSignalingClient } from "../signaling/socket-client.js";
 import { createPeerMesh } from "./peer-mesh.js";
 import { replaceConnectedPeerIds } from "./peer-status.js";
@@ -32,6 +39,10 @@ const logRealtimeEvent = (title, detail) => {
 
 const createRealtimeClient = () => {
   let currentSnapshot = null;
+  // Tracks envelope ids already pushed to the server queue this WebSocket session.
+  // Reset whenever the WebSocket re-registers so a server restart causes
+  // outbox messages to be re-queued instead of stranded.
+  const envelopesSentToServer = new Set();
 
   const peerMesh = createPeerMesh({
     getLocalUserId: () => currentSnapshot?.userId || "",
@@ -61,6 +72,16 @@ const createRealtimeClient = () => {
     onPeerSignal: ({ peerUserId, signal }) => {
       void peerMesh.handleSignal(peerUserId, signal);
     },
+    onPeerEnvelopeFromServer: ({ envelope }) => {
+      void handleServerDeliveredEnvelope(envelope);
+    },
+    onSessionReady: () => {
+      // The WebSocket just (re-)registered, so any envelopes the server held
+      // for us are about to arrive. Forget what we previously asked the server
+      // to queue so a server restart doesn't strand undelivered messages.
+      envelopesSentToServer.clear();
+      void syncRealtimeState();
+    },
   });
 
   const requestPeerConnectionIfNeeded = (peerUserId, logTitle = "Requesting peer connection") => {
@@ -74,22 +95,50 @@ const createRealtimeClient = () => {
     signalingClient.requestPeerConnection(peerUserId);
   };
 
-  const flushOutbox = () => {
+  const flushOutbox = async () => {
     if (!currentSnapshot) {
       return;
     }
 
-    currentSnapshot.outbox.forEach((message) => {
-      if (!peerMesh.canSend(message.to_user_id)) {
-        return;
+    const privateKeyHex = currentSnapshot.userPrivateKeyHex;
+    if (!privateKeyHex) {
+      return;
+    }
+
+    for (const message of currentSnapshot.outbox) {
+      const directlyConnected = peerMesh.canSend(message.to_user_id);
+      if (directlyConnected && peerMesh.hasInflightMessage(message.to_user_id, message.id)) {
+        continue;
+      }
+      if (!directlyConnected && envelopesSentToServer.has(message.id)) {
+        continue;
       }
 
-      if (peerMesh.hasInflightMessage(message.to_user_id, message.id)) {
-        return;
+      let envelope;
+      try {
+        envelope = await wrapPeerMessage(message, { privateKeyHex });
+      } catch (error) {
+        logRealtimeEvent("Failed to wrap outgoing peer message", {
+          messageId: message.id,
+          error: String(error?.message || error),
+        });
+        continue;
       }
 
-      peerMesh.sendPeerMessage(message.to_user_id, message);
-    });
+      if (directlyConnected) {
+        peerMesh.sendPeerMessage(message.to_user_id, envelope);
+        continue;
+      }
+
+      const queued = signalingClient.queuePeerEnvelopeOnServer(envelope);
+      if (queued) {
+        envelopesSentToServer.add(message.id);
+        logRealtimeEvent("Queued peer envelope on server", {
+          messageId: message.id,
+          peerUserId: message.to_user_id,
+        });
+      }
+    }
   };
 
   const syncRealtimeState = async () => {
@@ -110,10 +159,85 @@ const createRealtimeClient = () => {
     currentSnapshot.peerIds.forEach((peerUserId) => {
       requestPeerConnectionIfNeeded(peerUserId);
     });
-    flushOutbox();
+    await flushOutbox();
   };
 
   const pendingPings = new Map();
+
+  const handleReceiptMessage = async (receiptMessage) => {
+    const receivedMessageId =
+      typeof receiptMessage.payload?.message_id === "string"
+        ? receiptMessage.payload.message_id.trim()
+        : "";
+    if (!receivedMessageId) {
+      return;
+    }
+
+    logRealtimeEvent("Peer receipt received", { data: receiptMessage });
+    peerMesh.clearInflightMessage(receivedMessageId);
+    envelopesSentToServer.delete(receivedMessageId);
+    await markPeerMessageReceived(receivedMessageId);
+    await syncRealtimeState();
+  };
+
+  const sendReceiptForInnerMessage = async (innerMessage, acknowledgeResult, preferredPeerId) => {
+    if (!acknowledgeResult || !currentSnapshot?.userId) {
+      return;
+    }
+
+    const receipt = createPeerReceiptMessage({
+      fromUserId: currentSnapshot.userId,
+      toUserId: innerMessage.from_user_id,
+      messageId: innerMessage.id,
+      result: acknowledgeResult,
+    });
+
+    const targetPeerId = preferredPeerId || innerMessage.from_user_id;
+    if (peerMesh.canSend(targetPeerId)) {
+      peerMesh.sendControlMessage(targetPeerId, receipt);
+      logRealtimeEvent("Sent peer receipt over WebRTC", {
+        peerUserId: targetPeerId,
+        data: receipt,
+      });
+      return;
+    }
+
+    // No live data channel — wrap the receipt as an envelope and let the
+    // signaling server hold it until the original sender comes back online.
+    if (!currentSnapshot.userPrivateKeyHex) {
+      return;
+    }
+
+    try {
+      const envelope = await wrapPeerMessage(receipt, {
+        privateKeyHex: currentSnapshot.userPrivateKeyHex,
+      });
+      const queued = signalingClient.queuePeerEnvelopeOnServer(envelope);
+      logRealtimeEvent(queued ? "Queued peer receipt on server" : "Receipt queue rejected", {
+        peerUserId: targetPeerId,
+        receiptId: receipt.id,
+      });
+    } catch (error) {
+      logRealtimeEvent("Failed to wrap receipt for server delivery", {
+        error: String(error?.message || error),
+      });
+    }
+  };
+
+  const processInnerPeerMessage = async (innerMessage, { receiptChannelPeerId } = {}) => {
+    if (innerMessage.type === PEER_MESSAGE_TYPE_RECEIVED) {
+      await handleReceiptMessage(innerMessage);
+      return;
+    }
+
+    const processingResult = await applyInboundPeerMessage(innerMessage);
+    await sendReceiptForInnerMessage(
+      innerMessage,
+      processingResult?.acknowledgeResult,
+      receiptChannelPeerId,
+    );
+    await syncRealtimeState();
+  };
 
   const handlePeerMessage = async (peerUserId, message) => {
     if (!message || typeof message !== "object") {
@@ -142,37 +266,67 @@ const createRealtimeClient = () => {
     }
 
     if (message.type === PEER_MESSAGE_TYPE_RECEIVED) {
-      const receivedMessageId =
-        typeof message.payload?.message_id === "string" ? message.payload.message_id.trim() : "";
-      if (!receivedMessageId) {
-        return;
-      }
-
-      logRealtimeEvent("Peer receipt received", {
-        peerUserId,
-        data: message,
-      });
-      peerMesh.clearInflightMessage(receivedMessageId);
-      await markPeerMessageReceived(receivedMessageId);
-      await syncRealtimeState();
+      // Plaintext receipt over WebRTC — used as the fast path when both peers
+      // have a live data channel. Same handling as a server-delivered receipt.
+      await handleReceiptMessage(message);
       return;
     }
 
-    const processingResult = await applyInboundPeerMessage(message);
-    if (processingResult?.acknowledgeResult && currentSnapshot?.userId) {
-      const receipt = createPeerReceiptMessage({
-        fromUserId: currentSnapshot.userId,
-        toUserId: peerUserId,
-        messageId: message.id,
-        result: processingResult.acknowledgeResult,
-      });
-      logRealtimeEvent("Sending peer receipt", {
+    if (!isPeerEnvelope(message)) {
+      logRealtimeEvent("Dropping non-envelope application message", {
         peerUserId,
-        data: receipt,
+        type: message.type,
       });
-      peerMesh.sendControlMessage(peerUserId, receipt);
+      return;
     }
-    await syncRealtimeState();
+
+    const innerMessage = await unwrapEnvelopeOrLog(message, peerUserId);
+    if (!innerMessage) {
+      return;
+    }
+
+    await processInnerPeerMessage(innerMessage, { receiptChannelPeerId: peerUserId });
+  };
+
+  const unwrapEnvelopeOrLog = async (envelope, sourcePeerId) => {
+    const privateKeyHex = currentSnapshot?.userPrivateKeyHex;
+    if (!privateKeyHex || !currentSnapshot?.userId) {
+      return null;
+    }
+
+    try {
+      return await unwrapPeerEnvelope(envelope, {
+        privateKeyHex,
+        expectedRecipientId: currentSnapshot.userId,
+      });
+    } catch (error) {
+      logRealtimeEvent("Failed to unwrap peer envelope", {
+        peerUserId: sourcePeerId,
+        envelopeId: envelope?.id,
+        error: String(error?.message || error),
+      });
+      return null;
+    }
+  };
+
+  const handleServerDeliveredEnvelope = async (envelope) => {
+    if (!isPeerEnvelope(envelope)) {
+      return;
+    }
+
+    logRealtimeEvent("Peer envelope received from server", {
+      envelopeId: envelope.id,
+      from: envelope.from_user_id,
+    });
+
+    const innerMessage = await unwrapEnvelopeOrLog(envelope, envelope.from_user_id);
+    if (!innerMessage) {
+      return;
+    }
+
+    await processInnerPeerMessage(innerMessage, {
+      receiptChannelPeerId: innerMessage.from_user_id,
+    });
   };
 
   const unsubscribe = subscribeToDataChanges(() => {

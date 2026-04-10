@@ -47,6 +47,8 @@ const createSignalingClient = (
     onPeerConnect = null,
     onPeerDisconnect = null,
     onPeerSignal = null,
+    onPeerEnvelopeFromServer = null,
+    onSessionReady = null,
   } = {}
 ) => {
   let socket = null;
@@ -65,7 +67,7 @@ const createSignalingClient = (
     reconnectTimer = null;
   };
 
-  const sendRegistration = () => {
+  const sendRegistration = ({ notifyReady = false } = {}) => {
     if (!session.userId) {
       return;
     }
@@ -78,6 +80,9 @@ const createSignalingClient = (
       type: "peer_candidates",
       peer_user_ids: session.peerIds,
     });
+    if (notifyReady && typeof onSessionReady === "function") {
+      onSessionReady();
+    }
   };
 
   const scheduleReconnect = () => {
@@ -117,6 +122,13 @@ const createSignalingClient = (
         peerUserId: payload.peer_user_id,
         signal: payload.signal || null,
       });
+      return;
+    }
+
+    if (payload.type === "peer_envelope" && typeof onPeerEnvelopeFromServer === "function") {
+      onPeerEnvelopeFromServer({
+        envelope: payload.envelope || null,
+      });
     }
   };
 
@@ -125,7 +137,7 @@ const createSignalingClient = (
 
     socket.addEventListener("open", () => {
       clearReconnectTimer();
-      sendRegistration();
+      sendRegistration({ notifyReady: true });
     });
 
     socket.addEventListener("message", handleMessage);
@@ -175,6 +187,16 @@ const createSignalingClient = (
         type: "webrtc_signal",
         peer_user_id: normalizedPeerUserId,
         signal,
+      });
+    },
+    queuePeerEnvelopeOnServer: (envelope) => {
+      if (!envelope || typeof envelope !== "object") {
+        return false;
+      }
+
+      return sendJson(socket, {
+        type: "queue_peer_envelope",
+        envelope,
       });
     },
     destroy: () => {

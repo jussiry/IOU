@@ -129,7 +129,18 @@ const createTwoClientHarness = ({
     client.consoleEntries.length = 0;
   };
 
-  const createClient = async ({ label, userName = "" } = {}) => {
+  const attachPageListeners = (client) => {
+    client.page.on("console", createConsoleCollector(client.label, client.consoleEntries));
+    client.page.on("pageerror", (error) => {
+      client.consoleEntries.push({
+        label: client.label,
+        type: "pageerror",
+        text: String(error?.stack || error),
+      });
+    });
+  };
+
+  const createClient = async ({ label, userName = "", initScripts = [] } = {}) => {
     assert(label, "Client label is required");
     await ensureBrowser();
 
@@ -138,14 +149,6 @@ const createTwoClientHarness = ({
     });
     const page = await context.newPage();
     const consoleEntries = [];
-    page.on("console", createConsoleCollector(label, consoleEntries));
-    page.on("pageerror", (error) => {
-      consoleEntries.push({
-        label,
-        type: "pageerror",
-        text: String(error?.stack || error),
-      });
-    });
 
     const client = {
       label,
@@ -154,7 +157,12 @@ const createTwoClientHarness = ({
       page,
       consoleEntries,
     };
+    attachPageListeners(client);
     clients.set(label, client);
+
+    for (const script of initScripts) {
+      await page.addInitScript(script);
+    }
 
     await page.goto(`${baseUrl}/#welcome`, {
       waitUntil: "domcontentloaded",
@@ -170,10 +178,29 @@ const createTwoClientHarness = ({
     return client;
   };
 
+  const reopenClient = async (client, { hash = "friends" } = {}) => {
+    await client.page.close();
+    const page = await client.context.newPage();
+    client.page = page;
+    attachPageListeners(client);
+    await page.goto(`${baseUrl}/#${hash}`, {
+      waitUntil: "domcontentloaded",
+    });
+    await page.waitForSelector('nav [data-page="friends"]', {
+      timeout: waitMs,
+    });
+    await delay(1000);
+  };
+
   const bootstrapUser = async (client, userName) => {
     client.userName = userName;
     await client.page.fill('[data-bind="welcome-name"]', userName);
-    await client.page.click('[data-action="create-user"]');
+    // Call .click() inside the page to trigger form submission. Going through
+    // page.click() hangs on Playwright's auto-wait-for-navigation because the
+    // form handler preventDefaults and routes via hash change instead.
+    await client.page.evaluate(() => {
+      document.querySelector('[data-action="create-user"]').click();
+    });
     await client.page.waitForSelector('nav [data-page="friends"]', {
       timeout: waitMs,
     });
@@ -247,7 +274,7 @@ const createTwoClientHarness = ({
   const openFirstFriend = async (client) => {
     await waitForFriendRows(client, 1);
     await client.page.locator(".friend-row").first().click();
-    await client.page.waitForSelector('[data-slot="subpage-header-right"]', {
+    await client.page.waitForSelector('.friend-content', {
       timeout: waitMs,
     });
     await delay(600);
@@ -376,6 +403,7 @@ const createTwoClientHarness = ({
       navigateHash,
       clickNav,
       reloadClient,
+      reopenClient,
       readMyKey,
       submitFriendRequest,
       waitForFriendRows,

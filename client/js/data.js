@@ -189,6 +189,7 @@ export const getRealtimeSnapshot = async () => {
   return {
     userId: state.user.id,
     userName: state.user.name,
+    userPrivateKeyHex: state.user.private_key_hex || "",
     peerIds: Array.from(new Set([...relationshipPeerIds, ...queuedPeerIds])),
     peerNames,
     outbox: Array.isArray(state.outbox) ? state.outbox.map((entry) => createPeerMessageModel(entry)) : [],

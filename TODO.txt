@@ -1,9 +1,7 @@
 
+- kun peer yhteys muodostuu tarkistaa onko molemmat samassa tilassa ?
+  * onko tarpeellinen - receipt mekanismi varmistaa että kaikki viestit menevät läpi
 
-- peer viestien (send / add friend) cachetus serverin kautta jos peer ei paikalla
-  (- IOU:n lähetys cachettamalla severiin jos kaveri ei online
-    * message quet jotka lähetetään kun niiden vastaanottaja on online
-    * message quet myös clientteihin, eli kun kaveri tulee online, varmistetaan onko hän saanut viestin (serveristä tai muualta) - ja jos ei ole lähetetään itse)
 
 - manifest.json / taustalle jäävä appi (jääkö kun kännykkä sleep modessa??)
 
@@ -26,11 +24,21 @@ Joskus myöhemmin:
 
 Scratch book
 
-On add a friend page at the top of the main box show label "My key" followed by users public key in text input that can't be edited. On right side of text input show copy button (just an icon) that copies the key on clipboard. Clicking on the text will select it (so user can also copy from there). Make text field as wide as possible, but all of the key don't need to be visible (more important is having concurring sytles with the rest of the page).
+When sending messages to peers, is there a receitp response form peer when they receive it? And does the message stay in outbox before it has been sent?
 
-on friends page list keep friends name on one row (use textoverflow: ellipsis). Also make a green version of friend icon, and when there is active webrtc connection between you and that friend, show the green icon instead of the normal gray icon.
+If not received after some time period, try again or send to server? Receipt from server that has been send?
+
+
+I have pending friend request that has been sent but the client don't know if it has been received
+
 
 
 Security questions
-- when server sends "peer_connect" message for two peers to connect, do the clients still verify that the peer they are connecting to is still their friend? The security should always stay on client, so even conncting to malicious server should not be able to damage client data
-  * NOTE: messages between peers should always be encrypted anyways
+- what happens if malicious server sends "peer_connect" message for two peers to connect, that are not acutally friends?
+
+- vain payload cryptataan?
+  queuePeerMessage(state, {
+    toUserId: connection.person_id,
+    type: PEER_MESSAGE_TYPE_NAME_CHANGED,
+    payload: { name: trimmedName },
+  });

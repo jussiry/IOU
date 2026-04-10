@@ -122,14 +122,17 @@ const addPoints = (leftPoint, rightPoint) => {
   };
 };
 
-const multiplyGenerator = (scalar) => {
+const multiplyPoint = (scalar, basePoint) => {
   if (scalar <= 0n || scalar >= GROUP_ORDER) {
     throw new Error("Scalar is outside secp256k1 valid range.");
+  }
+  if (!basePoint) {
+    throw new Error("Cannot multiply a null point.");
   }
 
   let remainingScalar = scalar;
   let accumulatedPoint = null;
-  let doublingPoint = GENERATOR_POINT;
+  let doublingPoint = basePoint;
 
   while (remainingScalar > 0n) {
     const currentBit = remainingScalar & 1n;
@@ -141,10 +144,48 @@ const multiplyGenerator = (scalar) => {
   }
 
   if (!accumulatedPoint) {
-    throw new Error("Unable to derive public key point.");
+    throw new Error("Scalar multiplication produced the identity point.");
   }
 
   return accumulatedPoint;
+};
+
+const multiplyGenerator = (scalar) => multiplyPoint(scalar, GENERATOR_POINT);
+
+// Modular exponentiation: base^exponent mod modulo (square-and-multiply).
+const modPow = (base, exponent, modulo) => {
+  if (modulo === 1n) return 0n;
+  let result = 1n;
+  let runningBase = normalizeModulo(base, modulo);
+  let runningExponent = exponent;
+  while (runningExponent > 0n) {
+    if ((runningExponent & 1n) === 1n) {
+      result = (result * runningBase) % modulo;
+    }
+    runningExponent >>= 1n;
+    runningBase = (runningBase * runningBase) % modulo;
+  }
+  return result;
+};
+
+// Lift an x-only public key (BIP-340) to a full point on secp256k1 with even y.
+// y² = x³ + 7 (mod p). For secp256k1, p ≡ 3 mod 4, so √v = v^((p+1)/4) mod p.
+const liftXOnlyPubkey = (publicKeyHex) => {
+  const normalizedHex = normalizeHex(publicKeyHex, 32);
+  const pointX = BigInt(`0x${normalizedHex}`);
+  if (pointX <= 0n || pointX >= FIELD_PRIME) {
+    throw new Error("Public key x-coordinate is outside the secp256k1 field.");
+  }
+
+  const ySquared = normalizeModulo(pointX * pointX * pointX + 7n, FIELD_PRIME);
+  const candidateY = modPow(ySquared, (FIELD_PRIME + 1n) / 4n, FIELD_PRIME);
+  if ((candidateY * candidateY) % FIELD_PRIME !== ySquared) {
+    throw new Error("Public key x-coordinate has no point on secp256k1.");
+  }
+
+  // BIP-340 convention: pick the even y so the point is unambiguous.
+  const evenY = (candidateY & 1n) === 0n ? candidateY : FIELD_PRIME - candidateY;
+  return { pointX, pointY: evenY };
 };
 
 const bytesToHex = (bytes) => {
@@ -377,6 +418,20 @@ export const decodeNsecToHex = (encodedValue) => {
   return bytesToHex(new Uint8Array(decodedBytes));
 };
 
+export const decodeNpubToHex = (encodedValue) => {
+  const { humanReadablePart, dataWords } = decodeBech32(encodedValue);
+  if (humanReadablePart !== "npub") {
+    throw new Error("Expected an npub-encoded public key.");
+  }
+
+  const decodedBytes = convertBits(dataWords, 5, 8, false);
+  if (decodedBytes.length !== 32) {
+    throw new Error("Invalid npub payload length.");
+  }
+
+  return bytesToHex(new Uint8Array(decodedBytes));
+};
+
 export const isValidNpub = (encodedValue) => {
   try {
     const { humanReadablePart, dataWords } = decodeBech32(encodedValue);
@@ -408,6 +463,21 @@ export const deriveNostrPublicKeyHex = (privateKeyHex) => {
 
   const publicPoint = multiplyGenerator(privateScalar);
   return bigIntToFixedHex(publicPoint.pointX, 32);
+};
+
+// Derive an ECDH shared secret as the x-coordinate of (myPrivateKey * theirPubkeyPoint).
+// Both sides of the conversation produce the same 32 bytes, so it can be hashed into a
+// symmetric key for authenticated encryption between the two peers.
+export const deriveSharedSecretXHex = (privateKeyHex, peerPublicKeyHex) => {
+  const normalizedPrivateHex = normalizeHex(privateKeyHex, 32);
+  const privateScalar = BigInt(`0x${normalizedPrivateHex}`);
+  if (privateScalar <= 0n || privateScalar >= GROUP_ORDER) {
+    throw new Error("Private key scalar is outside secp256k1 range.");
+  }
+
+  const peerPoint = liftXOnlyPubkey(peerPublicKeyHex);
+  const sharedPoint = multiplyPoint(privateScalar, peerPoint);
+  return bigIntToFixedHex(sharedPoint.pointX, 32);
 };
 
 export const generateNostrKeyPair = () => {
