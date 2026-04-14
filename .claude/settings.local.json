@@ -23,6 +23,8 @@
       "Bash(kill *)",
       "Bash(export *)",
       "Bash(sleep *)",
+      "Bash(wc *)",
+      "Bash(md5 *)",
       "Bash(gh search:*)",
       "Bash(gh issue:*)",
       "Bash(xargs kill:*)",

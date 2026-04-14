@@ -789,6 +789,26 @@ export const respondToPaymentRequest = async (friendId, accepted) => {
   return persistAndBuildView(state);
 };
 
+export const dismissNameChangeNotification = async (friendId) => {
+  const normalizedFriendId = asTrimmedString(friendId);
+  if (!normalizedFriendId) {
+    return loadData();
+  }
+
+  const state = await loadState();
+  if (!hasUser(state)) {
+    return null;
+  }
+
+  const userConnection = getUserConnection(state, normalizedFriendId);
+  if (!userConnection) {
+    return loadData();
+  }
+
+  userConnection.pending_name_change = null;
+  return persistAndBuildView(state);
+};
+
 export const dismissPaymentRequest = async (friendId) => {
   const normalizedFriendId = asTrimmedString(friendId);
   if (!normalizedFriendId) {

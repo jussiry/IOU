@@ -109,6 +109,7 @@ const run = async () => {
       assert: harness.assert,
       helpers: harness.helpers,
       createClient: harness.createClient,
+      createSeededClient: harness.createSeededClient,
     });
 
     console.log(

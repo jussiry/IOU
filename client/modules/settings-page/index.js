@@ -12,13 +12,39 @@ export const bindSettings = (root, data, appVersion) => {
   if (userNameEl) {
     userNameEl.textContent = data?.you?.name || "You";
   }
+  const nameView = root.querySelector("[data-name-view]");
+  const nameEdit = root.querySelector("[data-name-edit]");
+  const nameInput = root.querySelector("[data-action='name-input']");
+
+  const enterEdit = () => {
+    nameInput.value = data?.you?.name || "";
+    nameView.hidden = true;
+    if (editNameButton) editNameButton.hidden = true;
+    nameEdit.hidden = false;
+    nameInput.focus();
+    nameInput.select();
+  };
+
+  const exitEdit = () => {
+    nameEdit.hidden = true;
+    nameView.hidden = false;
+    if (editNameButton) editNameButton.hidden = false;
+  };
+
   if (editNameButton) {
-    editNameButton.addEventListener("click", async () => {
-      const currentName = data?.you?.name || "";
-      const nextName = window.prompt("Choose a name", currentName);
-      if (nextName == null) return;
-      await updateUserName(nextName);
+    editNameButton.addEventListener("click", enterEdit);
+  }
+
+  if (nameEdit) {
+    nameEdit.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const nextName = nameInput.value.trim();
+      if (nextName) await updateUserName(nextName);
+      exitEdit();
     });
+
+    const cancelBtn = nameEdit.querySelector("[data-action='cancel-edit-name']");
+    if (cancelBtn) cancelBtn.addEventListener("click", exitEdit);
   }
 
   const versionEl = root.querySelector('[data-bind="app-version"]');

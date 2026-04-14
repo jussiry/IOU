@@ -7,6 +7,7 @@ It also exposes navigation triggers to related subpages by wiring the trust tile
 import {
   acceptFriend,
   cancelTrustLimitSuggestion,
+  dismissNameChangeNotification,
   dismissPaymentRequest,
   dismissTrustLimitNotification,
   rejectFriend,
@@ -249,6 +250,24 @@ export const bindFriendDetail = (root, data, friendId) => {
     dismissTrustButton.addEventListener("click", async () => {
       if (suggestionEl) suggestionEl.hidden = true;
       await dismissTrustLimitNotification(friendId);
+    });
+  }
+
+  const nameChangeEl = root.querySelector('[data-section="name-change-notification"]');
+  const nameChangeLabelEl = root.querySelector('[data-bind="name-change-label"]');
+  const pendingNameChange = connection?.pending_name_change;
+  if (nameChangeEl && pendingNameChange) {
+    nameChangeEl.hidden = false;
+    if (nameChangeLabelEl) {
+      nameChangeLabelEl.textContent = `${pendingNameChange.oldName} changed their name to ${pendingNameChange.newName}`;
+    }
+  }
+
+  const dismissNameChangeButton = root.querySelector('[data-action="dismiss-name-change"]');
+  if (dismissNameChangeButton && friendId) {
+    dismissNameChangeButton.addEventListener("click", async () => {
+      if (nameChangeEl) nameChangeEl.hidden = true;
+      await dismissNameChangeNotification(friendId);
     });
   }
 

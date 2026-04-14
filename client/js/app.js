@@ -26,6 +26,7 @@ import { initIouActions } from "../modules/components/iou-actions.js";
 import { bindSend } from "../modules/subpage/send.js";
 import { bindRequest } from "../modules/subpage/request.js";
 import { bindTrust } from "../modules/subpage/trust.js";
+import { applyDevSeedIfRequested } from "./dev/seed.js";
 import { createRealtimeClient } from "./realtime/client.js";
 import { subscribeToPeerStatusChanges } from "./realtime/peer-status.js";
 import { ensureIconSprite } from "./utils/icons.js";
@@ -436,6 +437,7 @@ window.addEventListener("hashchange", () => {
 
 const initApp = async () => {
   hashHistory.push(window.location.hash.replace("#", "") || "balance");
+  await applyDevSeedIfRequested();
   await ensureIconSprite();
   appVersion = await getAppVersion();
   await ensureVersion(appVersion);

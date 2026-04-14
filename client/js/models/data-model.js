@@ -107,6 +107,11 @@ export const createConnectionModel = (input = {}) => {
           created_at: asTrimmedStringOrDefault(input.pending_payment_request.created_at),
         }
       : null,
+    pending_name_change: input.pending_name_change &&
+      typeof input.pending_name_change.oldName === "string" &&
+      typeof input.pending_name_change.newName === "string"
+      ? { oldName: input.pending_name_change.oldName, newName: input.pending_name_change.newName }
+      : null,
   };
 };
 

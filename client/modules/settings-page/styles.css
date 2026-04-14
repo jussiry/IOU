@@ -25,6 +25,51 @@
   color: var(--ink);
 }
 
+.settings-field-value[hidden],
+.settings-name-form[hidden],
+.settings-edit-name[hidden] {
+  display: none;
+}
+
+.settings-name-form {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+}
+
+.settings-name-input {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ink);
+  border: 1.5px solid var(--accent, #4f6ef7);
+  border-radius: 8px;
+  padding: 4px 8px;
+  width: 178px;
+  background: transparent;
+  outline: none;
+}
+
+.settings-name-save,
+.settings-name-cancel {
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 8px;
+  padding: 4px 10px;
+  cursor: pointer;
+  border: none;
+}
+
+.settings-name-save {
+  background: var(--accent, #4f6ef7);
+  color: #fff;
+}
+
+.settings-name-cancel {
+  background: #f0f0f0;
+  color: var(--ink);
+}
+
 .settings-edit-name {
   border: 1px solid rgba(17, 17, 17, 0.08);
   background: #f6f6f6;

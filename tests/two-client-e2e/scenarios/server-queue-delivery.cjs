@@ -2,33 +2,31 @@
 This scenario validates that peer messages are delivered through the server's
 envelope queue when the recipient is offline.
 
-It creates two users, reads bob's key, takes bob offline, then has alice send
-a friend request. Because no WebRTC connection exists, the message must travel
-through the server queue. After bob comes back online, the scenario verifies
-the queued envelope was delivered and the friend request appears.
+Creates two solo-seeded users (skipping the welcome flow), takes bob offline
+immediately, then has alice send a friend request. Because no WebRTC connection
+exists, the message must travel through the server queue. After bob comes back
+online, the scenario verifies the queued envelope was delivered and the friend
+request appears.
 */
+
+const { BOB, buildSoloFixtures } = require("../fixtures/paired-friends.cjs");
 
 module.exports = {
   name: "server-queue-delivery",
-  run: async ({ assert, createClient, helpers, harness }) => {
-    const alice = await createClient({
-      label: "alice",
-      userName: "Alice",
-    });
-    const bob = await createClient({
-      label: "bob",
-      userName: "Bob",
-    });
+  run: async ({ assert, createSeededClient, helpers, harness }) => {
+    const setupStart = Date.now();
+    const fixtures = buildSoloFixtures();
+    const alice = await createSeededClient({ label: "alice", seed: fixtures.alice });
+    const bob = await createSeededClient({ label: "bob", seed: fixtures.bob });
 
-    // Read bob's key while online, then take bob offline
-    const bobKey = await helpers.readMyKey(bob);
+    // Take bob offline — his key is already known from the fixture
     await bob.page.close();
     await harness.delay(2000);
 
     helpers.clearClientEvents(alice);
 
-    // Alice sends friend request while bob is offline
-    await helpers.submitFriendRequest(alice, bobKey);
+    // Alice sends friend request while bob is offline (key known from fixture)
+    await helpers.submitFriendRequest(alice, BOB.publicKeyNpub);
     await harness.delay(2000);
 
     // Verify the message was queued on the server (not sent via WebRTC)
@@ -63,6 +61,7 @@ module.exports = {
     assert.match(bobFriendText, /Alice/i, "Bob should see Alice in friends list");
 
     return {
+      setupMs: Date.now() - setupStart,
       queuedOnServer,
       sentDirectly,
       serverDelivered,

@@ -178,6 +178,54 @@ const createTwoClientHarness = ({
     return client;
   };
 
+  const createSeededClient = async ({ label, seed, hash = "balance", initScripts = [] } = {}) => {
+    assert(label, "Client label is required");
+    assert(seed && typeof seed === "object", "Seed state is required");
+    await ensureBrowser();
+
+    const context = await browser.newContext({
+      viewport: DEFAULT_VIEWPORT,
+    });
+    const page = await context.newPage();
+    const consoleEntries = [];
+
+    const client = {
+      label,
+      userName: seed?.user?.name || "",
+      context,
+      page,
+      consoleEntries,
+    };
+    attachPageListeners(client);
+    clients.set(label, client);
+
+    // addInitScript runs at document_start on every navigation in this
+    // context. It sets window.__IOU_SEED_STATE before any app module loads;
+    // client/js/dev/seed.js awaits on this blob inside initApp (before
+    // loadData), so the state is in IndexedDB by the time the first route
+    // renders.
+    await context.addInitScript((state) => {
+      window.__IOU_SEED_STATE = state;
+    }, seed);
+
+    for (const script of initScripts) {
+      await page.addInitScript(script);
+    }
+
+    await page.goto(`${baseUrl}/#${hash}`, {
+      waitUntil: "domcontentloaded",
+    });
+    await page.waitForSelector('nav [data-page="friends"]', {
+      timeout: waitMs,
+    });
+    await page.waitForFunction(() => window.location.hash !== "#welcome", {
+      timeout: waitMs,
+    });
+    await delay(750);
+
+    return client;
+  };
+
   const reopenClient = async (client, { hash = "friends" } = {}) => {
     await client.page.close();
     const page = await client.context.newPage();
@@ -395,6 +443,7 @@ const createTwoClientHarness = ({
     delay,
     startServer,
     createClient,
+    createSeededClient,
     getClient,
     getServerLogs: () => [...serverLogs],
     helpers: {

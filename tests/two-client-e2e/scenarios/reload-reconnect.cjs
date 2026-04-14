@@ -3,7 +3,13 @@ This scenario validates that browser reloads re-establish WebRTC peer
 connections without negotiation errors. It covers both a single reload and
 two quick successive reloads to catch stale-description races where a second
 reconnect starts before the previous renegotiation has fully drained.
+
+Uses pre-seeded IndexedDB fixtures so the two clients boot already paired as
+friends, skipping the welcome flow and friend-request handshake which are
+covered by other scenarios.
 */
+
+const { buildPairedFriendsFixtures } = require("../fixtures/paired-friends.cjs");
 
 const NEGOTIATION_ERROR_PATTERN =
   /have-remote-offer|setLocalDescription|set remote offer or answer|ICE restart|ice-ufrag|ice-pwd|Cannot set local offer/i;
@@ -31,24 +37,23 @@ const assertReconnected = async (assert, helpers, alice, bob) => {
 
 module.exports = {
   name: "reload-reconnect",
-  run: async ({ assert, createClient, helpers, harness }) => {
-    const alice = await createClient({
+  run: async ({ assert, createSeededClient, helpers, harness }) => {
+    const setupStart = Date.now();
+    const fixtures = buildPairedFriendsFixtures();
+    const alice = await createSeededClient({
       label: "alice",
-      userName: "Alice",
+      seed: fixtures.alice,
     });
-    const bob = await createClient({
+    const bob = await createSeededClient({
       label: "bob",
-      userName: "Bob",
+      seed: fixtures.bob,
     });
 
-    const bobKey = await helpers.readMyKey(bob);
-    await helpers.submitFriendRequest(alice, bobKey);
-    await helpers.waitForFriendRows(bob, 1);
-    await helpers.acceptFirstFriend(bob);
     await harness.delay(3000);
 
     assert.equal(await helpers.getPeerConnectionCount(alice), "1");
     assert.equal(await helpers.getPeerConnectionCount(bob), "1");
+    const setupMs = Date.now() - setupStart;
 
     // --- Single reload ---
     helpers.clearClientEvents(alice);
@@ -71,6 +76,7 @@ module.exports = {
     const doubleReload = await assertReconnected(assert, helpers, alice, bob);
 
     return {
+      setupMs,
       singleReload,
       doubleReload,
       aliceTransportTail: helpers.getTransportLogs(alice).slice(-20),

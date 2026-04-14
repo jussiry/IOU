@@ -3,9 +3,14 @@
   <div class="settings-user surface-box">
     <div class="settings-field">
       <span class="settings-field-label">Name:</span>
-      <span class="settings-field-value" data-bind="user-name"></span>
+      <span class="settings-field-value" data-bind="user-name" data-name-view></span>
+      <form class="settings-name-form" data-name-edit hidden>
+        <input class="settings-name-input" type="text" data-action="name-input" autocomplete="off" />
+        <button class="settings-name-save" type="submit">Save</button>
+        <button class="settings-name-cancel" type="button" data-action="cancel-edit-name">Cancel</button>
+      </form>
     </div>
-    <button class="settings-edit-name" type="button" data-action="edit-user-name" aria-label="Edit user name">
+    <button class="settings-edit-name" type="button" data-action="edit-user-name" aria-label="Edit user name" data-name-edit-btn>
       <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
         <path
           d="M4 20h4l10.5-10.5a1.4 1.4 0 0 0 0-2L16.5 5.5a1.4 1.4 0 0 0-2 0L4 16v4z"

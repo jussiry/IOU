@@ -11,6 +11,8 @@ succeed if the TURN server is reachable and working.
 NOTE: Requires the TURN server at junction.proxy.rlwy.net:20947 to be online.
 */
 
+const { BOB, buildSoloFixtures } = require("../fixtures/paired-friends.cjs");
+
 const ONLINE_ICON_CLASS = "friend-icon friend-icon--online";
 
 const FORCE_RELAY_SCRIPT = () => {
@@ -27,20 +29,21 @@ const FORCE_RELAY_SCRIPT = () => {
 
 module.exports = {
   name: "turn-relay",
-  run: async ({ assert, createClient, helpers, harness }) => {
-    const alice = await createClient({
+  run: async ({ assert, createSeededClient, helpers, harness }) => {
+    const setupStart = Date.now();
+    const fixtures = buildSoloFixtures();
+    const alice = await createSeededClient({
       label: "alice",
-      userName: "Alice",
+      seed: fixtures.alice,
       initScripts: [FORCE_RELAY_SCRIPT],
     });
-    const bob = await createClient({
+    const bob = await createSeededClient({
       label: "bob",
-      userName: "Bob",
+      seed: fixtures.bob,
       initScripts: [FORCE_RELAY_SCRIPT],
     });
 
-    const bobKey = await helpers.readMyKey(bob);
-    await helpers.submitFriendRequest(alice, bobKey);
+    await helpers.submitFriendRequest(alice, BOB.publicKeyNpub);
     await helpers.waitForFriendRows(bob, 1);
     await harness.delay(3000);
 
@@ -109,6 +112,7 @@ module.exports = {
     assert.equal(errors.bob.length, 0, "Bob should have no errors");
 
     return {
+      setupMs: Date.now() - setupStart,
       peerCounts,
       friendIcons,
       acceptedCounts,

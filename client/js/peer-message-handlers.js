@@ -244,6 +244,7 @@ const applyNameChangedMessage = (state, message) => {
   ensureContact(state, message.from_user_id, newName);
 
   if (oldName === newName) return null;
+  userConnection.pending_name_change = { oldName, newName };
   return friendNotification(`${oldName} changed their name to ${newName}`, message.from_user_id);
 };
 
