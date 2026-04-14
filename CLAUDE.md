@@ -104,6 +104,22 @@ After making a UI change that is visible in the browser:
    from Bash and then snapshot Alice's view
 3. For complex multi-step flows, write an E2E scenario instead
 
+### Page transitions
+
+There is a **400 ms animated transition** between pages. After clicking any
+action that navigates to a new page (nav buttons, Back, opening a friend row,
+etc.) wait at least 400 ms before taking a screenshot or querying the DOM —
+otherwise you may capture the outgoing page mid-animation.
+
+```js
+// preview_eval example
+await new Promise(r => setTimeout(r, 400));
+```
+
+Use `preview_snapshot` instead of `preview_screenshot` when you only need to
+check element presence — it reads the DOM directly and is not affected by the
+animation.
+
 ---
 
 ## Key files
