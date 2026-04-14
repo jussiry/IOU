@@ -41,6 +41,9 @@ export const bindLogs = (root, data) => {
       const messageSuffix = message ? ` — ${message}` : "";
       textEl.innerHTML = formatMarkdownish(`${log.text || ""}${messageSuffix}`);
     }
+    node.addEventListener("click", () => {
+      node.classList.toggle("log-item--expanded");
+    });
     return node;
   });
 };

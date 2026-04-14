@@ -37,6 +37,8 @@
   grid-template-columns: auto 1fr;
   gap: 12px;
   align-items: center;
+  cursor: pointer;
+  user-select: none;
 }
 
 .log-time {
@@ -52,4 +54,14 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.log-item--expanded {
+  align-items: start;
+}
+
+.log-item--expanded .log-text {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
 }
