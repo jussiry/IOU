@@ -29,7 +29,10 @@ the peer helper, so they can actually connect via WebRTC when both are running.
 
 `?seed=reset` is a backward-compat alias for `?seed=alice`.
 
-All named seeds always force-reset the local IndexedDB state.
+**Seeds only apply when IndexedDB is empty.** The preview browser always
+starts with empty state, so `?seed=alice` on first open just works. If you
+need to switch users or start fresh, navigate to `/?removeUser` first — that
+clears IndexedDB so the next `?seed=<name>` can apply.
 
 **Starting state:**
 - Alice has Bob as an accepted friend and Carol as a pending incoming request

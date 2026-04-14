@@ -173,6 +173,8 @@ const run = async () => {
   const page = await context.newPage();
 
   try {
+    // Clear any existing state first so the seed can apply
+    await page.goto(`http://127.0.0.1:${opts.port}/?removeUser`);
     await page.goto(url);
     // Wait for the app to finish seeding and reach the main UI
     await page.waitForSelector('nav button', { timeout: 15000 });

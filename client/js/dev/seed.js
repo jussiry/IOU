@@ -225,10 +225,10 @@ const SEED_BUILDERS = {
 // URL helpers
 // ---------------------------------------------------------------------------
 
-const stripSeedParam = () => {
+const stripParam = (name) => {
   const url = new URL(window.location.href);
-  if (!url.searchParams.has(SEED_PARAM)) return;
-  url.searchParams.delete(SEED_PARAM);
+  if (!url.searchParams.has(name)) return;
+  url.searchParams.delete(name);
   window.history.replaceState(null, "", url.toString() + window.location.hash);
 };
 
@@ -256,26 +256,43 @@ export const applyDevSeedIfRequested = async () => {
   }
 
   const params = new URLSearchParams(window.location.search);
+
+  // ?removeUser — clear state so the next ?seed=<name> can apply
+  if (params.has("removeUser")) {
+    try {
+      await clearAppState();
+    } catch {
+      // best-effort
+    }
+    stripParam("removeUser");
+    return;
+  }
+
   if (!params.has(SEED_PARAM)) return;
 
   const mode = params.get(SEED_PARAM);
-
   // "reset" is a backward-compat alias for "alice"
   const userName = mode === "reset" || mode === "" || mode === null ? "alice" : mode.toLowerCase();
   const builder = SEED_BUILDERS[userName];
 
   if (!builder) {
     // Unknown seed name — strip param and do nothing
-    stripSeedParam();
+    stripParam(SEED_PARAM);
     return;
   }
 
+  // Only seed if no user exists — the preview browser starts empty so this
+  // is the normal case. Use ?removeUser first if you need to switch users.
   try {
-    await clearAppState();
+    const existing = await loadAppState();
+    if (existing && existing.user) {
+      stripParam(SEED_PARAM);
+      return;
+    }
     await saveAppState(builder());
   } catch {
     // seeding is best-effort; fall through to normal flow
   }
 
-  stripSeedParam();
+  stripParam(SEED_PARAM);
 };
