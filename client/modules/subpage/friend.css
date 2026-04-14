@@ -196,9 +196,9 @@
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--muted);
-  overflow: hidden;
+  /*overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: nowrap;*/
 }
 
 .actionable-box-actions {

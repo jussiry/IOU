@@ -4,69 +4,80 @@ preset app state into IndexedDB so the preview browser can skip the welcome
 flow and start with realistic friends, transactions, and pending items.
 
 Usage:
-  http://localhost:…/?seed         — seed only if IDB is empty
-  http://localhost:…/?seed=reset   — clear and reseed unconditionally
+  http://localhost:3000/?seed=alice   — seed (or re-seed) as Alice
+  http://localhost:3000/?seed=bob     — seed (or re-seed) as Bob
+  http://localhost:3000/?seed=carol   — seed (or re-seed) as Carol
+  http://localhost:3000/?seed=reset   — alias for ?seed=alice (backward compat)
 
-The param is stripped from the URL after seeding so reloads behave normally.
+All named seeds always force-reset so you always get a clean state for that
+user. The param is stripped from the URL after seeding so reloads behave
+normally.
+
+Alice is the default preview browser user. Bob and Carol are driven by the
+peer-helper (tests/peer-helper/) to test multi-user interactions.
 */
 
 import { DATA_MODEL_VERSION } from "../models/data-model.js";
 import {
   FRIENDSHIP_STATUS_ACCEPTED,
   FRIENDSHIP_STATUS_PENDING_INCOMING,
+  FRIENDSHIP_STATUS_PENDING_OUTGOING,
 } from "../utils/friendships.js";
 import { clearAppState, loadAppState, saveAppState } from "../storage/indexeddb.js";
 
 const SEED_PARAM = "seed";
 
-// Fixed test keypair so seeded state is reproducible across preview restarts.
-const SEED_USER = {
+// ---------------------------------------------------------------------------
+// Fixed keypairs — deterministic across restarts so peer messages actually
+// route correctly when Alice (preview) and Bob/Carol (peer-helper) connect.
+// ---------------------------------------------------------------------------
+
+const ALICE = {
   publicKeyNpub: "npub10c0r3r9u0qfyk5q58r5zm73cgj7p23erlmyyppq2wj26quksp45s5xf43v",
   publicKeyHex: "7e1e388cbc78124b501438e82dfa3844bc154723fec840840a7495a072d00d69",
   privateKeyNsec: "nsec1s9ervmd04ueyp7km3qphq3skaejtsuf546kw47f8yp96mz6qmmxqvpcdde",
   privateKeyHex: "8172366dafaf3240fadb8803704616ee64b87134aeaceaf927204bad8b40decc",
+  name: "Alice",
 };
 
-// Stable fake npubs for seeded friends. Not cryptographically valid — fine for
-// local UI testing since peer messages to them will just sit in the outbox.
-const aliceId = "npub1seedaliceaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaalice";
-const bobId = "npub1seedbobbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbob";
-const carolId = "npub1seedcarolccccccccccccccccccccccccccccccccccccccccccccccccarol";
+const BOB = {
+  publicKeyNpub: "npub1l7vvz68z2405e5zfz85z76ecn942vmevzevgcmapdqyd4zlqvmns7zhjhj",
+  publicKeyHex: "ff98c168e2555f4cd04911e82f6b38996aa66f2c16588c6fa16808da8be066e7",
+  privateKeyNsec: "nsec1rewgmu4zkssflszcz5q230sc5d349kzcrjqg44pdq8nkaudjk9lqhkjyvd",
+  privateKeyHex: "1e5c8df2a2b4209fc0581500a8be18a36352d8581c808ad42d01e76ef1b2b17e",
+  name: "Bob",
+};
 
-const buildSeedState = () => {
-  const { privateKeyHex, privateKeyNsec, publicKeyHex, publicKeyNpub } = SEED_USER;
+const CAROL = {
+  publicKeyNpub: "npub1n9890qe5nvt4n3hp6pvdruela4xmtdjda6wqac3ayl2r627feqssxm6cvp",
+  publicKeyHex: "994e5783349b1759c6e1d058d1f33fed4db5b64dee9c0ee23d27d43d2bc9c821",
+  privateKeyNsec: "nsec1up74jyx7us6ad3efxqejxnx43jhq665ls65k7ku7me2c374dp9gqj28uck",
+  privateKeyHex: "e07d5910dee435d6c7293033234cd58cae0d6a9f86a96f5b9ede5588faad0950",
+  name: "Carol",
+};
 
+// ---------------------------------------------------------------------------
+// State builders
+// ---------------------------------------------------------------------------
+
+const buildAliceState = () => {
   const now = new Date();
-  const iso = (offsetDays) =>
-    new Date(now.getTime() - offsetDays * 86400000).toISOString();
-  const date = (offsetDays) => iso(offsetDays).slice(0, 10);
+  const iso = (d) => new Date(now.getTime() - d * 86400000).toISOString();
+  const date = (d) => iso(d).slice(0, 10);
 
   return {
     model_version: DATA_MODEL_VERSION,
     user: {
-      id: publicKeyNpub,
-      name: "Claude Preview",
-      public_key: publicKeyNpub,
-      public_key_hex: publicKeyHex,
-      private_key: privateKeyNsec,
-      private_key_hex: privateKeyHex,
+      id: ALICE.publicKeyNpub,
+      name: ALICE.name,
+      public_key: ALICE.publicKeyNpub,
+      public_key_hex: ALICE.publicKeyHex,
+      private_key: ALICE.privateKeyNsec,
+      private_key_hex: ALICE.privateKeyHex,
       connections: [
         {
-          person_id: aliceId,
-          person_name: "Alice",
-          friendship_status: FRIENDSHIP_STATUS_ACCEPTED,
-          debt_eur: -15,
-          trust_credit_limit_eur: 100,
-          recent_transactions: [
-            { id: "tx-seed-1", date: date(1), amount_eur: -15, note: "Lunch" },
-            { id: "tx-seed-2", date: date(4), amount_eur: 25, note: "Taxi share" },
-            { id: "tx-seed-3", date: date(10), amount_eur: -25, note: "Concert ticket" },
-          ],
-          last_synced_at: iso(0),
-        },
-        {
-          person_id: bobId,
-          person_name: "Bob",
+          person_id: BOB.publicKeyNpub,
+          person_name: BOB.name,
           friendship_status: FRIENDSHIP_STATUS_ACCEPTED,
           debt_eur: 42,
           trust_credit_limit_eur: 200,
@@ -83,8 +94,8 @@ const buildSeedState = () => {
           last_synced_at: iso(1),
         },
         {
-          person_id: carolId,
-          person_name: "Carol",
+          person_id: CAROL.publicKeyNpub,
+          person_name: CAROL.name,
           friendship_status: FRIENDSHIP_STATUS_PENDING_INCOMING,
           debt_eur: 0,
           trust_credit_limit_eur: 0,
@@ -94,26 +105,16 @@ const buildSeedState = () => {
       ],
     },
     contacts: {
-      [aliceId]: { id: aliceId, public_key: aliceId, name: "Alice" },
-      [bobId]: { id: bobId, public_key: bobId, name: "Bob" },
-      [carolId]: { id: carolId, public_key: carolId, name: "Carol" },
+      [BOB.publicKeyNpub]: { id: BOB.publicKeyNpub, public_key: BOB.publicKeyNpub, public_key_hex: BOB.publicKeyHex, name: BOB.name },
+      [CAROL.publicKeyNpub]: { id: CAROL.publicKeyNpub, public_key: CAROL.publicKeyNpub, public_key_hex: CAROL.publicKeyHex, name: CAROL.name },
     },
     logs: [
       {
-        id: "log-seed-1",
-        timestamp: iso(1),
-        text: "You sent €15.00 to **Alice**",
-        message: "Lunch",
-        friend_id: aliceId,
-        amount_eur: 15,
-        transaction_id: "tx-seed-1",
-      },
-      {
         id: "log-seed-2",
         timestamp: iso(2),
-        text: "**Bob** sent you €42.00",
+        text: `**${BOB.name}** sent you €42.00`,
         message: "Groceries",
-        friend_id: bobId,
+        friend_id: BOB.publicKeyNpub,
         amount_eur: 42,
         transaction_id: "tx-seed-4",
       },
@@ -123,12 +124,117 @@ const buildSeedState = () => {
   };
 };
 
+const buildBobState = () => {
+  const now = new Date();
+  const iso = (d) => new Date(now.getTime() - d * 86400000).toISOString();
+  const date = (d) => iso(d).slice(0, 10);
+
+  return {
+    model_version: DATA_MODEL_VERSION,
+    user: {
+      id: BOB.publicKeyNpub,
+      name: BOB.name,
+      public_key: BOB.publicKeyNpub,
+      public_key_hex: BOB.publicKeyHex,
+      private_key: BOB.privateKeyNsec,
+      private_key_hex: BOB.privateKeyHex,
+      connections: [
+        {
+          person_id: ALICE.publicKeyNpub,
+          person_name: ALICE.name,
+          friendship_status: FRIENDSHIP_STATUS_ACCEPTED,
+          debt_eur: -42,
+          trust_credit_limit_eur: 200,
+          recent_transactions: [
+            { id: "tx-seed-4", date: date(2), amount_eur: -42, note: "Groceries" },
+          ],
+          last_synced_at: iso(1),
+        },
+        {
+          person_id: CAROL.publicKeyNpub,
+          person_name: CAROL.name,
+          friendship_status: FRIENDSHIP_STATUS_ACCEPTED,
+          debt_eur: 0,
+          trust_credit_limit_eur: 100,
+          recent_transactions: [],
+          last_synced_at: iso(3),
+        },
+      ],
+    },
+    contacts: {
+      [ALICE.publicKeyNpub]: { id: ALICE.publicKeyNpub, public_key: ALICE.publicKeyNpub, public_key_hex: ALICE.publicKeyHex, name: ALICE.name },
+      [CAROL.publicKeyNpub]: { id: CAROL.publicKeyNpub, public_key: CAROL.publicKeyNpub, public_key_hex: CAROL.publicKeyHex, name: CAROL.name },
+    },
+    logs: [],
+    outbox: [],
+    processed_peer_message_ids: [],
+  };
+};
+
+const buildCarolState = () => {
+  const now = new Date();
+  const iso = (d) => new Date(now.getTime() - d * 86400000).toISOString();
+
+  return {
+    model_version: DATA_MODEL_VERSION,
+    user: {
+      id: CAROL.publicKeyNpub,
+      name: CAROL.name,
+      public_key: CAROL.publicKeyNpub,
+      public_key_hex: CAROL.publicKeyHex,
+      private_key: CAROL.privateKeyNsec,
+      private_key_hex: CAROL.privateKeyHex,
+      connections: [
+        {
+          person_id: ALICE.publicKeyNpub,
+          person_name: ALICE.name,
+          friendship_status: FRIENDSHIP_STATUS_PENDING_OUTGOING,
+          debt_eur: 0,
+          trust_credit_limit_eur: 0,
+          recent_transactions: [],
+          last_synced_at: "",
+        },
+        {
+          person_id: BOB.publicKeyNpub,
+          person_name: BOB.name,
+          friendship_status: FRIENDSHIP_STATUS_ACCEPTED,
+          debt_eur: 0,
+          trust_credit_limit_eur: 100,
+          recent_transactions: [],
+          last_synced_at: iso(3),
+        },
+      ],
+    },
+    contacts: {
+      [ALICE.publicKeyNpub]: { id: ALICE.publicKeyNpub, public_key: ALICE.publicKeyNpub, public_key_hex: ALICE.publicKeyHex, name: ALICE.name },
+      [BOB.publicKeyNpub]: { id: BOB.publicKeyNpub, public_key: BOB.publicKeyNpub, public_key_hex: BOB.publicKeyHex, name: BOB.name },
+    },
+    logs: [],
+    outbox: [],
+    processed_peer_message_ids: [],
+  };
+};
+
+const SEED_BUILDERS = {
+  alice: buildAliceState,
+  bob: buildBobState,
+  carol: buildCarolState,
+};
+
+// ---------------------------------------------------------------------------
+// URL helpers
+// ---------------------------------------------------------------------------
+
 const stripSeedParam = () => {
   const url = new URL(window.location.href);
   if (!url.searchParams.has(SEED_PARAM)) return;
   url.searchParams.delete(SEED_PARAM);
   window.history.replaceState(null, "", url.toString() + window.location.hash);
 };
+
+// ---------------------------------------------------------------------------
+// Entry point
+// ---------------------------------------------------------------------------
 
 export const applyDevSeedIfRequested = async () => {
   // Test/harness hook: an init-script may inject a full app state on
@@ -153,21 +259,21 @@ export const applyDevSeedIfRequested = async () => {
   if (!params.has(SEED_PARAM)) return;
 
   const mode = params.get(SEED_PARAM);
-  const force = mode === "reset";
+
+  // "reset" is a backward-compat alias for "alice"
+  const userName = mode === "reset" || mode === "" || mode === null ? "alice" : mode.toLowerCase();
+  const builder = SEED_BUILDERS[userName];
+
+  if (!builder) {
+    // Unknown seed name — strip param and do nothing
+    stripSeedParam();
+    return;
+  }
 
   try {
-    if (force) {
-      await clearAppState();
-    } else {
-      const existing = await loadAppState();
-      if (existing && existing.user) {
-        stripSeedParam();
-        return;
-      }
-    }
-
-    await saveAppState(buildSeedState());
-  } catch (error) {
+    await clearAppState();
+    await saveAppState(builder());
+  } catch {
     // seeding is best-effort; fall through to normal flow
   }
 
