@@ -8,6 +8,19 @@ npm run dev   # starts server at http://localhost:3000 with auto-reload
 
 ---
 
+## Commits and deploys
+
+Do **not** run `git commit` or `git push` automatically after finishing a
+task. When work is complete, propose a commit message and ask the user
+whether to commit and push — wait for explicit confirmation before running
+any git write commands.
+
+**Exception:** if the user says "deploy" (or otherwise explicitly asks to
+commit/push), that is the trigger to run `git add` + `git commit` +
+`git push origin main` with a well-crafted message.
+
+---
+
 ## Browser tools — which to use
 
 **Preview browser (`preview_*` tools) is the only tool for testing this app's UI.**
