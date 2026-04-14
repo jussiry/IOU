@@ -1,0 +1,75 @@
+<div class="send-content request-content">
+  <div class="request-tabs" data-section="request-tabs">
+    <button class="request-tab request-tab--active" type="button" data-tab="request-friend">
+      Send request
+    </button>
+    <button class="request-tab" type="button" data-tab="qr-code">
+      Use QR code
+    </button>
+  </div>
+  <div class="request-panel" data-panel="request-friend">
+    <div class="balance-hero trust-hero send-card">
+      <form class="send-form" aria-label="Request payment form">
+        <label class="form-field form-field-inline">
+          <span class="form-label">Request from</span>
+          <select class="form-select" data-bind="request-to"></select>
+        </label>
+        <label class="form-field form-field-inline">
+          <span class="form-label">Amount (EUR)</span>
+          <input
+            class="form-input"
+            type="number"
+            inputmode="decimal"
+            min="0"
+            step="1"
+            placeholder="0.00"
+            data-bind="request-amount"
+          />
+        </label>
+        <label class="form-field">
+          <span class="form-label"></span>
+          <textarea
+            class="form-textarea"
+            rows="1"
+            placeholder="Add a note"
+            data-bind="request-message"
+          ></textarea>
+        </label>
+        <button class="primary-button" type="button" data-bind="request-submit">
+          <svg class="primary-button-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <use href="#icon-request" />
+          </svg>
+          Request payment
+        </button>
+      </form>
+    </div>
+  </div>
+  <div class="request-panel" data-panel="qr-code" hidden>
+    <div class="balance-hero trust-hero send-card">
+      <form class="send-form request-qr-form" aria-label="QR code form">
+        <label class="form-field form-field-inline">
+          <span class="form-label">Amount (EUR)</span>
+          <input
+            class="form-input"
+            type="number"
+            inputmode="decimal"
+            min="0"
+            step="1"
+            placeholder="0.00"
+            data-bind="qr-amount"
+          />
+        </label>
+        <label class="form-field">
+          <span class="form-label"></span>
+          <textarea
+            class="form-textarea"
+            rows="1"
+            placeholder="Add a note"
+            data-bind="qr-message"
+          ></textarea>
+        </label>
+        <div class="request-qr-display" data-bind="request-qr"></div>
+      </form>
+    </div>
+  </div>
+</div>

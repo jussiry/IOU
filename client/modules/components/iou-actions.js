@@ -13,10 +13,10 @@ export const initIouActions = (root, friendId) => {
     });
   }
 
-  const receiveButton = root.querySelector('[data-action="receive"]');
-  if (receiveButton) {
-    receiveButton.addEventListener("click", () => {
-      window.location.hash = "receive";
+  const requestButton = root.querySelector('[data-action="request"]');
+  if (requestButton) {
+    requestButton.addEventListener("click", () => {
+      window.location.hash = "request";
     });
   }
 };

@@ -63,6 +63,25 @@
   text-align: right;
 }
 
+.send-form .form-input,
+.send-form .form-select {
+  font-size: 20px;
+  font-weight: 700;
+  text-align: left;
+  color: var(--ink);
+}
+
+/* Hide number input spinners — too small to be practical on mobile */
+.form-input[type="number"]::-webkit-inner-spin-button,
+.form-input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.form-input[type="number"] {
+  -moz-appearance: textfield;
+}
+
 .form-textarea {
   border: 1px solid rgba(0, 0, 0, 0.08);
   text-align: left;

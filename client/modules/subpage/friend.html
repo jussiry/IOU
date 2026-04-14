@@ -36,6 +36,22 @@
       </button>
     </div>
   </div>
+  <div class="actionable-box surface-box" data-section="payment-request" hidden>
+    <div class="actionable-box-label" data-bind="payment-request-label"></div>
+    <div class="actionable-box-actions" data-section="payment-request-accept-actions" hidden>
+      <button class="friend-inline-action friend-inline-action--primary surface-box" type="button" data-action="accept-payment-request">
+        Pay
+      </button>
+      <button class="friend-inline-action surface-box" type="button" data-action="decline-payment-request">
+        Decline
+      </button>
+    </div>
+    <div class="actionable-box-actions" data-section="payment-request-cancel-actions" hidden>
+      <button class="friend-inline-action surface-box" type="button" data-action="cancel-payment-request">
+        Cancel request
+      </button>
+    </div>
+  </div>
   <div class="friend-stats" aria-label="Debt and trust">
     <div class="friend-stat surface-box" data-section="friend-debt">
       <div class="friend-stat-label" data-bind="debt-label">owes you</div>

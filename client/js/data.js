@@ -24,6 +24,8 @@ import {
   PEER_MESSAGE_TYPE_FRIEND_ACCEPT,
   PEER_MESSAGE_TYPE_FRIEND_REQUEST,
   PEER_MESSAGE_TYPE_NAME_CHANGED,
+  PEER_MESSAGE_TYPE_PAYMENT_REQUEST,
+  PEER_MESSAGE_TYPE_PAYMENT_REQUEST_RESPONSE,
   PEER_MESSAGE_TYPE_TRANSACTION_CREATED,
 } from "./realtime/peer-messages.js";
 import {
@@ -648,6 +650,162 @@ export const createTransaction = async ({ friendId, amount, message }) => {
     },
   });
 
+  return persistAndBuildView(state);
+};
+
+// ---------------------------------------------------------------------------
+// Payment requests
+// ---------------------------------------------------------------------------
+
+export const requestPayment = async ({ friendId, amount, message }) => {
+  const normalizedFriendId = asTrimmedString(friendId);
+  const normalizedAmount = normalizeCurrencyAmount(amount, NaN);
+  if (!normalizedFriendId || !Number.isFinite(normalizedAmount) || normalizedAmount <= 0) {
+    return loadData();
+  }
+
+  const state = await loadState();
+  if (!hasUser(state)) {
+    return null;
+  }
+
+  const displayName = getDisplayName(state, normalizedFriendId);
+  const userConnection = getUserConnection(state, normalizedFriendId);
+  if (!userConnection || !isAcceptedFriendshipStatus(userConnection.friendship_status)) {
+    return loadData();
+  }
+
+  const trimmedMessage = asTrimmedString(message);
+  const requestId = createId("pr");
+
+  userConnection.pending_payment_request = {
+    id: requestId,
+    amount_eur: normalizedAmount,
+    note: trimmedMessage || "",
+    is_incoming: false,
+    created_at: new Date().toISOString(),
+  };
+
+  appendLog(state, {
+    text: `You requested €${normalizedAmount.toFixed(2)} from **${displayName}**`,
+    message: trimmedMessage,
+    friendId: normalizedFriendId,
+    amount: normalizedAmount,
+  });
+
+  queuePeerMessage(state, {
+    toUserId: normalizedFriendId,
+    type: PEER_MESSAGE_TYPE_PAYMENT_REQUEST,
+    payload: {
+      request_id: requestId,
+      amount_eur: normalizedAmount,
+      note: trimmedMessage,
+    },
+  });
+
+  return persistAndBuildView(state);
+};
+
+export const respondToPaymentRequest = async (friendId, accepted) => {
+  const normalizedFriendId = asTrimmedString(friendId);
+  if (!normalizedFriendId) {
+    return loadData();
+  }
+
+  const state = await loadState();
+  if (!hasUser(state)) {
+    return null;
+  }
+
+  const displayName = getDisplayName(state, normalizedFriendId);
+  const userConnection = getUserConnection(state, normalizedFriendId);
+  if (!userConnection || !isAcceptedFriendshipStatus(userConnection.friendship_status)) {
+    return loadData();
+  }
+
+  const pendingRequest = userConnection.pending_payment_request;
+  if (!pendingRequest || !pendingRequest.is_incoming) {
+    return loadData();
+  }
+
+  const requestId = pendingRequest.id;
+  const requestAmount = pendingRequest.amount_eur;
+  const requestNote = pendingRequest.note;
+
+  userConnection.pending_payment_request = null;
+
+  queuePeerMessage(state, {
+    toUserId: normalizedFriendId,
+    type: PEER_MESSAGE_TYPE_PAYMENT_REQUEST_RESPONSE,
+    payload: {
+      request_id: requestId,
+      accepted,
+    },
+  });
+
+  if (accepted) {
+    // Create the transaction as if the user sent an IOU
+    const transactionId = createId("tx");
+    const date = new Date().toISOString().slice(0, 10);
+    const note = requestNote || "Payment request accepted";
+
+    userConnection.debt_eur = (userConnection.debt_eur || 0) - requestAmount;
+    userConnection.recent_transactions.unshift(
+      createTransactionModel({
+        id: transactionId,
+        date,
+        amount_eur: -requestAmount,
+        note,
+      })
+    );
+
+    appendLog(state, {
+      text: `You accepted payment request of €${requestAmount.toFixed(2)} from **${displayName}**`,
+      message: requestNote,
+      friendId: normalizedFriendId,
+      amount: requestAmount,
+      transactionId,
+    });
+
+    queuePeerMessage(state, {
+      toUserId: normalizedFriendId,
+      type: PEER_MESSAGE_TYPE_TRANSACTION_CREATED,
+      payload: {
+        transaction_id: transactionId,
+        amount_eur: requestAmount,
+        date,
+        note,
+        message: requestNote,
+      },
+    });
+  } else {
+    appendLog(state, {
+      text: `You declined payment request of €${requestAmount.toFixed(2)} from **${displayName}**`,
+      friendId: normalizedFriendId,
+      amount: requestAmount,
+    });
+  }
+
+  return persistAndBuildView(state);
+};
+
+export const dismissPaymentRequest = async (friendId) => {
+  const normalizedFriendId = asTrimmedString(friendId);
+  if (!normalizedFriendId) {
+    return loadData();
+  }
+
+  const state = await loadState();
+  if (!hasUser(state)) {
+    return null;
+  }
+
+  const userConnection = getUserConnection(state, normalizedFriendId);
+  if (!userConnection) {
+    return loadData();
+  }
+
+  userConnection.pending_payment_request = null;
   return persistAndBuildView(state);
 };
 

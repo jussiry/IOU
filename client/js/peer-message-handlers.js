@@ -33,6 +33,8 @@ import {
   PEER_MESSAGE_TYPE_FRIEND_REJECT,
   PEER_MESSAGE_TYPE_FRIEND_REQUEST,
   PEER_MESSAGE_TYPE_NAME_CHANGED,
+  PEER_MESSAGE_TYPE_PAYMENT_REQUEST,
+  PEER_MESSAGE_TYPE_PAYMENT_REQUEST_RESPONSE,
   PEER_MESSAGE_TYPE_RECEIVED,
   PEER_MESSAGE_TYPE_TRANSACTION_CREATED,
   PEER_RECEIPT_RESULT_IGNORED,
@@ -245,6 +247,67 @@ const applyNameChangedMessage = (state, message) => {
   return friendNotification(`${oldName} changed their name to ${newName}`, message.from_user_id);
 };
 
+const applyPaymentRequestMessage = (state, message) => {
+  const amount = normalizeCurrencyAmount(message.payload?.amount_eur, NaN);
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return null;
+  }
+
+  const displayName = getDisplayName(state, message.from_user_id);
+  const userConnection = getUserConnection(state, message.from_user_id);
+  if (!userConnection || !isAcceptedFriendshipStatus(userConnection.friendship_status)) {
+    return null;
+  }
+
+  const note = asTrimmedString(message.payload?.note) || "";
+  const requestId = asTrimmedString(message.payload?.request_id) || message.id;
+
+  userConnection.pending_payment_request = {
+    id: requestId,
+    amount_eur: amount,
+    note,
+    is_incoming: true,
+    created_at: message.created_at || new Date().toISOString(),
+  };
+
+  return friendNotification(
+    `${displayName} requested €${amount.toFixed(2)}`,
+    message.from_user_id,
+  );
+};
+
+const applyPaymentRequestResponseMessage = (state, message) => {
+  const displayName = getDisplayName(state, message.from_user_id);
+  const userConnection = getUserConnection(state, message.from_user_id);
+  if (!userConnection || !isAcceptedFriendshipStatus(userConnection.friendship_status)) {
+    return null;
+  }
+
+  const pendingRequest = userConnection.pending_payment_request;
+  if (!pendingRequest || pendingRequest.is_incoming) {
+    return null;
+  }
+
+  const requestId = asTrimmedString(message.payload?.request_id);
+  if (requestId && pendingRequest.id && requestId !== pendingRequest.id) {
+    return null;
+  }
+
+  const accepted = message.payload?.accepted === true;
+  userConnection.pending_payment_request = null;
+
+  if (accepted) {
+    return friendNotification(
+      `${displayName} accepted your payment request`,
+      message.from_user_id,
+    );
+  }
+  return friendNotification(
+    `${displayName} declined your payment request`,
+    message.from_user_id,
+  );
+};
+
 const applyTransactionCreatedMessage = (state, message) => {
   const amount = normalizeCurrencyAmount(message.payload?.amount_eur, NaN);
   if (!Number.isFinite(amount) || amount <= 0) {
@@ -317,6 +380,12 @@ export const routeInboundMessage = (state, message) => {
       break;
     case PEER_MESSAGE_TYPE_TRUST_LIMIT_SUGGESTION:
       result = applyTrustLimitSuggestionMessage(state, message);
+      break;
+    case PEER_MESSAGE_TYPE_PAYMENT_REQUEST:
+      result = applyPaymentRequestMessage(state, message);
+      break;
+    case PEER_MESSAGE_TYPE_PAYMENT_REQUEST_RESPONSE:
+      result = applyPaymentRequestResponseMessage(state, message);
       break;
     case PEER_MESSAGE_TYPE_TRANSACTION_CREATED:
       result = applyTransactionCreatedMessage(state, message);

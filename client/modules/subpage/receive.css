@@ -1,9 +1,0 @@
-.receive-qr-display {
-  display: flex;
-  justify-content: center;
-  padding: 8px 0 0;
-}
-
-.receive-qr-display canvas {
-  border-radius: 10px;
-}

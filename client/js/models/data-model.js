@@ -98,6 +98,15 @@ export const createConnectionModel = (input = {}) => {
       : null,
     recent_transactions: transactions,
     last_synced_at: asTrimmedStringOrDefault(input.last_synced_at),
+    pending_payment_request: input.pending_payment_request && typeof input.pending_payment_request === "object"
+      ? {
+          id: asTrimmedStringOrDefault(input.pending_payment_request.id),
+          amount_eur: asNumberOrDefault(input.pending_payment_request.amount_eur, 0),
+          note: asTrimmedStringOrDefault(input.pending_payment_request.note),
+          is_incoming: input.pending_payment_request.is_incoming === true,
+          created_at: asTrimmedStringOrDefault(input.pending_payment_request.created_at),
+        }
+      : null,
   };
 };
 

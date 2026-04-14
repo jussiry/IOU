@@ -1,0 +1,41 @@
+.request-tabs {
+  display: flex;
+  gap: 0;
+  margin: 7px 20px;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid rgba(17, 17, 17, 0.08);
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.request-tab {
+  flex: 1;
+  padding: 10px 8px;
+  border: none;
+  background: none;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.request-tab--active {
+  background: rgba(244, 184, 96, 0.35);
+  color: var(--ink);
+}
+
+.request-panel[hidden] {
+  display: none;
+}
+
+.request-qr-display {
+  display: flex;
+  justify-content: center;
+  padding: 8px 0 0;
+}
+
+.request-qr-display canvas {
+  border-radius: 10px;
+}

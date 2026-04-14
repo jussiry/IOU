@@ -11,6 +11,7 @@ import {
   ensureVersion,
   hasUserData,
   loadData,
+  requestPayment,
   subscribeToDataChanges,
   updateTrustLimit,
 } from "./data.js";
@@ -23,7 +24,7 @@ import { bindFriendDetail } from "../modules/subpage/friend.js";
 import { bindAddFriend } from "../modules/subpage/add-friend.js";
 import { initIouActions } from "../modules/components/iou-actions.js";
 import { bindSend } from "../modules/subpage/send.js";
-import { bindReceive } from "../modules/subpage/receive.js";
+import { bindRequest } from "../modules/subpage/request.js";
 import { bindTrust } from "../modules/subpage/trust.js";
 import { createRealtimeClient } from "./realtime/client.js";
 import { subscribeToPeerStatusChanges } from "./realtime/peer-status.js";
@@ -55,7 +56,7 @@ const templatePaths = {
   friend: "modules/subpage/friend.html",
   addFriend: "modules/subpage/add-friend.html",
   send: "modules/subpage/send.html",
-  receive: "modules/subpage/receive.html",
+  request: "modules/subpage/request.html",
   trust: "modules/subpage/trust.html",
   trustLimitField: "modules/subpage/trust-limit-field.html",
   trustExplainer: "modules/subpage/trust-explainer.html",
@@ -190,8 +191,8 @@ const parseRoute = () => {
     const parts = hash.split("/");
     return createSubpageRoute("send", parts[1] || null);
   }
-  if (hash === "receive") {
-    return createSubpageRoute("receive");
+  if (hash === "request") {
+    return createSubpageRoute("request");
   }
   if (hash.startsWith("trust/")) {
     const friendId = hash.replace("trust/", "");
@@ -325,12 +326,22 @@ const loadPage = async (route) => {
           navigateTo(`friend/${payload.friendId}`);
         });
       }
-    } else if (route.type === "receive") {
-      const receiveHtml = await fetchTemplate(templatePaths.receive);
-      renderSubpageContent(pageView, receiveHtml);
-      bindReceive(pageView, data);
-      document.title = "IOU — Receive";
+    } else if (route.type === "request") {
+      const requestHtml = await fetchTemplate(templatePaths.request);
+      renderSubpageContent(pageView, requestHtml);
+      const requestHandlers = bindRequest(pageView, data);
+      document.title = "IOU — Request";
       setFallbackBackNavigation(pageView);
+      if (requestHandlers?.submitEl) {
+        requestHandlers.submitEl.addEventListener("click", async () => {
+          const payload = requestHandlers.getPayload();
+          if (!payload.friendId || !Number.isFinite(payload.amount) || payload.amount <= 0) {
+            return;
+          }
+          await requestPayment(payload);
+          navigateTo(`friend/${payload.friendId}`);
+        });
+      }
     } else if (route.type === "trust") {
       const [trustHtml, trustLimitFieldHtml, trustExplainerHtml] = await Promise.all([
         fetchTemplate(templatePaths.trust),
