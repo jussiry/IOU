@@ -6,33 +6,40 @@
 npm run dev   # starts server at http://localhost:3000 with auto-reload
 ```
 
-The preview browser is always seeded as **Alice**. Open it at:
+---
 
-```
-http://localhost:3000/?seed=alice
-```
+## Browser tools — which to use
 
-or just use the Preview tool — it opens `localhost:3000` and the seed is applied automatically on first load.
+**Preview browser (`preview_*` tools) is the only tool for testing this app's UI.**
+
+- Use `preview_screenshot` and `preview_snapshot` to check what Alice sees
+- Use `preview_click`, `preview_fill`, `preview_eval` to interact
+- Do **not** use the Chrome plugin (`mcp__Claude_in_Chrome__*`) for localhost
+  testing — it operates on the real browser and shares the same IndexedDB as
+  the preview browser, which can corrupt Alice's seeded state
+
+The Chrome plugin is only for cases the preview tools genuinely cannot handle
+(e.g. file uploads, keyboard shortcuts). For normal UI verification it is
+never needed.
 
 ---
 
 ## Dev seed users
 
-Three fixed identities share the same keypairs across the preview browser and
-the peer helper, so they can actually connect via WebRTC when both are running.
+The preview browser is always **Alice**. On first load it seeds automatically
+via `?seed=alice` (no-op if a user already exists). Three fixed identities
+share real keypairs so the preview browser and peer helper can connect via
+WebRTC.
 
-| User  | Seed URL             | Role in testing             |
-|-------|----------------------|-----------------------------|
-| Alice | `?seed=alice`        | Default preview browser user |
-| Bob   | `?seed=bob`          | Peer helper (second user)    |
-| Carol | `?seed=carol`        | Peer helper (third user)     |
+| User  | Seed URL      | Role                        |
+|-------|---------------|-----------------------------|
+| Alice | `?seed=alice` | Preview browser (main user) |
+| Bob   | `?seed=bob`   | Peer helper (secondary)     |
+| Carol | `?seed=carol` | Peer helper (secondary)     |
 
-`?seed=reset` is a backward-compat alias for `?seed=alice`.
-
-**Seeds only apply when IndexedDB is empty.** The preview browser always
-starts with empty state, so `?seed=alice` on first open just works. If you
-need to switch users or start fresh, navigate to `/?removeUser` first — that
-clears IndexedDB so the next `?seed=<name>` can apply.
+**Seeds only apply when IndexedDB is empty.** To switch users or start fresh,
+navigate to `/?removeUser` first — that clears IndexedDB — then open
+`/?seed=<name>`.
 
 **Starting state:**
 - Alice has Bob as an accepted friend and Carol as a pending incoming request
@@ -41,12 +48,36 @@ clears IndexedDB so the next `?seed=<name>` can apply.
 
 ---
 
+## Verification workflow
+
+1. Make the change
+2. Use `preview_screenshot` or `preview_snapshot` to verify Alice's view
+3. If the change requires a second user to act first, run the peer helper from
+   Bash, then snapshot Alice's view
+
+### Page transitions
+
+There is a **400 ms animated transition** between pages. After any navigation
+click (nav buttons, Back, opening a friend row, etc.) wait at least 400 ms
+before screenshotting or querying the DOM.
+
+```js
+// in preview_eval
+await new Promise(r => setTimeout(r, 400));
+```
+
+`preview_snapshot` reads the DOM directly and shows the correct content even
+during the animation, so prefer it over `preview_screenshot` when you only
+need to check element presence or text.
+
+---
+
 ## Testing multi-user interactions
 
-To test how Alice's UI reacts to something Bob does:
-
-1. Open the preview browser at `/?seed=alice` (Alice's view)
-2. Run the peer helper in a terminal to drive Bob headlessly:
+To test how Alice's UI reacts to something Bob or Carol does, run the peer
+helper from Bash. It opens a headless Chromium with isolated storage, seeds
+the user, performs the action, waits for delivery, then closes — without
+touching the preview browser's state.
 
 ```bash
 npm run peer -- --user bob --action changeName --value Robert
@@ -55,70 +86,34 @@ npm run peer -- --user carol --action sendPaymentRequest --amount 25 --note "Din
 npm run peer -- --user bob --action cancelPaymentRequest
 ```
 
-The peer helper opens a headless Chromium, seeds the user, connects to the
-same dev server, performs the action, waits 2 s for delivery, then closes.
-
-Add `--headed` to watch the peer's browser while it acts:
-
-```bash
-npm run peer -- --user bob --action changeName --value Robert --headed
-```
+Add `--headed` to watch the peer's browser window while it acts.
 
 ### Available peer actions
 
-| Action                | Required args          | What it does                              |
-|-----------------------|------------------------|-------------------------------------------|
-| `changeName`          | `--value <name>`       | Changes display name, triggers notification on Alice's friend page |
-| `acceptFriend`        | —                      | Accepts first incoming friend request     |
-| `rejectFriend`        | —                      | Rejects first incoming friend request     |
-| `sendPaymentRequest`  | `--amount <n> [--note]`| Sends payment request to first friend     |
-| `cancelPaymentRequest`| —                      | Cancels outgoing payment request          |
+| Action                | Required args           | What it does                                      |
+|-----------------------|-------------------------|---------------------------------------------------|
+| `changeName`          | `--value <name>`        | Changes display name, triggers notification on Alice's friend page |
+| `acceptFriend`        | —                       | Accepts first incoming friend request             |
+| `rejectFriend`        | —                       | Rejects first incoming friend request             |
+| `sendPaymentRequest`  | `--amount <n> [--note]` | Sends payment request to first friend             |
+| `cancelPaymentRequest`| —                       | Cancels outgoing payment request                  |
 
 ---
 
 ## E2E tests (full two-client Playwright)
 
-These run two complete browser instances with no dev server dependency — the
-harness starts its own server on port 3001.
+These run two complete browser instances against a dedicated test server on
+port 3001 — independent of the dev server and preview browser.
 
 ```bash
-npm run test:e2e:two-client                        # default scenario
 npm run test:e2e:friend-request-online
 npm run test:e2e:reload-reconnect
 node tests/two-client-e2e/run.cjs --scenario turn-relay
 node tests/two-client-e2e/run.cjs --scenario server-queue-delivery
 ```
 
-Scenarios live in `tests/two-client-e2e/scenarios/`. To add a new scenario,
-create a `.cjs` file that exports `{ name, run }` and register it in
-`tests/two-client-e2e/run.cjs`.
-
----
-
-## Verification workflow
-
-After making a UI change that is visible in the browser:
-
-1. Use the `preview_screenshot` or `preview_snapshot` tools to check the result
-2. If you need a second user's action to trigger something, run the peer helper
-   from Bash and then snapshot Alice's view
-3. For complex multi-step flows, write an E2E scenario instead
-
-### Page transitions
-
-There is a **400 ms animated transition** between pages. After clicking any
-action that navigates to a new page (nav buttons, Back, opening a friend row,
-etc.) wait at least 400 ms before taking a screenshot or querying the DOM —
-otherwise you may capture the outgoing page mid-animation.
-
-```js
-// preview_eval example
-await new Promise(r => setTimeout(r, 400));
-```
-
-Use `preview_snapshot` instead of `preview_screenshot` when you only need to
-check element presence — it reads the DOM directly and is not affected by the
-animation.
+Scenarios live in `tests/two-client-e2e/scenarios/`. Add a `.cjs` file that
+exports `{ name, run }` and register it in `tests/two-client-e2e/run.cjs`.
 
 ---
 
@@ -126,10 +121,10 @@ animation.
 
 | Path | Purpose |
 |------|---------|
-| `client/js/dev/seed.js` | Dev seed — user identities and starting state |
-| `client/js/models/data-model.js` | `createConnectionModel` — add new connection fields here |
+| `client/js/dev/seed.js` | Dev seed — user identities and starting states |
+| `client/js/models/data-model.js` | `createConnectionModel` — register new connection fields here |
 | `client/modules/subpage/friend.js` | Friend detail page binding |
 | `client/modules/subpage/friend.html` | Actionable box templates |
-| `tests/peer-helper/run.cjs` | Headless second-user driver |
-| `tests/two-client-e2e/fixtures/paired-friends.cjs` | Shared keypairs (Alice/Bob/Carol) |
+| `tests/peer-helper/run.cjs` | Headless secondary-user driver |
+| `tests/two-client-e2e/fixtures/paired-friends.cjs` | Shared keypairs (Alice / Bob / Carol) |
 | `tests/two-client-e2e/scenarios/` | E2E scenario modules |
