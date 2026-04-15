@@ -25,6 +25,7 @@ import {
 import {
   isPeerEnvelope,
   unwrapPeerEnvelope,
+  verifyLedgerEntrySignature,
   wrapPeerMessage,
 } from "./peer-envelope.js";
 import { createSignalingClient } from "../signaling/socket-client.js";
@@ -137,12 +138,34 @@ const createRealtimeClient = () => {
     const myId = currentSnapshot.userId;
     const inboundLike = [];
     const outboundOnly = [];
-    entries.forEach((entry) => {
+    for (const entry of entries) {
+      // Every synced entry must carry a valid Schnorr signature by its
+      // claimed `from_user_id`. Without this check a peer could backfill
+      // forged ledger history during recovery — AES-GCM on the envelope only
+      // proves the sync *envelope* came from `peerUserId`, not that the
+      // enclosed entries were authored by whoever they claim.
+      const signatureValid = await verifyLedgerEntrySignature(entry);
+      if (!signatureValid) {
+        logRealtimeEvent("Rejected synced ledger entry with invalid signature", {
+          peerUserId,
+          entryId: entry?.id,
+          entryFrom: entry?.from_user_id,
+        });
+        continue;
+      }
       if (entry.to_user_id === myId) {
         inboundLike.push(entry);
       } else if (entry.from_user_id === myId) {
         outboundOnly.push(entry);
       }
+    }
+
+    // Replay chronologically: a later tx_created can only apply after an
+    // earlier friend_accept has re-created the connection during recovery.
+    inboundLike.sort((a, b) => {
+      const aTs = a.timestamp || "";
+      const bTs = b.timestamp || "";
+      return aTs < bTs ? -1 : aTs > bTs ? 1 : 0;
     });
 
     logRealtimeEvent("Received sync_data", {
@@ -158,8 +181,12 @@ const createRealtimeClient = () => {
         type: entry.type,
         from_user_id: entry.from_user_id,
         to_user_id: entry.to_user_id,
-        created_at: entry.timestamp,
+        // Preserve the sender's original `created_at` — it's what the
+        // Schnorr signature was computed over, and what `originated_at`
+        // should track in the resulting ledger entry.
+        created_at: entry.originated_at || entry.timestamp,
         payload: entry.payload,
+        signature: entry.signature,
       });
     }
     if (outboundOnly.length > 0) {

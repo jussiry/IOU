@@ -31,6 +31,11 @@ const BUILT_IN_SCENARIOS = {
     "scenarios",
     "turn-relay.cjs"
   ),
+  "trio-recovery": path.join(
+    __dirname,
+    "scenarios",
+    "trio-recovery.cjs"
+  ),
 };
 
 const parseArgs = (argv) => {

@@ -149,6 +149,14 @@ export const createLedgerEntryModel = (input = {}) => {
     type: asTrimmedStringOrDefault(input.type),
     from_user_id: asTrimmedStringOrDefault(input.from_user_id),
     to_user_id: asTrimmedStringOrDefault(input.to_user_id),
+    // Sender's asserted timestamp from the peer message's created_at. Kept
+    // alongside the locally-authoritative `timestamp` so the signed digest can
+    // be reconstructed and verified after the fact.
+    originated_at: asTrimmedStringOrDefault(input.originated_at),
+    // Schnorr signature (hex) over the canonical inner-message digest.
+    // Present on entries that originated from peer messages; may be empty for
+    // legacy data where no signature was produced.
+    signature: asTrimmedStringOrDefault(input.signature),
     payload: clonePlainObject(input.payload),
   };
 };
@@ -160,6 +168,7 @@ export const createPeerMessageModel = (input = {}) => {
     from_user_id: asTrimmedStringOrDefault(input.from_user_id),
     to_user_id: asTrimmedStringOrDefault(input.to_user_id),
     created_at: asTrimmedStringOrDefault(input.created_at),
+    signature: asTrimmedStringOrDefault(input.signature),
     payload: clonePlainObject(input.payload),
   };
 };

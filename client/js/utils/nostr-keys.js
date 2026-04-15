@@ -1,252 +1,27 @@
 /*
-This module implements the key primitives needed for Nostr-compatible identities in the IOU client. It generates secp256k1 private keys, derives x-only public keys, and encodes keys into NIP-19 bech32 formats (`npub` and `nsec`).
+Nostr-compatible identity helpers for the IOU client.
 
-The implementation intentionally keeps all key-shape logic in one place so the rest of the app can treat identity creation as a simple utility call and store consistent key fields in IndexedDB.
+Key primitives (random scalar, public-key derivation, ECDH) live in
+`crypto/secp256k1.js` on top of the vendored @noble/curves bundle. This module
+only owns the surface-level Nostr identity concerns: NIP-19 bech32 encoding
+between raw hex and the `npub` / `nsec` formats, plus a small helper that ties
+generation + encoding together.
 */
 
-const FIELD_PRIME = BigInt(
-  "0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F"
-);
-const GROUP_ORDER = BigInt(
-  "0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141"
-);
-const GENERATOR_POINT = {
-  pointX: BigInt(
-    "0x79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798"
-  ),
-  pointY: BigInt(
-    "0x483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8"
-  ),
-};
+import {
+  bytesToHex,
+  derivePublicKeyHex,
+  deriveSharedSecretXHex as deriveSharedSecretXHexImpl,
+  generatePrivateKeyHex,
+  hexToBytes,
+} from "../crypto/secp256k1.js";
 
 const BECH32_CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
 
-const normalizeModulo = (value, modulo) => {
-  const remainder = value % modulo;
-  return remainder >= 0n ? remainder : remainder + modulo;
-};
-
-const modInverse = (value, modulo) => {
-  const normalizedValue = normalizeModulo(value, modulo);
-  if (normalizedValue === 0n) {
-    throw new Error("Cannot invert zero in modular arithmetic.");
-  }
-
-  let previousRemainder = modulo;
-  let currentRemainder = normalizedValue;
-  let previousCoefficient = 0n;
-  let currentCoefficient = 1n;
-
-  while (currentRemainder !== 0n) {
-    const quotient = previousRemainder / currentRemainder;
-    const nextRemainder = previousRemainder - quotient * currentRemainder;
-    const nextCoefficient = previousCoefficient - quotient * currentCoefficient;
-
-    previousRemainder = currentRemainder;
-    currentRemainder = nextRemainder;
-    previousCoefficient = currentCoefficient;
-    currentCoefficient = nextCoefficient;
-  }
-
-  if (previousRemainder !== 1n) {
-    throw new Error("Value has no modular inverse.");
-  }
-
-  return normalizeModulo(previousCoefficient, modulo);
-};
-
-const doublePoint = (point) => {
-  if (!point) return null;
-  if (point.pointY === 0n) return null;
-
-  const slopeNumerator = normalizeModulo(
-    3n * point.pointX * point.pointX,
-    FIELD_PRIME
-  );
-  const slopeDenominator = normalizeModulo(2n * point.pointY, FIELD_PRIME);
-  const slope = normalizeModulo(
-    slopeNumerator * modInverse(slopeDenominator, FIELD_PRIME),
-    FIELD_PRIME
-  );
-
-  const resultPointX = normalizeModulo(
-    slope * slope - 2n * point.pointX,
-    FIELD_PRIME
-  );
-  const resultPointY = normalizeModulo(
-    slope * (point.pointX - resultPointX) - point.pointY,
-    FIELD_PRIME
-  );
-
-  return {
-    pointX: resultPointX,
-    pointY: resultPointY,
-  };
-};
-
-const addPoints = (leftPoint, rightPoint) => {
-  if (!leftPoint) return rightPoint;
-  if (!rightPoint) return leftPoint;
-
-  if (leftPoint.pointX === rightPoint.pointX) {
-    const ySum = normalizeModulo(leftPoint.pointY + rightPoint.pointY, FIELD_PRIME);
-    if (ySum === 0n) return null;
-    return doublePoint(leftPoint);
-  }
-
-  const slopeNumerator = normalizeModulo(
-    rightPoint.pointY - leftPoint.pointY,
-    FIELD_PRIME
-  );
-  const slopeDenominator = normalizeModulo(
-    rightPoint.pointX - leftPoint.pointX,
-    FIELD_PRIME
-  );
-  const slope = normalizeModulo(
-    slopeNumerator * modInverse(slopeDenominator, FIELD_PRIME),
-    FIELD_PRIME
-  );
-
-  const resultPointX = normalizeModulo(
-    slope * slope - leftPoint.pointX - rightPoint.pointX,
-    FIELD_PRIME
-  );
-  const resultPointY = normalizeModulo(
-    slope * (leftPoint.pointX - resultPointX) - leftPoint.pointY,
-    FIELD_PRIME
-  );
-
-  return {
-    pointX: resultPointX,
-    pointY: resultPointY,
-  };
-};
-
-const multiplyPoint = (scalar, basePoint) => {
-  if (scalar <= 0n || scalar >= GROUP_ORDER) {
-    throw new Error("Scalar is outside secp256k1 valid range.");
-  }
-  if (!basePoint) {
-    throw new Error("Cannot multiply a null point.");
-  }
-
-  let remainingScalar = scalar;
-  let accumulatedPoint = null;
-  let doublingPoint = basePoint;
-
-  while (remainingScalar > 0n) {
-    const currentBit = remainingScalar & 1n;
-    if (currentBit === 1n) {
-      accumulatedPoint = addPoints(accumulatedPoint, doublingPoint);
-    }
-    doublingPoint = doublePoint(doublingPoint);
-    remainingScalar >>= 1n;
-  }
-
-  if (!accumulatedPoint) {
-    throw new Error("Scalar multiplication produced the identity point.");
-  }
-
-  return accumulatedPoint;
-};
-
-const multiplyGenerator = (scalar) => multiplyPoint(scalar, GENERATOR_POINT);
-
-// Modular exponentiation: base^exponent mod modulo (square-and-multiply).
-const modPow = (base, exponent, modulo) => {
-  if (modulo === 1n) return 0n;
-  let result = 1n;
-  let runningBase = normalizeModulo(base, modulo);
-  let runningExponent = exponent;
-  while (runningExponent > 0n) {
-    if ((runningExponent & 1n) === 1n) {
-      result = (result * runningBase) % modulo;
-    }
-    runningExponent >>= 1n;
-    runningBase = (runningBase * runningBase) % modulo;
-  }
-  return result;
-};
-
-// Lift an x-only public key (BIP-340) to a full point on secp256k1 with even y.
-// y² = x³ + 7 (mod p). For secp256k1, p ≡ 3 mod 4, so √v = v^((p+1)/4) mod p.
-const liftXOnlyPubkey = (publicKeyHex) => {
-  const normalizedHex = normalizeHex(publicKeyHex, 32);
-  const pointX = BigInt(`0x${normalizedHex}`);
-  if (pointX <= 0n || pointX >= FIELD_PRIME) {
-    throw new Error("Public key x-coordinate is outside the secp256k1 field.");
-  }
-
-  const ySquared = normalizeModulo(pointX * pointX * pointX + 7n, FIELD_PRIME);
-  const candidateY = modPow(ySquared, (FIELD_PRIME + 1n) / 4n, FIELD_PRIME);
-  if ((candidateY * candidateY) % FIELD_PRIME !== ySquared) {
-    throw new Error("Public key x-coordinate has no point on secp256k1.");
-  }
-
-  // BIP-340 convention: pick the even y so the point is unambiguous.
-  const evenY = (candidateY & 1n) === 0n ? candidateY : FIELD_PRIME - candidateY;
-  return { pointX, pointY: evenY };
-};
-
-const bytesToHex = (bytes) => {
-  return Array.from(bytes, (byteValue) => byteValue.toString(16).padStart(2, "0")).join("");
-};
-
-const normalizeHex = (value, expectedByteLength) => {
-  if (typeof value !== "string") {
-    throw new Error("Expected a hex string.");
-  }
-
-  const trimmedValue = value.trim().toLowerCase();
-  const withoutPrefix = trimmedValue.startsWith("0x")
-    ? trimmedValue.slice(2)
-    : trimmedValue;
-
-  if (!/^[0-9a-f]+$/.test(withoutPrefix)) {
-    throw new Error("Invalid hex string.");
-  }
-
-  const expectedLength = expectedByteLength * 2;
-  const paddedHex = withoutPrefix.padStart(expectedLength, "0");
-  if (paddedHex.length !== expectedLength) {
-    throw new Error("Hex value has invalid length.");
-  }
-
-  return paddedHex;
-};
-
-const hexToBytes = (hexValue) => {
-  const normalizedHex = normalizeHex(hexValue, hexValue.length / 2);
-  const bytes = new Uint8Array(normalizedHex.length / 2);
-  for (let byteIndex = 0; byteIndex < bytes.length; byteIndex += 1) {
-    const startIndex = byteIndex * 2;
-    bytes[byteIndex] = Number.parseInt(
-      normalizedHex.slice(startIndex, startIndex + 2),
-      16
-    );
-  }
-  return bytes;
-};
-
-const bytesToBigInt = (bytes) => {
-  const hexValue = bytesToHex(bytes);
-  return BigInt(`0x${hexValue}`);
-};
-
-const bigIntToFixedHex = (value, byteLength = 32) => {
-  return value.toString(16).padStart(byteLength * 2, "0");
-};
-
-const createRandomPrivateScalar = () => {
-  while (true) {
-    const candidateBytes = new Uint8Array(32);
-    window.crypto.getRandomValues(candidateBytes);
-    const candidateScalar = bytesToBigInt(candidateBytes);
-    if (candidateScalar > 0n && candidateScalar < GROUP_ORDER) {
-      return candidateScalar;
-    }
-  }
-};
+// ---------------------------------------------------------------------------
+// Bech32 (BIP-173 / NIP-19 flavour) — pure-JS encode/decode. Independent of
+// the curve math and small enough to keep inline.
+// ---------------------------------------------------------------------------
 
 const bech32Polymod = (values) => {
   const generatorValues = [
@@ -257,7 +32,6 @@ const bech32Polymod = (values) => {
     0x2a1462b3,
   ];
   let checksum = 1;
-
   values.forEach((value) => {
     const topBits = checksum >> 25;
     checksum = ((checksum & 0x1ffffff) << 5) ^ value;
@@ -267,7 +41,6 @@ const bech32Polymod = (values) => {
       }
     });
   });
-
   return checksum;
 };
 
@@ -287,7 +60,6 @@ const createChecksumWords = (humanReadablePart, dataWords) => {
   const expandedHrp = hrpExpand(humanReadablePart);
   const valuesForChecksum = [...expandedHrp, ...dataWords, 0, 0, 0, 0, 0, 0];
   const polymodResult = bech32Polymod(valuesForChecksum) ^ 1;
-
   return Array.from({ length: 6 }, (_, checksumIndex) => {
     const shiftAmount = 5 * (5 - checksumIndex);
     return (polymodResult >> shiftAmount) & 31;
@@ -305,21 +77,17 @@ const convertBits = (inputValues, fromBits, toBits, shouldPad) => {
   const outputValues = [];
   const maxOutputValue = (1 << toBits) - 1;
   const maxAccumulatorValue = (1 << (fromBits + toBits - 1)) - 1;
-
   inputValues.forEach((inputValue) => {
     if (inputValue < 0 || inputValue >> fromBits !== 0) {
       throw new Error("Input value exceeds bit-size for conversion.");
     }
-
     accumulator = ((accumulator << fromBits) | inputValue) & maxAccumulatorValue;
     bitCount += fromBits;
-
     while (bitCount >= toBits) {
       bitCount -= toBits;
       outputValues.push((accumulator >> bitCount) & maxOutputValue);
     }
   });
-
   if (shouldPad && bitCount > 0) {
     outputValues.push((accumulator << (toBits - bitCount)) & maxOutputValue);
   } else if (!shouldPad) {
@@ -329,16 +97,13 @@ const convertBits = (inputValues, fromBits, toBits, shouldPad) => {
       throw new Error("Invalid padding during bit conversion.");
     }
   }
-
   return outputValues;
 };
 
 const encodeBech32 = (humanReadablePart, dataWords) => {
   const checksumWords = createChecksumWords(humanReadablePart, dataWords);
   const allWords = [...dataWords, ...checksumWords];
-  const encodedWords = allWords
-    .map((word) => BECH32_CHARSET[word])
-    .join("");
+  const encodedWords = allWords.map((word) => BECH32_CHARSET[word]).join("");
   return `${humanReadablePart}1${encodedWords}`;
 };
 
@@ -346,18 +111,15 @@ const decodeBech32 = (encodedValue) => {
   if (typeof encodedValue !== "string") {
     throw new Error("Expected a bech32 string.");
   }
-
   const trimmedValue = encodedValue.trim();
   const normalizedValue = trimmedValue.toLowerCase();
   if (!trimmedValue || trimmedValue !== normalizedValue) {
     throw new Error("Bech32 value must be lowercase.");
   }
-
   const separatorIndex = normalizedValue.lastIndexOf("1");
   if (separatorIndex <= 0 || separatorIndex + 7 > normalizedValue.length) {
     throw new Error("Invalid bech32 separator position.");
   }
-
   const humanReadablePart = normalizedValue.slice(0, separatorIndex);
   const encodedWords = normalizedValue.slice(separatorIndex + 1);
   const allWords = Array.from(encodedWords, (character) => {
@@ -367,11 +129,9 @@ const decodeBech32 = (encodedValue) => {
     }
     return index;
   });
-
   if (!verifyChecksumWords(humanReadablePart, allWords)) {
     throw new Error("Bech32 checksum verification failed.");
   }
-
   return {
     humanReadablePart,
     dataWords: allWords.slice(0, -6),
@@ -379,112 +139,59 @@ const decodeBech32 = (encodedValue) => {
 };
 
 const encodeNip19Key = (humanReadablePart, keyHex) => {
-  const normalizedHex = normalizeHex(keyHex, 32);
-  const keyBytes = hexToBytes(normalizedHex);
+  const keyBytes = hexToBytes(keyHex);
   const fiveBitWords = convertBits(Array.from(keyBytes), 8, 5, true);
   return encodeBech32(humanReadablePart, fiveBitWords);
 };
 
+const decodeNip19Key = (encodedValue, expectedHrp) => {
+  const { humanReadablePart, dataWords } = decodeBech32(encodedValue);
+  if (humanReadablePart !== expectedHrp) {
+    throw new Error(`Expected a ${expectedHrp}-encoded key.`);
+  }
+  const decodedBytes = convertBits(dataWords, 5, 8, false);
+  if (decodedBytes.length !== 32) {
+    throw new Error(`Invalid ${expectedHrp} payload length.`);
+  }
+  return bytesToHex(new Uint8Array(decodedBytes));
+};
+
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
+
 export const isValidNsec = (encodedValue) => {
   try {
-    const { humanReadablePart, dataWords } = decodeBech32(encodedValue);
-    if (humanReadablePart !== "nsec") {
-      return false;
-    }
-
-    const decodedBytes = convertBits(dataWords, 5, 8, false);
-    if (decodedBytes.length !== 32) {
-      return false;
-    }
-
-    const scalar = BigInt(`0x${bytesToHex(new Uint8Array(decodedBytes))}`);
-    return scalar > 0n && scalar < GROUP_ORDER;
-  } catch (error) {
+    decodeNip19Key(encodedValue, "nsec");
+    return true;
+  } catch {
     return false;
   }
-};
-
-export const decodeNsecToHex = (encodedValue) => {
-  const { humanReadablePart, dataWords } = decodeBech32(encodedValue);
-  if (humanReadablePart !== "nsec") {
-    throw new Error("Expected an nsec-encoded private key.");
-  }
-
-  const decodedBytes = convertBits(dataWords, 5, 8, false);
-  if (decodedBytes.length !== 32) {
-    throw new Error("Invalid nsec payload length.");
-  }
-
-  return bytesToHex(new Uint8Array(decodedBytes));
-};
-
-export const decodeNpubToHex = (encodedValue) => {
-  const { humanReadablePart, dataWords } = decodeBech32(encodedValue);
-  if (humanReadablePart !== "npub") {
-    throw new Error("Expected an npub-encoded public key.");
-  }
-
-  const decodedBytes = convertBits(dataWords, 5, 8, false);
-  if (decodedBytes.length !== 32) {
-    throw new Error("Invalid npub payload length.");
-  }
-
-  return bytesToHex(new Uint8Array(decodedBytes));
 };
 
 export const isValidNpub = (encodedValue) => {
   try {
-    const { humanReadablePart, dataWords } = decodeBech32(encodedValue);
-    if (humanReadablePart !== "npub") {
-      return false;
-    }
-
-    const decodedBytes = convertBits(dataWords, 5, 8, false);
-    return decodedBytes.length === 32;
-  } catch (error) {
+    decodeNip19Key(encodedValue, "npub");
+    return true;
+  } catch {
     return false;
   }
 };
 
-export const encodeNpubFromPublicKeyHex = (publicKeyHex) => {
-  return encodeNip19Key("npub", publicKeyHex);
-};
+export const decodeNsecToHex = (encodedValue) => decodeNip19Key(encodedValue, "nsec");
+export const decodeNpubToHex = (encodedValue) => decodeNip19Key(encodedValue, "npub");
 
-export const encodeNsecFromPrivateKeyHex = (privateKeyHex) => {
-  return encodeNip19Key("nsec", privateKeyHex);
-};
+export const encodeNpubFromPublicKeyHex = (publicKeyHex) => encodeNip19Key("npub", publicKeyHex);
+export const encodeNsecFromPrivateKeyHex = (privateKeyHex) => encodeNip19Key("nsec", privateKeyHex);
 
-export const deriveNostrPublicKeyHex = (privateKeyHex) => {
-  const normalizedPrivateHex = normalizeHex(privateKeyHex, 32);
-  const privateScalar = BigInt(`0x${normalizedPrivateHex}`);
-  if (privateScalar <= 0n || privateScalar >= GROUP_ORDER) {
-    throw new Error("Private key scalar is outside secp256k1 range.");
-  }
+export const deriveNostrPublicKeyHex = (privateKeyHex) => derivePublicKeyHex(privateKeyHex);
 
-  const publicPoint = multiplyGenerator(privateScalar);
-  return bigIntToFixedHex(publicPoint.pointX, 32);
-};
-
-// Derive an ECDH shared secret as the x-coordinate of (myPrivateKey * theirPubkeyPoint).
-// Both sides of the conversation produce the same 32 bytes, so it can be hashed into a
-// symmetric key for authenticated encryption between the two peers.
-export const deriveSharedSecretXHex = (privateKeyHex, peerPublicKeyHex) => {
-  const normalizedPrivateHex = normalizeHex(privateKeyHex, 32);
-  const privateScalar = BigInt(`0x${normalizedPrivateHex}`);
-  if (privateScalar <= 0n || privateScalar >= GROUP_ORDER) {
-    throw new Error("Private key scalar is outside secp256k1 range.");
-  }
-
-  const peerPoint = liftXOnlyPubkey(peerPublicKeyHex);
-  const sharedPoint = multiplyPoint(privateScalar, peerPoint);
-  return bigIntToFixedHex(sharedPoint.pointX, 32);
-};
+export const deriveSharedSecretXHex = (privateKeyHex, peerPublicKeyHex) =>
+  deriveSharedSecretXHexImpl(privateKeyHex, peerPublicKeyHex);
 
 export const generateNostrKeyPair = () => {
-  const privateScalar = createRandomPrivateScalar();
-  const privateKeyHex = bigIntToFixedHex(privateScalar, 32);
-  const publicKeyHex = deriveNostrPublicKeyHex(privateKeyHex);
-
+  const privateKeyHex = generatePrivateKeyHex();
+  const publicKeyHex = derivePublicKeyHex(privateKeyHex);
   return {
     privateKeyHex,
     privateKeyNsec: encodeNsecFromPrivateKeyHex(privateKeyHex),

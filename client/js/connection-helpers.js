@@ -187,7 +187,7 @@ export const removeFriendRelationshipData = (state, friendId) => {
   });
 };
 
-export const cancelPendingFriendRequest = (
+export const cancelPendingFriendRequest = async (
   state,
   friendId,
   { direction, displayName, notifyPeer = false, skipLog = false } = {}
@@ -214,7 +214,7 @@ export const cancelPendingFriendRequest = (
   removeFriendRelationshipData(state, normalizedFriendId);
   let rejectMessage = null;
   if (notifyPeer && !hasUnsentOutgoingRequest) {
-    rejectMessage = queuePeerMessage(state, {
+    rejectMessage = await queuePeerMessage(state, {
       toUserId: normalizedFriendId,
       type: PEER_MESSAGE_TYPE_FRIEND_REJECT,
       payload: {},
@@ -227,6 +227,8 @@ export const cancelPendingFriendRequest = (
       fromUserId: rejectMessage.from_user_id,
       toUserId: rejectMessage.to_user_id,
       payload: rejectMessage.payload,
+      signature: rejectMessage.signature,
+      originatedAt: rejectMessage.created_at,
     });
   }
   // direction/displayName currently unused; kept for call-site compatibility

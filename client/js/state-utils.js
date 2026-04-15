@@ -28,7 +28,10 @@ export const createId = (prefix = "tx") => {
   return `${prefix}_${Date.now().toString(36)}_${randomToken}`;
 };
 
-export const appendLedgerEntry = (state, { id, type, fromUserId, toUserId, payload = {} } = {}) => {
+export const appendLedgerEntry = (
+  state,
+  { id, type, fromUserId, toUserId, payload = {}, signature = "", originatedAt = "" } = {}
+) => {
   state.ledger = Array.isArray(state.ledger) ? state.ledger : [];
   state.ledger.unshift(
     createLedgerEntryModel({
@@ -37,6 +40,8 @@ export const appendLedgerEntry = (state, { id, type, fromUserId, toUserId, paylo
       type,
       from_user_id: fromUserId || "",
       to_user_id: toUserId || "",
+      signature,
+      originated_at: originatedAt,
       payload,
     })
   );

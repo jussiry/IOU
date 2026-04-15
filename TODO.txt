@@ -1,17 +1,48 @@
 
-- kun peer yhteys muodostuu tarkistaa onko molemmat samassa tilassa ?
-  * onko tarpeellinen - receipt mekanismi varmistaa että kaikki viestit menevät läpi
 
 
-- manifest.json / taustalle jäävä appi (jääkö kun kännykkä sleep modessa??)
+
+VIESTI: Jaana Vainio
+
+
+
+
+NOT DONE YET:
+
+
+signature commands/questions:
+
+  Unify ledger code under ledger.js ?
+
+  Check my own undestranding of signatures and public/private key (ECDH)
+
+
+SIGNATURES reply
+  The current implementation is a hand-rolled BigInt double-and-add scalar multiplication — naive but correct. That's fine for ECDH because the result is cached per peer connection. For per-message signing it's a problem.
+
+  Rough benchmarks for one secp256k1 point multiplication (which is the core of both sign and verify):
+
+  Implementation	One point mul	Sign	Verify
+  Current hand-rolled BigInt	~100–300ms	~150ms	~300ms
+  @noble/secp256k1 (optimized pure JS)	~2ms	~3ms	~5ms
+  WASM (libsecp256k1)	<1ms	~1ms	~1ms
+  The existing ECDH call is that same ~100–300ms — it only gets away with it because it's cached after the first connection.
+
+  The practical answer: adding signatures per-message with the current code would add ~150ms to every send and ~300ms to every receive, which is perceptible. The fix is to bring in @noble/secp256k1 (or @noble/curves) alongside the existing code — it uses field arithmetic and Wasm-assisted multiplication, bringing sign+verify to a combined ~8ms per message. That's invisible to the user.
+
+  The existing hand-rolled code can stay for key generation and ECDH (still cached), and @noble handles the per-message signature work. They use the same curve and the same key format (32-byte hex private key → x-only public key), so the two coexist without changes to key storage.
+
+  Worth noting: npm/bundling would need to be added if it's not already there, since @noble/secp256k1 is a package. Is there a bundler in this project currently?
+
+
+Syncing multiple devices with same user
+  Another case is when same user has many devices online. When one device makes an action, this should proagate to other devices of the same user, so that they stay in the same state. This also needs to be handled on server side. Maybe but
+
+  Same user with different keys possible / worth implementing?
+
+
 
 - on a friend page highlight latest transaction(s) since the page was last visited
-
-- Jos sama käyttäjä on auki kahdella eri laitteella (esim. kun kirjautuu priva avaimella), luo webrtc yhteydet niiden välille ja synkkaa kaikki tiedot / toiminnot
-
-
-CODE
-- should there be some UI framework to simplify rendering?
 
 
 Joskus myöhemmin:
@@ -20,25 +51,7 @@ Joskus myöhemmin:
   * Sama ticker voi olla eri valuutoilla, mutta ei samaa selostusta valuutasta
   * listaa suosituimmuus järjestyksessä, joten ei haittaa vaikka joku "spämmää"
 
-
-
 Scratch book
-
-When sending messages to peers, is there a receitp response form peer when they receive it? And does the message stay in outbox before it has been sent?
-
-If not received after some time period, try again or send to server? Receipt from server that has been send?
-
-
-I have pending friend request that has been sent but the client don't know if it has been received
-
-
 
 Security questions
 - what happens if malicious server sends "peer_connect" message for two peers to connect, that are not acutally friends?
-
-- vain payload cryptataan?
-  queuePeerMessage(state, {
-    toUserId: connection.person_id,
-    type: PEER_MESSAGE_TYPE_NAME_CHANGED,
-    payload: { name: trimmedName },
-  });

@@ -5,18 +5,92 @@ from, to) in plaintext so the signaling server can deliver messages to offline
 peers without learning their contents, while the inner message — the original
 peer message model — is encrypted to the recipient's public key.
 
-After decryption, callers must trust the returned `inner` only after the
-envelope's plaintext claims have been cross-checked against the inner fields,
-which `unwrapPeerEnvelope` performs before returning.
+Inner messages are Schnorr-signed by the sender before encryption. The
+signature covers a canonical JSON digest of the message (id, type, from, to,
+created_at, payload) and travels inside the encrypted inner blob. This gives
+us non-repudiation and lets a recipient verify messages authored by a third
+party that are forwarded during ledger sync — AES-GCM authentication only
+tells us "someone with the ECDH shared secret produced this," which isn't
+enough once messages can travel transitively.
+
+After decryption, callers must trust the returned `inner` only after:
+  1. The envelope's plaintext claims match the inner fields (AES-GCM already
+     authenticates the inner content; mismatched outer fields mean the
+     plaintext envelope was tampered with).
+  2. The Schnorr signature on the inner message verifies against
+     `from_user_id` as an x-only public key.
 */
 
 import { decryptFromPeer, encryptForPeer } from "../crypto/peer-crypto.js";
+import { canonicalJsonForSigning } from "../crypto/canonical.js";
+import {
+  schnorrSignHex,
+  schnorrVerifyHex,
+  sha256HexOfString,
+} from "../crypto/secp256k1.js";
+import { decodeNpubToHex } from "../utils/nostr-keys.js";
 
 export const PEER_ENVELOPE_TYPE = "peer_envelope";
-export const PEER_ENVELOPE_VERSION = 1;
+export const PEER_ENVELOPE_VERSION = 2;
 
 export const isPeerEnvelope = (value) => {
   return Boolean(value) && typeof value === "object" && value.type === PEER_ENVELOPE_TYPE;
+};
+
+const toPublicKeyHex = (userId) => {
+  if (typeof userId !== "string" || !userId) {
+    throw new Error("User id is required to resolve a public key.");
+  }
+  return userId.startsWith("npub1") ? decodeNpubToHex(userId) : userId.toLowerCase();
+};
+
+// Compute the Schnorr digest over an inner message. Excludes the `signature`
+// field so signing and verifying produce the same pre-image.
+export const digestForSigning = async (innerMessage) => {
+  const canonical = canonicalJsonForSigning(innerMessage);
+  return sha256HexOfString(canonical);
+};
+
+export const signInnerMessage = async (innerMessage, { privateKeyHex }) => {
+  if (!privateKeyHex) {
+    throw new Error("A private key is required to sign a peer message.");
+  }
+  const digestHex = await digestForSigning(innerMessage);
+  return schnorrSignHex(digestHex, privateKeyHex);
+};
+
+// Reconstruct the inner-message shape from a stored ledger entry and verify
+// its Schnorr signature. Ledger entries hold the sender-asserted timestamp
+// under `originated_at` (the local `timestamp` is set on receive and is not
+// part of the signed digest).
+export const verifyLedgerEntrySignature = async (entry) => {
+  if (!entry || typeof entry !== "object") return false;
+  if (typeof entry.signature !== "string" || !entry.signature) return false;
+  const innerShape = {
+    id: entry.id,
+    type: entry.type,
+    from_user_id: entry.from_user_id,
+    to_user_id: entry.to_user_id,
+    created_at: entry.originated_at || entry.timestamp || "",
+    payload: entry.payload || {},
+    signature: entry.signature,
+  };
+  return verifyInnerSignature(innerShape);
+};
+
+export const verifyInnerSignature = async (innerMessage) => {
+  if (!innerMessage || typeof innerMessage.signature !== "string" || !innerMessage.signature) {
+    return false;
+  }
+  let publicKeyHex;
+  try {
+    publicKeyHex = toPublicKeyHex(innerMessage.from_user_id);
+  } catch {
+    return false;
+  }
+  const { signature, ...withoutSignature } = innerMessage;
+  const digestHex = await digestForSigning(withoutSignature);
+  return schnorrVerifyHex(signature, digestHex, publicKeyHex);
 };
 
 export const wrapPeerMessage = async (message, { privateKeyHex }) => {
@@ -30,7 +104,19 @@ export const wrapPeerMessage = async (message, { privateKeyHex }) => {
     throw new Error("A private key is required to encrypt a peer envelope.");
   }
 
-  const ciphertext = await encryptForPeer(JSON.stringify(message), {
+  // Sign the inner message (without an existing signature field) so the
+  // signature travels protected under AES-GCM alongside the content. If the
+  // caller already attached a signature at queue time, reuse it — signatures
+  // are deterministic for a given (message, key), but reusing also lets the
+  // ledger and outbox agree on the exact signature bytes.
+  const unsigned = { ...message };
+  delete unsigned.signature;
+  const signature = typeof message.signature === "string" && message.signature
+    ? message.signature
+    : await signInnerMessage(unsigned, { privateKeyHex });
+  const signedInner = { ...unsigned, signature };
+
+  const ciphertext = await encryptForPeer(JSON.stringify(signedInner), {
     privateKeyHex,
     peerPublicKey: message.to_user_id,
   });
@@ -85,6 +171,14 @@ export const unwrapPeerEnvelope = async (envelope, { privateKeyHex, expectedReci
   }
   if (inner.to_user_id !== envelope.to_user_id) {
     throw new Error("Peer envelope to_user_id does not match its inner message.");
+  }
+
+  // Verify the Schnorr signature. This is what lets us trust forwarded
+  // messages later — AES-GCM alone only proves the ECDH peer produced the
+  // ciphertext; Schnorr proves the original author signed the content.
+  const signatureValid = await verifyInnerSignature(inner);
+  if (!signatureValid) {
+    throw new Error("Peer envelope inner signature is invalid.");
   }
 
   return inner;

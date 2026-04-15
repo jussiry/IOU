@@ -54,6 +54,8 @@ const addLedgerEntryFromMessage = (state, message) => {
     fromUserId: message.from_user_id,
     toUserId: message.to_user_id,
     payload: message.payload,
+    signature: message.signature,
+    originatedAt: message.created_at,
   });
 };
 import { buildView } from "./view-model.js";
@@ -75,6 +77,7 @@ import {
   createInboundProcessingResult,
   routeInboundMessage,
 } from "./peer-message-handlers.js";
+import { verifyLedgerEntrySignature } from "./realtime/peer-envelope.js";
 import { showNotification } from "./notifications.js";
 
 const VERSION_KEY = "iou_version";
@@ -211,6 +214,10 @@ export const getRealtimeSnapshot = async () => {
 /**
  * Merges a batch of ledger entries from a sync peer. Entries with ids already
  * present (either in the ledger or processed_peer_message_ids) are skipped.
+ * Each entry must carry a valid Schnorr signature by `from_user_id`; entries
+ * with missing or invalid signatures are dropped so that a malicious peer
+ * cannot backfill forged history during sync recovery.
+ *
  * Returns the count of entries actually added.
  */
 export const addLedgerEntries = async (entries) => {
@@ -223,13 +230,21 @@ export const addLedgerEntries = async (entries) => {
   state.ledger = Array.isArray(state.ledger) ? state.ledger : [];
   const existingIds = new Set(state.ledger.map((entry) => entry.id));
   let added = 0;
-  entries.forEach((entry) => {
+  for (const entry of entries) {
     const normalized = createLedgerEntryModel(entry);
-    if (!normalized.id || existingIds.has(normalized.id)) return;
+    if (!normalized.id || existingIds.has(normalized.id)) continue;
+    const signatureValid = await verifyLedgerEntrySignature(normalized);
+    if (!signatureValid) {
+      console.warn(
+        "[Sync] Rejected ledger entry with missing or invalid signature:",
+        normalized.id,
+      );
+      continue;
+    }
     state.ledger.unshift(normalized);
     existingIds.add(normalized.id);
     added += 1;
-  });
+  }
 
   if (added > 0) {
     state.ledger.sort((a, b) => (a.timestamp < b.timestamp ? 1 : -1));
@@ -253,15 +268,16 @@ export const updateUserName = async (name) => {
   syncUserNameAcrossContacts(state);
 
   const connections = Array.isArray(state.user.connections) ? state.user.connections : [];
-  connections
-    .filter((connection) => isPeerEligibleFriendshipStatus(connection.friendship_status))
-    .forEach((connection) => {
-      queuePeerMessage(state, {
-        toUserId: connection.person_id,
-        type: PEER_MESSAGE_TYPE_NAME_CHANGED,
-        payload: { name: trimmedName },
-      });
+  const eligibleConnections = connections.filter((connection) =>
+    isPeerEligibleFriendshipStatus(connection.friendship_status)
+  );
+  for (const connection of eligibleConnections) {
+    await queuePeerMessage(state, {
+      toUserId: connection.person_id,
+      type: PEER_MESSAGE_TYPE_NAME_CHANGED,
+      payload: { name: trimmedName },
     });
+  }
 
   return persistAndBuildView(state);
 };
@@ -325,11 +341,12 @@ export const createFriend = async ({ friendId, trustLimit }) => {
 
   if (existingStatus === FRIENDSHIP_STATUS_PENDING_INCOMING) {
     userConnection.friendship_status = FRIENDSHIP_STATUS_ACCEPTED;
-    const acceptMsg = queuePeerMessage(state, {
+    const acceptMsg = await queuePeerMessage(state, {
       toUserId: normalizedFriendId,
       type: PEER_MESSAGE_TYPE_FRIEND_ACCEPT,
       payload: {
         accepter_name: state.user.name,
+        trust_credit_limit_eur: userConnection.trust_credit_limit_eur || 0,
       },
     });
     addLedgerEntryFromMessage(state, acceptMsg);
@@ -341,7 +358,7 @@ export const createFriend = async ({ friendId, trustLimit }) => {
   }
 
   userConnection.friendship_status = FRIENDSHIP_STATUS_PENDING_OUTGOING;
-  const requestMsg = queuePeerMessage(state, {
+  const requestMsg = await queuePeerMessage(state, {
     toUserId: normalizedFriendId,
     type: PEER_MESSAGE_TYPE_FRIEND_REQUEST,
     payload: {
@@ -381,11 +398,12 @@ export const acceptFriend = async (friendId) => {
 
   userConnection.friendship_status = FRIENDSHIP_STATUS_ACCEPTED;
   userConnection.person_name = displayName;
-  const acceptMsg = queuePeerMessage(state, {
+  const acceptMsg = await queuePeerMessage(state, {
     toUserId: normalizedFriendId,
     type: PEER_MESSAGE_TYPE_FRIEND_ACCEPT,
     payload: {
       accepter_name: state.user.name,
+      trust_credit_limit_eur: userConnection.trust_credit_limit_eur || 0,
     },
   });
   addLedgerEntryFromMessage(state, acceptMsg);
@@ -416,7 +434,7 @@ export const rejectFriend = async (friendId) => {
     return buildView(state);
   }
 
-  cancelPendingFriendRequest(state, normalizedFriendId, {
+  await cancelPendingFriendRequest(state, normalizedFriendId, {
     direction: "from",
     displayName,
     notifyPeer: true,
@@ -445,7 +463,7 @@ export const removeFriendRequest = async (friendId) => {
     return buildView(state);
   }
 
-  cancelPendingFriendRequest(state, normalizedFriendId, {
+  await cancelPendingFriendRequest(state, normalizedFriendId, {
     direction: "to",
     displayName,
     notifyPeer: true,
@@ -496,7 +514,7 @@ export const updateTrustLimit = async (friendId, trustLimit) => {
     userConnection.pending_credit_limit_eur = null;
     userConnection.pending_credit_limit_is_incoming = null;
     if (isPeerEligibleFriendshipStatus(userConnection.friendship_status)) {
-      const msg = queueTrustLimitSuggestion(state, normalizedFriendId, normalizedTrustLimit);
+      const msg = await queueTrustLimitSuggestion(state, normalizedFriendId, normalizedTrustLimit);
       addLedgerEntryFromMessage(state, msg);
     }
   } else {
@@ -504,7 +522,7 @@ export const updateTrustLimit = async (friendId, trustLimit) => {
     userConnection.pending_credit_limit_eur = normalizedTrustLimit;
     userConnection.pending_credit_limit_is_incoming = false;
     if (isPeerEligibleFriendshipStatus(userConnection.friendship_status)) {
-      const msg = queueTrustLimitSuggestion(state, normalizedFriendId, normalizedTrustLimit);
+      const msg = await queueTrustLimitSuggestion(state, normalizedFriendId, normalizedTrustLimit);
       addLedgerEntryFromMessage(state, msg);
     }
   }
@@ -545,7 +563,7 @@ export const respondToTrustLimitSuggestion = async (friendId, accepted) => {
   userConnection.pending_credit_limit_is_incoming = null;
 
   if (isPeerEligibleFriendshipStatus(userConnection.friendship_status)) {
-    const msg = queueTrustLimitSuggestion(state, normalizedFriendId, responseLimit);
+    const msg = await queueTrustLimitSuggestion(state, normalizedFriendId, responseLimit);
     addLedgerEntryFromMessage(state, msg);
   }
 
@@ -575,7 +593,7 @@ export const cancelTrustLimitSuggestion = async (friendId) => {
   void displayName;
 
   if (isPeerEligibleFriendshipStatus(userConnection.friendship_status)) {
-    const msg = queueTrustLimitSuggestion(state, normalizedFriendId, currentLimit);
+    const msg = await queueTrustLimitSuggestion(state, normalizedFriendId, currentLimit);
     addLedgerEntryFromMessage(state, msg);
   }
 
@@ -643,7 +661,7 @@ export const createTransaction = async ({ friendId, amount, message }) => {
     })
   );
 
-  const txMsg = queuePeerMessage(state, {
+  const txMsg = await queuePeerMessage(state, {
     toUserId: normalizedFriendId,
     type: PEER_MESSAGE_TYPE_TRANSACTION_CREATED,
     payload: {
@@ -692,7 +710,7 @@ export const requestPayment = async ({ friendId, amount, message }) => {
     created_at: new Date().toISOString(),
   };
 
-  const prMsg = queuePeerMessage(state, {
+  const prMsg = await queuePeerMessage(state, {
     toUserId: normalizedFriendId,
     type: PEER_MESSAGE_TYPE_PAYMENT_REQUEST,
     payload: {
@@ -734,7 +752,7 @@ export const respondToPaymentRequest = async (friendId, accepted) => {
 
   userConnection.pending_payment_request = null;
 
-  const responseMsg = queuePeerMessage(state, {
+  const responseMsg = await queuePeerMessage(state, {
     toUserId: normalizedFriendId,
     type: PEER_MESSAGE_TYPE_PAYMENT_REQUEST_RESPONSE,
     payload: {
@@ -760,7 +778,7 @@ export const respondToPaymentRequest = async (friendId, accepted) => {
       })
     );
 
-    const txMsg = queuePeerMessage(state, {
+    const txMsg = await queuePeerMessage(state, {
       toUserId: normalizedFriendId,
       type: PEER_MESSAGE_TYPE_TRANSACTION_CREATED,
       payload: {
@@ -874,7 +892,7 @@ export const applyInboundPeerMessage = async (incomingMessage) => {
     return createInboundProcessingResult(null);
   }
 
-  const result = routeInboundMessage(state, message);
+  const result = await routeInboundMessage(state, message);
 
   if (!result.applied && !result.persisted) {
     return createInboundProcessingResult(

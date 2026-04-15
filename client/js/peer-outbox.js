@@ -3,10 +3,17 @@ Manages the outbound peer message queue (outbox) and message deduplication.
 
 All functions operate on the state object directly. Persistence is handled
 by the caller (data.js).
+
+Outbound peer messages are Schnorr-signed at queue time. Keeping the
+signature in the outbox (rather than producing it only at wrap time) means
+the same signature travels with the message through retries, persists
+across reloads, and is available when we mirror the message into the local
+ledger — so recovering peers can verify authorship offline.
 */
 
 import { createPeerMessageModel } from "./models/data-model.js";
 import { PEER_MESSAGE_TYPE_TRUST_LIMIT_SUGGESTION } from "./realtime/peer-messages.js";
+import { signInnerMessage } from "./realtime/peer-envelope.js";
 import { asTrimmedString, createId, hasUser } from "./state-utils.js";
 
 const PROCESSED_MESSAGE_ID_LIMIT = 500;
@@ -23,7 +30,7 @@ export const ensureProcessedPeerMessageIds = (state) => {
   }
 };
 
-export const queuePeerMessage = (state, { toUserId, type, payload = {} } = {}) => {
+export const queuePeerMessage = async (state, { toUserId, type, payload = {} } = {}) => {
   if (!hasUser(state)) {
     return null;
   }
@@ -34,7 +41,7 @@ export const queuePeerMessage = (state, { toUserId, type, payload = {} } = {}) =
   }
 
   ensureOutbox(state);
-  const message = createPeerMessageModel({
+  const unsigned = createPeerMessageModel({
     id: createId("peer"),
     type,
     from_user_id: state.user.id,
@@ -42,6 +49,21 @@ export const queuePeerMessage = (state, { toUserId, type, payload = {} } = {}) =
     created_at: new Date().toISOString(),
     payload,
   });
+
+  const privateKeyHex = state.user.private_key_hex || "";
+  let signature = "";
+  if (privateKeyHex) {
+    try {
+      signature = await signInnerMessage(unsigned, { privateKeyHex });
+    } catch {
+      // Signing should not fail, but if it does we still queue the message
+      // unsigned so delivery can proceed; recipients enforcing signatures
+      // will reject it and we'll surface the issue that way.
+      signature = "";
+    }
+  }
+
+  const message = createPeerMessageModel({ ...unsigned, signature });
   state.outbox.push(message);
   return message;
 };
@@ -102,7 +124,7 @@ export const hasQueuedPeerMessage = (state, { toUserId = "", type = "" } = {}) =
   });
 };
 
-export const queueTrustLimitSuggestion = (state, friendId, trustLimit) => {
+export const queueTrustLimitSuggestion = async (state, friendId, trustLimit) => {
   if (!Number.isFinite(trustLimit) || trustLimit < 0) {
     return null;
   }

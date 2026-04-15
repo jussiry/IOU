@@ -75,7 +75,7 @@ const warnIllegalPeerMessage = (message) => {
 const notification = (text, friendId, hash) => ({ text, friendId, hash });
 const friendNotification = (text, friendId) => notification(text, friendId, `friend/${friendId}`);
 
-const applyFriendRequestMessage = (state, message) => {
+const applyFriendRequestMessage = async (state, message) => {
   const requesterName =
     asTrimmedString(message.payload?.requester_name) || message.from_user_id;
   const existingConnection = getUserConnection(state, message.from_user_id);
@@ -84,7 +84,7 @@ const applyFriendRequestMessage = (state, message) => {
     existingConnection.friendship_status = FRIENDSHIP_STATUS_ACCEPTED;
     existingConnection.person_name = requesterName;
     ensureContact(state, message.from_user_id, requesterName);
-    queuePeerMessage(state, {
+    await queuePeerMessage(state, {
       toUserId: message.from_user_id,
       type: PEER_MESSAGE_TYPE_FRIEND_ACCEPT,
       payload: {
@@ -128,9 +128,16 @@ const applyFriendRequestMessage = (state, message) => {
 const applyFriendAcceptMessage = (state, message) => {
   const accepterName =
     asTrimmedString(message.payload?.accepter_name) || message.from_user_id;
-  const userConnection = getUserConnection(state, message.from_user_id);
+  let userConnection = getUserConnection(state, message.from_user_id);
   if (!userConnection) {
-    return null;
+    // Recovery path: the peer is telling us we're friends but we don't remember.
+    // Since they could only encrypt this message to us via ECDH (proving prior
+    // relationship), trust it and re-establish the connection.
+    userConnection = ensureUserConnection(state, message.from_user_id, accepterName, {
+      friendshipStatus: FRIENDSHIP_STATUS_ACCEPTED,
+    });
+    if (!userConnection) return null;
+    ensureContactBackLink(state, message.from_user_id, accepterName);
   }
   if (userConnection.friendship_status === FRIENDSHIP_STATUS_REJECTED) {
     return null;
@@ -141,15 +148,24 @@ const applyFriendAcceptMessage = (state, message) => {
   userConnection.person_name = accepterName;
   ensureContact(state, message.from_user_id, accepterName);
 
+  // Restore the trust limit the accepter agreed to. This is the value the
+  // peer echoes back from the suggested_credit_limit_eur in our friend_request,
+  // so replaying a friend_accept during sync recovery fully reconstitutes the
+  // established trust limit without any extra negotiation round-trips.
+  const agreedLimit = normalizeCurrencyAmount(message.payload?.trust_credit_limit_eur, NaN);
+  if (Number.isFinite(agreedLimit) && agreedLimit >= 0) {
+    userConnection.trust_credit_limit_eur = agreedLimit;
+  }
+
   if (wasAccepted) {
     return null;
   }
   return friendNotification(`${accepterName} accepted your friend request`, message.from_user_id);
 };
 
-const applyFriendRejectMessage = (state, message) => {
+const applyFriendRejectMessage = async (state, message) => {
   const displayName = getDisplayName(state, message.from_user_id);
-  const applied = cancelPendingFriendRequest(state, message.from_user_id, {
+  const applied = await cancelPendingFriendRequest(state, message.from_user_id, {
     direction: "from",
     displayName,
     skipLog: true,
@@ -353,7 +369,7 @@ const createInboundProcessingResult = (view, acknowledgeResult = null) => {
  * caller can decide whether to persist, which receipt to send, and
  * whether to show a toast.
  */
-export const routeInboundMessage = (state, message) => {
+export const routeInboundMessage = async (state, message) => {
   if (message.to_user_id && message.to_user_id !== state.user.id) {
     return { applied: false, acknowledgeResult: null };
   }
@@ -369,13 +385,13 @@ export const routeInboundMessage = (state, message) => {
   let result = null;
   switch (message.type) {
     case PEER_MESSAGE_TYPE_FRIEND_REQUEST:
-      result = applyFriendRequestMessage(state, message);
+      result = await applyFriendRequestMessage(state, message);
       break;
     case PEER_MESSAGE_TYPE_FRIEND_ACCEPT:
       result = applyFriendAcceptMessage(state, message);
       break;
     case PEER_MESSAGE_TYPE_FRIEND_REJECT:
-      result = applyFriendRejectMessage(state, message);
+      result = await applyFriendRejectMessage(state, message);
       break;
     case PEER_MESSAGE_TYPE_TRUST_LIMIT_SUGGESTION:
       result = applyTrustLimitSuggestionMessage(state, message);
@@ -413,6 +429,8 @@ export const routeInboundMessage = (state, message) => {
     fromUserId: message.from_user_id,
     toUserId: message.to_user_id,
     payload: message.payload,
+    signature: message.signature,
+    originatedAt: message.created_at,
   });
 
   return {
