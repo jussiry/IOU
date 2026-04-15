@@ -19,7 +19,7 @@ import {
   PEER_MESSAGE_TYPE_FRIEND_REJECT,
   PEER_MESSAGE_TYPE_FRIEND_REQUEST,
 } from "./realtime/peer-messages.js";
-import { appendLog, asTrimmedString, hasUser } from "./state-utils.js";
+import { appendLedgerEntry, asTrimmedString, hasUser } from "./state-utils.js";
 import {
   FRIENDSHIP_STATUS_ACCEPTED,
   FRIENDSHIP_STATUS_PENDING_INCOMING,
@@ -212,18 +212,25 @@ export const cancelPendingFriendRequest = (
       type: PEER_MESSAGE_TYPE_FRIEND_REQUEST,
     });
   removeFriendRelationshipData(state, normalizedFriendId);
+  let rejectMessage = null;
   if (notifyPeer && !hasUnsentOutgoingRequest) {
-    queuePeerMessage(state, {
+    rejectMessage = queuePeerMessage(state, {
       toUserId: normalizedFriendId,
       type: PEER_MESSAGE_TYPE_FRIEND_REJECT,
       payload: {},
     });
   }
-  if (!skipLog) {
-    appendLog(state, {
-      text: `Friend request cancelled ${direction} ${normalizedDisplayName}`,
-      friendId: normalizedFriendId,
+  if (!skipLog && rejectMessage) {
+    appendLedgerEntry(state, {
+      id: rejectMessage.id,
+      type: rejectMessage.type,
+      fromUserId: rejectMessage.from_user_id,
+      toUserId: rejectMessage.to_user_id,
+      payload: rejectMessage.payload,
     });
   }
+  // direction/displayName currently unused; kept for call-site compatibility
+  void direction;
+  void normalizedDisplayName;
   return true;
 };

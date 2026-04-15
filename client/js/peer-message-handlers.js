@@ -40,7 +40,7 @@ import {
   PEER_RECEIPT_RESULT_IGNORED,
   PEER_RECEIPT_RESULT_PROCESSED,
 } from "./realtime/peer-messages.js";
-import { appendLog, asTrimmedString, createId } from "./state-utils.js";
+import { appendLedgerEntry, asTrimmedString, createId } from "./state-utils.js";
 import {
   FRIENDSHIP_STATUS_ACCEPTED,
   FRIENDSHIP_STATUS_PENDING_INCOMING,
@@ -68,10 +68,8 @@ const serializePeerMessageData = (message) => {
   }
 };
 
-const appendIllegalPeerMessageLog = (state, message) => {
-  appendLog(state, {
-    text: `Illegal peer message received: ${serializePeerMessageData(message)}`,
-  });
+const warnIllegalPeerMessage = (message) => {
+  console.warn("[PeerMessage] Illegal peer message received:", serializePeerMessageData(message));
 };
 
 const notification = (text, friendId, hash) => ({ text, friendId, hash });
@@ -395,12 +393,12 @@ export const routeInboundMessage = (state, message) => {
       result = applyNameChangedMessage(state, message);
       break;
     default:
-      appendIllegalPeerMessageLog(state, message);
+      warnIllegalPeerMessage(message);
       return { applied: false, acknowledgeResult: PEER_RECEIPT_RESULT_IGNORED, persisted: true };
   }
 
   if (!result) {
-    appendIllegalPeerMessageLog(state, message);
+    warnIllegalPeerMessage(message);
     return { applied: false, acknowledgeResult: PEER_RECEIPT_RESULT_IGNORED, persisted: true };
   }
 
@@ -409,9 +407,12 @@ export const routeInboundMessage = (state, message) => {
   if (userConnection) {
     userConnection.last_synced_at = new Date().toISOString();
   }
-  appendLog(state, {
-    text: result.text,
-    friendId: result.friendId,
+  appendLedgerEntry(state, {
+    id: message.id,
+    type: message.type,
+    fromUserId: message.from_user_id,
+    toUserId: message.to_user_id,
+    payload: message.payload,
   });
 
   return {

@@ -6,7 +6,7 @@ The same helpers are used for normalization when loading persisted state. Keepin
 
 import { FRIENDSHIP_STATUS_ACCEPTED } from "../utils/friendships.js";
 
-export const DATA_MODEL_VERSION = 2;
+export const DATA_MODEL_VERSION = 3;
 
 const asNumberOrDefault = (value, defaultValue = 0) => {
   const parsedValue = Number(value);
@@ -142,15 +142,14 @@ export const createPublicPersonModel = (input = {}) => {
   return createPersonModel(input, { includePrivateKeys: false });
 };
 
-export const createLogEntryModel = (input = {}) => {
+export const createLedgerEntryModel = (input = {}) => {
   return {
     id: asTrimmedStringOrDefault(input.id),
-    transaction_id: asTrimmedStringOrDefault(input.transaction_id),
     timestamp: asTrimmedStringOrDefault(input.timestamp),
-    text: asTrimmedStringOrDefault(input.text),
-    message: asTrimmedStringOrDefault(input.message),
-    friend_id: asTrimmedStringOrDefault(input.friend_id),
-    amount_eur: asNumberOrDefault(input.amount_eur, 0),
+    type: asTrimmedStringOrDefault(input.type),
+    from_user_id: asTrimmedStringOrDefault(input.from_user_id),
+    to_user_id: asTrimmedStringOrDefault(input.to_user_id),
+    payload: clonePlainObject(input.payload),
   };
 };
 
@@ -170,7 +169,7 @@ export const createEmptyAppState = (userPerson) => {
     model_version: DATA_MODEL_VERSION,
     user: createPersonModel(userPerson),
     contacts: {},
-    logs: [],
+    ledger: [],
     outbox: [],
     processed_peer_message_ids: [],
   };
@@ -196,10 +195,10 @@ export const normalizeAppState = (state) => {
   if (!state.user) return null;
 
   return {
-    model_version: asNumberOrDefault(state.model_version, DATA_MODEL_VERSION),
+    model_version: DATA_MODEL_VERSION,
     user: createPersonModel(state.user),
     contacts: normalizeContactsMap(state.contacts),
-    logs: Array.isArray(state.logs) ? state.logs.map((entry) => createLogEntryModel(entry)) : [],
+    ledger: Array.isArray(state.ledger) ? state.ledger.map((entry) => createLedgerEntryModel(entry)) : [],
     outbox: Array.isArray(state.outbox)
       ? state.outbox.map((entry) => createPeerMessageModel(entry))
       : [],

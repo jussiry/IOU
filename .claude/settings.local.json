@@ -25,6 +25,7 @@
       "Bash(sleep *)",
       "Bash(wc *)",
       "Bash(md5 *)",
+      "Bash(for f *)",
       "Bash(gh search:*)",
       "Bash(gh issue:*)",
       "Bash(xargs kill:*)",

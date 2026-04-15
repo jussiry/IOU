@@ -49,6 +49,7 @@ const createSignalingClient = (
     onPeerSignal = null,
     onPeerEnvelopeFromServer = null,
     onSessionReady = null,
+    onQueueDrained = null,
   } = {}
 ) => {
   let socket = null;
@@ -129,6 +130,11 @@ const createSignalingClient = (
       onPeerEnvelopeFromServer({
         envelope: payload.envelope || null,
       });
+      return;
+    }
+
+    if (payload.type === "queue_drained" && typeof onQueueDrained === "function") {
+      onQueueDrained();
     }
   };
 

@@ -15,6 +15,8 @@ export const PEER_MESSAGE_TYPE_PAYMENT_REQUEST_RESPONSE = "payment_request_respo
 export const PEER_MESSAGE_TYPE_PING = "ping";
 export const PEER_MESSAGE_TYPE_PONG = "pong";
 export const PEER_MESSAGE_TYPE_RECEIVED = "received";
+export const PEER_MESSAGE_TYPE_SYNC_HELLO = "sync_hello";
+export const PEER_MESSAGE_TYPE_SYNC_DATA = "sync_data";
 export const PEER_RECEIPT_RESULT_PROCESSED = "peer_processed";
 export const PEER_RECEIPT_RESULT_IGNORED = "peer_ignored";
 

@@ -53,6 +53,6 @@ export const buildView = (state) => {
       trustAgreements,
       availableTrust,
     },
-    logs: Array.isArray(state.logs) ? state.logs : [],
+    ledger: Array.isArray(state.ledger) ? state.ledger : [],
   };
 };

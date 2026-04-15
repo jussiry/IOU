@@ -7,6 +7,7 @@ Application-level peer messages travel inside encrypted envelopes wrapped here s
 */
 
 import {
+  addLedgerEntries,
   applyInboundPeerMessage,
   getRealtimeSnapshot,
   markPeerMessageReceived,
@@ -18,6 +19,8 @@ import {
   PEER_MESSAGE_TYPE_PING,
   PEER_MESSAGE_TYPE_PONG,
   PEER_MESSAGE_TYPE_RECEIVED,
+  PEER_MESSAGE_TYPE_SYNC_HELLO,
+  PEER_MESSAGE_TYPE_SYNC_DATA,
 } from "./peer-messages.js";
 import {
   isPeerEnvelope,
@@ -44,6 +47,140 @@ const createRealtimeClient = () => {
   // outbox messages to be re-queued instead of stranded.
   const envelopesSentToServer = new Set();
 
+  // Sync protocol state.
+  // We defer sync_hello until the server has finished flushing any queued
+  // envelopes for us — that way we won't re-request ledger entries we're
+  // about to receive anyway via the regular inbound path.
+  let serverQueueDrained = false;
+  const pendingSyncPeers = new Set();
+  const syncedPeers = new Set();
+
+  const getLedgerEntriesForPeer = (ledger, myId, peerId) => {
+    if (!Array.isArray(ledger)) return [];
+    return ledger.filter((entry) =>
+      (entry.from_user_id === myId && entry.to_user_id === peerId) ||
+      (entry.from_user_id === peerId && entry.to_user_id === myId)
+    );
+  };
+
+  const sendSyncMessage = async (peerUserId, type, payload) => {
+    if (!currentSnapshot?.userPrivateKeyHex || !currentSnapshot?.userId) return;
+    if (!peerMesh.canSend(peerUserId)) return;
+
+    const randomId = (window.crypto?.randomUUID && window.crypto.randomUUID())
+      || `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+    const message = {
+      id: `sync_${randomId}`,
+      type,
+      from_user_id: currentSnapshot.userId,
+      to_user_id: peerUserId,
+      created_at: new Date().toISOString(),
+      payload,
+    };
+    try {
+      const envelope = await wrapPeerMessage(message, {
+        privateKeyHex: currentSnapshot.userPrivateKeyHex,
+      });
+      peerMesh.sendPeerMessage(peerUserId, envelope);
+    } catch (error) {
+      logRealtimeEvent("Failed to wrap sync message", {
+        type,
+        peerUserId,
+        error: String(error?.message || error),
+      });
+    }
+  };
+
+  const sendSyncHello = async (peerUserId) => {
+    if (!currentSnapshot) return;
+    const entries = getLedgerEntriesForPeer(
+      currentSnapshot.ledger,
+      currentSnapshot.userId,
+      peerUserId,
+    );
+    syncedPeers.add(peerUserId);
+    logRealtimeEvent("Sending sync_hello", {
+      peerUserId,
+      knownCount: entries.length,
+    });
+    await sendSyncMessage(peerUserId, PEER_MESSAGE_TYPE_SYNC_HELLO, {
+      known_ids: entries.map((entry) => entry.id),
+    });
+  };
+
+  const handleSyncHello = async (peerUserId, payload) => {
+    if (!currentSnapshot) return;
+    const knownIds = new Set(
+      Array.isArray(payload?.known_ids) ? payload.known_ids : []
+    );
+    const myEntries = getLedgerEntriesForPeer(
+      currentSnapshot.ledger,
+      currentSnapshot.userId,
+      peerUserId,
+    );
+    const missing = myEntries.filter((entry) => !knownIds.has(entry.id));
+    logRealtimeEvent("Received sync_hello, replying with sync_data", {
+      peerUserId,
+      peerKnownCount: knownIds.size,
+      sendingCount: missing.length,
+    });
+    await sendSyncMessage(peerUserId, PEER_MESSAGE_TYPE_SYNC_DATA, {
+      entries: missing,
+    });
+  };
+
+  const handleSyncData = async (peerUserId, payload) => {
+    if (!currentSnapshot) return;
+    const entries = Array.isArray(payload?.entries) ? payload.entries : [];
+    if (entries.length === 0) return;
+
+    const myId = currentSnapshot.userId;
+    const inboundLike = [];
+    const outboundOnly = [];
+    entries.forEach((entry) => {
+      if (entry.to_user_id === myId) {
+        inboundLike.push(entry);
+      } else if (entry.from_user_id === myId) {
+        outboundOnly.push(entry);
+      }
+    });
+
+    logRealtimeEvent("Received sync_data", {
+      peerUserId,
+      total: entries.length,
+      inboundLike: inboundLike.length,
+      outboundOnly: outboundOnly.length,
+    });
+
+    for (const entry of inboundLike) {
+      await applyInboundPeerMessage({
+        id: entry.id,
+        type: entry.type,
+        from_user_id: entry.from_user_id,
+        to_user_id: entry.to_user_id,
+        created_at: entry.timestamp,
+        payload: entry.payload,
+      });
+    }
+    if (outboundOnly.length > 0) {
+      await addLedgerEntries(outboundOnly);
+    }
+    await syncRealtimeState();
+  };
+
+  const trySyncPendingPeers = () => {
+    if (!serverQueueDrained) return;
+    Array.from(pendingSyncPeers).forEach((peerId) => {
+      if (!peerMesh.canSend(peerId)) return;
+      if (syncedPeers.has(peerId)) {
+        pendingSyncPeers.delete(peerId);
+        return;
+      }
+      pendingSyncPeers.delete(peerId);
+      void sendSyncHello(peerId);
+    });
+  };
+
   const peerMesh = createPeerMesh({
     getLocalUserId: () => currentSnapshot?.userId || "",
     sendSignal: (peerUserId, signal) => {
@@ -51,6 +188,8 @@ const createRealtimeClient = () => {
     },
     onPeerReady: (peerUserId) => {
       void updateLastSyncedAt(peerUserId);
+      pendingSyncPeers.add(peerUserId);
+      trySyncPendingPeers();
       void syncRealtimeState();
     },
     onPeerStatusChange: (connectedPeerIds) => {
@@ -80,7 +219,16 @@ const createRealtimeClient = () => {
       // for us are about to arrive. Forget what we previously asked the server
       // to queue so a server restart doesn't strand undelivered messages.
       envelopesSentToServer.clear();
+      // Wait for `queue_drained` before initiating sync_hello so we don't
+      // re-request ledger entries the server is about to redeliver.
+      serverQueueDrained = false;
+      syncedPeers.clear();
       void syncRealtimeState();
+    },
+    onQueueDrained: () => {
+      logRealtimeEvent("Server queue drained");
+      serverQueueDrained = true;
+      trySyncPendingPeers();
     },
   });
 
@@ -227,6 +375,16 @@ const createRealtimeClient = () => {
   const processInnerPeerMessage = async (innerMessage, { receiptChannelPeerId } = {}) => {
     if (innerMessage.type === PEER_MESSAGE_TYPE_RECEIVED) {
       await handleReceiptMessage(innerMessage);
+      return;
+    }
+
+    if (innerMessage.type === PEER_MESSAGE_TYPE_SYNC_HELLO) {
+      await handleSyncHello(innerMessage.from_user_id, innerMessage.payload);
+      return;
+    }
+
+    if (innerMessage.type === PEER_MESSAGE_TYPE_SYNC_DATA) {
+      await handleSyncData(innerMessage.from_user_id, innerMessage.payload);
       return;
     }
 

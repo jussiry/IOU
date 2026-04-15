@@ -5,7 +5,7 @@ These small helpers are extracted to avoid circular dependencies between
 data.js, peer-outbox.js, connection-helpers.js, and peer-message-handlers.js.
 */
 
-import { createLogEntryModel } from "./models/data-model.js";
+import { createLedgerEntryModel } from "./models/data-model.js";
 
 export const hasUser = (state) => {
   return Boolean(
@@ -28,26 +28,16 @@ export const createId = (prefix = "tx") => {
   return `${prefix}_${Date.now().toString(36)}_${randomToken}`;
 };
 
-export const appendLog = (
-  state,
-  {
-    text,
-    message = "",
-    friendId = "",
-    amount = 0,
-    transactionId = "",
-  } = {}
-) => {
-  state.logs = Array.isArray(state.logs) ? state.logs : [];
-  state.logs.unshift(
-    createLogEntryModel({
-      id: createId("log"),
-      transaction_id: transactionId,
+export const appendLedgerEntry = (state, { id, type, fromUserId, toUserId, payload = {} } = {}) => {
+  state.ledger = Array.isArray(state.ledger) ? state.ledger : [];
+  state.ledger.unshift(
+    createLedgerEntryModel({
+      id: id || createId("ledger"),
       timestamp: new Date().toISOString(),
-      text,
-      message,
-      friend_id: friendId,
-      amount_eur: amount,
+      type,
+      from_user_id: fromUserId || "",
+      to_user_id: toUserId || "",
+      payload,
     })
   );
 };

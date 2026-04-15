@@ -241,6 +241,7 @@ const createSignalingServer = (server) => {
     client.userId = normalizedUserId;
     clientsByUserId.set(normalizedUserId, client);
     flushStoredEnvelopes(client);
+    sendJson(client.socket, { type: "queue_drained" });
     syncClientPeers(client);
   };
 

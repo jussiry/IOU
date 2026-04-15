@@ -1,12 +1,83 @@
 /*
-This module binds the logs page and maps log entries into reusable template nodes. It handles timestamp formatting and optional message suffixes per entry.
+Binds the logs page by deriving human-readable rows from the ledger.
 
-Keeping log-row assembly isolated here allows the data layer to stay transport-focused while this module owns presentation details. It also surfaces a small live state summary so transport status can be inspected alongside the event log.
+Each ledger entry is a peer message that either the user sent or received;
+the formatter below turns it into a presentation string based on its type.
+Formatting lives here (not in the data layer) so the ledger stays transport-
+focused while this module owns display concerns.
 */
 
 import { formatMarkdownish } from "../../js/utils/markdownish.js";
 import { getConnectedPeerIds } from "../../js/realtime/peer-status.js";
 import { initInfiniteList } from "../../js/utils/infinite-list.js";
+
+const formatEur = (amount) => {
+  const value = Number(amount);
+  return Number.isFinite(value) ? `€${value.toFixed(2)}` : "€0.00";
+};
+
+const getPeerDisplayName = (namesById, peerId, fallback = "") =>
+  namesById[peerId] || fallback || peerId;
+
+const formatLedgerEntry = (entry, myId, namesById) => {
+  const isOutgoing = entry.from_user_id === myId;
+  const peerId = isOutgoing ? entry.to_user_id : entry.from_user_id;
+  const peerName = getPeerDisplayName(namesById, peerId);
+  const peerBold = `**${peerName}**`;
+  const payload = entry.payload || {};
+
+  switch (entry.type) {
+    case "friend_request":
+      return isOutgoing
+        ? `Friend request sent to ${peerBold}`
+        : `Friend request received from ${peerBold}`;
+    case "friend_accept":
+      return isOutgoing
+        ? `You accepted ${peerBold} as a friend`
+        : `${peerBold} accepted your friend request`;
+    case "friend_reject":
+      return isOutgoing
+        ? `You rejected friend request from ${peerBold}`
+        : `${peerBold} rejected your friend request`;
+    case "credit_limit_suggestion": {
+      const limit = formatEur(payload.credit_limit_eur);
+      return isOutgoing
+        ? `You suggested trust limit of ${limit} with ${peerBold}`
+        : `${peerBold} suggested trust limit of ${limit}`;
+    }
+    case "transaction_created": {
+      const amount = formatEur(payload.amount_eur);
+      return isOutgoing
+        ? `You sent ${amount} to ${peerBold}`
+        : `${peerBold} sent ${amount} to you`;
+    }
+    case "payment_request": {
+      const amount = formatEur(payload.amount_eur);
+      return isOutgoing
+        ? `You requested ${amount} from ${peerBold}`
+        : `${peerBold} requested ${amount} from you`;
+    }
+    case "payment_request_response": {
+      const accepted = payload.accepted === true;
+      if (isOutgoing) {
+        return accepted
+          ? `You accepted payment request from ${peerBold}`
+          : `You declined payment request from ${peerBold}`;
+      }
+      return accepted
+        ? `${peerBold} accepted your payment request`
+        : `${peerBold} declined your payment request`;
+    }
+    case "name_changed": {
+      const newName = typeof payload.name === "string" ? payload.name : "";
+      return isOutgoing
+        ? `You changed your name to **${newName}**`
+        : `${peerBold} changed name to **${newName}**`;
+    }
+    default:
+      return `${entry.type} ${isOutgoing ? "→" : "←"} ${peerBold}`;
+  }
+};
 
 export const bindLogs = (root, data) => {
   const peerConnectionsEl = root.querySelector('[data-bind="peer-connections"]');
@@ -19,14 +90,23 @@ export const bindLogs = (root, data) => {
   }
 
   listEl.innerHTML = "";
-  const logs = Array.isArray(data.logs) ? data.logs : [];
 
-  initInfiniteList(listEl, logs, (log) => {
+  const myId = data.you?.id || "";
+  const namesById = {};
+  (Array.isArray(data.connections) ? data.connections : []).forEach((conn) => {
+    if (conn.person_id) {
+      namesById[conn.person_id] = conn.person_name || conn.person_id;
+    }
+  });
+
+  const entries = Array.isArray(data.ledger) ? data.ledger : [];
+
+  initInfiniteList(listEl, entries, (entry) => {
     const node = itemTemplate.content.firstElementChild.cloneNode(true);
     const timeEl = node.querySelector('[data-bind="time"]');
     const textEl = node.querySelector('[data-bind="text"]');
     if (timeEl) {
-      const time = new Date(log.timestamp);
+      const time = new Date(entry.timestamp);
       timeEl.textContent = Number.isNaN(time.getTime())
         ? ""
         : time.toLocaleString("en-US", {
@@ -37,9 +117,9 @@ export const bindLogs = (root, data) => {
           });
     }
     if (textEl) {
-      const message = log.message ? log.message.trim() : "";
-      const messageSuffix = message ? ` — ${message}` : "";
-      textEl.innerHTML = formatMarkdownish(`${log.text || ""}${messageSuffix}`);
+      textEl.innerHTML = formatMarkdownish(
+        formatLedgerEntry(entry, myId, namesById)
+      );
     }
     node.addEventListener("click", () => {
       node.classList.toggle("log-item--expanded");

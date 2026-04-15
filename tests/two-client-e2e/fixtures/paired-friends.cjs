@@ -38,7 +38,7 @@ const CAROL = {
   name: "Carol",
 };
 
-const DATA_MODEL_VERSION = 2;
+const DATA_MODEL_VERSION = 3;
 
 const buildState = (self, peers) => ({
   model_version: DATA_MODEL_VERSION,
@@ -65,7 +65,7 @@ const buildState = (self, peers) => ({
       { id: peer.publicKeyNpub, public_key: peer.publicKeyNpub, public_key_hex: peer.publicKeyHex, name: peer.name },
     ])
   ),
-  logs: [],
+  ledger: [],
   outbox: [],
   processed_peer_message_ids: [],
 });
@@ -82,7 +82,7 @@ const buildSoloState = (self) => ({
     connections: [],
   },
   contacts: {},
-  logs: [],
+  ledger: [],
   outbox: [],
   processed_peer_message_ids: [],
 });
