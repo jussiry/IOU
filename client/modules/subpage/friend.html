@@ -82,7 +82,16 @@
     <ul class="tx-list" data-list="friend-transactions"></ul>
   </div>
   <div data-section="trust-suggestion-explainer" data-slot="trust-explainer" hidden></div>
-  <div class="friend-sync-status" data-bind="sync-status" hidden></div>
+  <div class="friend-key friend-card surface-box">
+    <div class="friend-key-row" data-section="sync-info" hidden>
+      <div class="friend-key-label">Fully synchronised</div>
+      <div class="friend-key-value" data-bind="sync-time"></div>
+    </div>
+    <div class="friend-key-row">
+      <div class="friend-key-label" data-bind="friend-key-label">Key</div>
+      <div class="friend-key-value" data-bind="friend-public-key"></div>
+    </div>
+  </div>
 </div>
 
 <template data-template="tx-item">

@@ -53,7 +53,9 @@ export const bindFriendDetail = (root, data, friendId) => {
   const paymentRequestAcceptActionsEl = root.querySelector('[data-section="payment-request-accept-actions"]');
   const paymentRequestCancelActionsEl = root.querySelector('[data-section="payment-request-cancel-actions"]');
 
-  const syncStatusEl = root.querySelector('[data-bind="sync-status"]');
+  const syncInfoEl = root.querySelector('[data-section="sync-info"]');
+  const syncTimeEl = root.querySelector('[data-bind="sync-time"]');
+  const friendKeyLabelEl = root.querySelector('[data-bind="friend-key-label"]');
 
   const connection = data.connections.find((entry) => entry.person_id === friendId);
   const friendName = connection?.person_name || "Friend";
@@ -72,7 +74,9 @@ export const bindFriendDetail = (root, data, friendId) => {
     }
   }
 
-  if (syncStatusEl && !isOnline) {
+  if (friendKeyLabelEl) friendKeyLabelEl.textContent = `${friendFirstName}'s key`;
+
+  if (syncInfoEl && syncTimeEl) {
     if (connection?.last_synced_at) {
       const syncDate = new Date(connection.last_synced_at);
       if (!Number.isNaN(syncDate.getTime())) {
@@ -91,12 +95,12 @@ export const bindFriendDetail = (root, data, friendId) => {
           timeAgo = `${diffMinutes} minute${diffMinutes === 1 ? "" : "s"} ago`;
         }
 
-        syncStatusEl.textContent = `Last time both of you were online ${timeAgo}`;
-        syncStatusEl.hidden = false;
+        syncTimeEl.textContent = timeAgo;
+        syncInfoEl.hidden = false;
       }
     } else {
-      syncStatusEl.textContent = `You have never fully synchronised with ${friendFirstName}, since you have never been online at the same time.`;
-      syncStatusEl.hidden = false;
+      syncTimeEl.textContent = "Never";
+      syncInfoEl.hidden = false;
     }
   }
   if (labelEl) {
@@ -312,6 +316,9 @@ export const bindFriendDetail = (root, data, friendId) => {
       await dismissPaymentRequest(friendId);
     });
   }
+
+  const friendKeyEl = root.querySelector('[data-bind="friend-public-key"]');
+  if (friendKeyEl) friendKeyEl.textContent = friendId;
 
   if (!bodyEl || !listEl || !txTemplate) return;
   listEl.innerHTML = "";
