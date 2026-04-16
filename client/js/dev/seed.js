@@ -108,23 +108,9 @@ const buildAliceState = () => {
       [BOB.publicKeyNpub]: { id: BOB.publicKeyNpub, public_key: BOB.publicKeyNpub, public_key_hex: BOB.publicKeyHex, name: BOB.name },
       [CAROL.publicKeyNpub]: { id: CAROL.publicKeyNpub, public_key: CAROL.publicKeyNpub, public_key_hex: CAROL.publicKeyHex, name: CAROL.name },
     },
-    ledger: [
-      {
-        id: "peer-seed-bob-tx",
-        timestamp: iso(2),
-        type: "transaction_created",
-        from_user_id: BOB.publicKeyNpub,
-        to_user_id: ALICE.publicKeyNpub,
-        payload: {
-          transaction_id: "tx-seed-4",
-          amount_eur: 42,
-          date: date(2),
-          note: "Groceries",
-        },
-      },
-    ],
+    ledger: [],
     outbox: [],
-    processed_peer_message_ids: ["peer-seed-bob-tx"],
+    processed_peer_message_ids: [],
   };
 };
 
@@ -169,21 +155,7 @@ const buildBobState = () => {
       [ALICE.publicKeyNpub]: { id: ALICE.publicKeyNpub, public_key: ALICE.publicKeyNpub, public_key_hex: ALICE.publicKeyHex, name: ALICE.name },
       [CAROL.publicKeyNpub]: { id: CAROL.publicKeyNpub, public_key: CAROL.publicKeyNpub, public_key_hex: CAROL.publicKeyHex, name: CAROL.name },
     },
-    ledger: [
-      {
-        id: "peer-seed-bob-tx",
-        timestamp: iso(2),
-        type: "transaction_created",
-        from_user_id: BOB.publicKeyNpub,
-        to_user_id: ALICE.publicKeyNpub,
-        payload: {
-          transaction_id: "tx-seed-4",
-          amount_eur: 42,
-          date: date(2),
-          note: "Groceries",
-        },
-      },
-    ],
+    ledger: [],
     outbox: [],
     processed_peer_message_ids: [],
   };

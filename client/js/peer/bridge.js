@@ -96,7 +96,7 @@ export const updateLastSyncedAt = async (peerId) => {
   const state = await loadState();
   if (!hasUser(state)) return;
 
-  const connection = findConnection(state, normalizedPeerId);
+  const connection = findConnection(state.user, normalizedPeerId);
   if (!connection) return;
 
   connection.last_synced_at = new Date().toISOString();
@@ -121,7 +121,7 @@ export const markPeerMessageReceived = async (messageId) => {
 
   const peerId = removedMessage.to_user_id;
   if (peerId) {
-    const connection = findConnection(state, peerId);
+    const connection = findConnection(state.user, peerId);
     if (connection) {
       connection.last_synced_at = new Date().toISOString();
     }

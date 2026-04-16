@@ -130,6 +130,11 @@ const applyFriendAcceptMessage = (state, message) => {
   const accepterName =
     asTrimmedString(message.payload?.accepter_name) || message.from_user_id;
   let userConnection = getUserConnection(state, message.from_user_id);
+  // Track whether this is a recovery case *before* ensureUserConnection runs,
+  // because that call sets friendship_status to ACCEPTED immediately — which
+  // would otherwise make `wasAccepted` true and suppress the return value,
+  // preventing markProcessedPeerMessage from ever being called (causing a loop).
+  const isRecovery = !userConnection;
   if (!userConnection) {
     // Recovery path: the peer is telling us we're friends but we don't remember.
     // Since they could only encrypt this message to us via ECDH (proving prior
@@ -144,7 +149,7 @@ const applyFriendAcceptMessage = (state, message) => {
     return null;
   }
 
-  const wasAccepted = isAcceptedFriendshipStatus(userConnection.friendship_status);
+  const wasAccepted = !isRecovery && isAcceptedFriendshipStatus(userConnection.friendship_status);
   userConnection.friendship_status = FRIENDSHIP_STATUS_ACCEPTED;
   userConnection.person_name = accepterName;
   ensureContact(state, message.from_user_id, accepterName);
