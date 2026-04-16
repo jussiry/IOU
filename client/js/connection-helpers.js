@@ -14,12 +14,13 @@ import {
   ensureOutbox,
   hasQueuedPeerMessage,
   queuePeerMessage,
-} from "./peer-outbox.js";
+} from "./peer/outbox.js";
 import {
   PEER_MESSAGE_TYPE_FRIEND_REJECT,
   PEER_MESSAGE_TYPE_FRIEND_REQUEST,
-} from "./realtime/peer-messages.js";
-import { appendLedgerEntry, asTrimmedString, hasUser } from "./state-utils.js";
+} from "./peer/messages.js";
+import { appendLedgerEntry } from "./ledger.js";
+import { asTrimmedString, hasUser } from "./state-utils.js";
 import {
   FRIENDSHIP_STATUS_ACCEPTED,
   FRIENDSHIP_STATUS_PENDING_INCOMING,

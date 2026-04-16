@@ -5,8 +5,8 @@ The view model aggregates balance totals, trust agreements, and connection
 data so that page binders never need to compute these values themselves.
 */
 
-import { createPublicPersonModel } from "./models/data-model.js";
-import { isAcceptedFriendshipStatus } from "./utils/friendships.js";
+import { createPublicPersonModel } from "../models/data-model.js";
+import { isAcceptedFriendshipStatus } from "../utils/friendships.js";
 
 export const buildView = (state) => {
   const user = state.user;

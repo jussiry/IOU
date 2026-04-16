@@ -11,9 +11,9 @@ import {
   applyInboundPeerMessage,
   getRealtimeSnapshot,
   markPeerMessageReceived,
-  subscribeToDataChanges,
   updateLastSyncedAt,
-} from "../data.js";
+} from "./bridge.js";
+import { subscribeToDataChanges } from "../app-state.js";
 import {
   createPeerReceiptMessage,
   PEER_MESSAGE_TYPE_PING,
@@ -21,16 +21,19 @@ import {
   PEER_MESSAGE_TYPE_RECEIVED,
   PEER_MESSAGE_TYPE_SYNC_HELLO,
   PEER_MESSAGE_TYPE_SYNC_DATA,
-} from "./peer-messages.js";
+} from "./messages.js";
 import {
   isPeerEnvelope,
   unwrapPeerEnvelope,
-  verifyLedgerEntrySignature,
   wrapPeerMessage,
-} from "./peer-envelope.js";
+} from "./envelope.js";
+import {
+  getLedgerEntriesForPeer,
+  verifyLedgerEntrySignature,
+} from "../ledger.js";
 import { createSignalingClient } from "../signaling/socket-client.js";
-import { createPeerMesh } from "./peer-mesh.js";
-import { replaceConnectedPeerIds } from "./peer-status.js";
+import { createPeerMesh } from "./mesh.js";
+import { replaceConnectedPeerIds } from "./status.js";
 
 const logRealtimeEvent = (title, detail) => {
   if (typeof detail === "undefined") {
@@ -55,14 +58,6 @@ const createRealtimeClient = () => {
   let serverQueueDrained = false;
   const pendingSyncPeers = new Set();
   const syncedPeers = new Set();
-
-  const getLedgerEntriesForPeer = (ledger, myId, peerId) => {
-    if (!Array.isArray(ledger)) return [];
-    return ledger.filter((entry) =>
-      (entry.from_user_id === myId && entry.to_user_id === peerId) ||
-      (entry.from_user_id === peerId && entry.to_user_id === myId)
-    );
-  };
 
   const sendSyncMessage = async (peerUserId, type, payload) => {
     if (!currentSnapshot?.userPrivateKeyHex || !currentSnapshot?.userId) return;

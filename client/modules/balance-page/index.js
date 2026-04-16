@@ -4,7 +4,7 @@ This module binds the balance page UI. It renders totals, populates list section
 It keeps all balance-page specific rendering logic local to this module so the app shell can treat the page as a simple binder callback.
 */
 
-import { formatCurrency, formatNet, formatSigned } from "../../js/utils/format.js";
+import { formatCurrency, formatNet, formatSigned } from "../../js/ui/format.js";
 import { isAcceptedFriendshipStatus } from "../../js/utils/friendships.js";
 
 const closePanel = (button, panel) => {

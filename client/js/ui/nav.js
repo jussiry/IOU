@@ -4,7 +4,7 @@ This module owns active-state handling for primary navigation buttons. It update
 Centralizing nav state changes prevents duplicated button toggling logic across route handlers.
 */
 
-import { hasActionableNotification } from "./friendships.js";
+import { hasActionableNotification } from "../utils/friendships.js";
 
 const getActionableCountsByPage = (data) => {
   const counts = {};

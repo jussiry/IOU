@@ -12,7 +12,7 @@ import {
   createPeerMessageModel,
   createTransactionModel,
   normalizeCurrencyAmount,
-} from "./models/data-model.js";
+} from "../models/data-model.js";
 import {
   cancelPendingFriendRequest,
   ensureContact,
@@ -20,13 +20,13 @@ import {
   ensureUserConnection,
   getDisplayName,
   getUserConnection,
-} from "./connection-helpers.js";
-import { formatCurrency } from "./utils/format.js";
+} from "../connection-helpers.js";
+import { formatCurrency } from "../ui/format.js";
 import {
   hasProcessedPeerMessage,
   markProcessedPeerMessage,
   queuePeerMessage,
-} from "./peer-outbox.js";
+} from "./outbox.js";
 import {
   PEER_MESSAGE_TYPE_TRUST_LIMIT_SUGGESTION,
   PEER_MESSAGE_TYPE_FRIEND_ACCEPT,
@@ -39,8 +39,9 @@ import {
   PEER_MESSAGE_TYPE_TRANSACTION_CREATED,
   PEER_RECEIPT_RESULT_IGNORED,
   PEER_RECEIPT_RESULT_PROCESSED,
-} from "./realtime/peer-messages.js";
-import { appendLedgerEntry, asTrimmedString, createId } from "./state-utils.js";
+} from "./messages.js";
+import { appendLedgerEntry } from "../ledger.js";
+import { asTrimmedString, createId } from "../state-utils.js";
 import {
   FRIENDSHIP_STATUS_ACCEPTED,
   FRIENDSHIP_STATUS_PENDING_INCOMING,
@@ -48,7 +49,7 @@ import {
   FRIENDSHIP_STATUS_REJECTED,
   isAcceptedFriendshipStatus,
   isPeerEligibleFriendshipStatus,
-} from "./utils/friendships.js";
+} from "../utils/friendships.js";
 
 const getIncomingTrustLimitFromPayload = (payload) => {
   const suggestedTrustLimit = normalizeCurrencyAmount(

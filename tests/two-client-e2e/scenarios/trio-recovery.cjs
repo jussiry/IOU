@@ -37,20 +37,20 @@ const BOB_IOU_AMOUNT = 25;
 const CAROL_IOU_AMOUNT = 15;
 
 // ---------------------------------------------------------------------------
-// Page-side helpers: drive data.js directly via dynamic import so we can
-// orchestrate multi-user flows without routing through three different UIs.
+// Page-side helpers: drive command modules directly via dynamic import so we
+// can orchestrate multi-user flows without routing through three different UIs.
 // ---------------------------------------------------------------------------
 
 const callData = async (client, fnName, ...args) => {
   return client.page.evaluate(
     async ({ name, params }) => {
-      const mod = await import("/js/data.js");
+      const mod = await import("/js/commands/index.js");
       const fn = mod[name];
       if (typeof fn !== "function") {
-        throw new Error(`data.js has no export '${name}'`);
+        throw new Error(`commands/index.js has no export '${name}'`);
       }
       const result = await fn(...params);
-      // Most data.js mutators return a view; strip it so we only serialize
+      // Most command mutators return a view; strip it so we only serialize
       // small payloads across the Playwright bridge.
       return result == null ? null : true;
     },
@@ -126,7 +126,7 @@ module.exports = {
     const bob = await createSeededClient({ label: "bob", seed: fixtures.bob });
     const carol = await createSeededClient({ label: "carol", seed: carolSeed });
 
-    // --- Pair Alice<->Bob and Alice<->Carol via data.js ---
+    // --- Pair Alice<->Bob and Alice<->Carol via command modules ---
     // Alice sends friend requests with a non-zero suggested trust limit so
     // Bob/Carol auto-adopt it on accept.
     await callData(alice, "createFriend", { friendId: BOB.publicKeyNpub, trustLimit: TRUST_LIMIT_INITIAL });

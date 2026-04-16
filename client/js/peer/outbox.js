@@ -2,7 +2,7 @@
 Manages the outbound peer message queue (outbox) and message deduplication.
 
 All functions operate on the state object directly. Persistence is handled
-by the caller (data.js).
+by the caller (app-state.js).
 
 Outbound peer messages are Schnorr-signed at queue time. Keeping the
 signature in the outbox (rather than producing it only at wrap time) means
@@ -11,10 +11,10 @@ across reloads, and is available when we mirror the message into the local
 ledger — so recovering peers can verify authorship offline.
 */
 
-import { createPeerMessageModel } from "./models/data-model.js";
-import { PEER_MESSAGE_TYPE_TRUST_LIMIT_SUGGESTION } from "./realtime/peer-messages.js";
-import { signInnerMessage } from "./realtime/peer-envelope.js";
-import { asTrimmedString, createId, hasUser } from "./state-utils.js";
+import { createPeerMessageModel } from "../models/data-model.js";
+import { PEER_MESSAGE_TYPE_TRUST_LIMIT_SUGGESTION } from "./messages.js";
+import { signInnerMessage } from "./envelope.js";
+import { asTrimmedString, createId, hasUser } from "../state-utils.js";
 
 const PROCESSED_MESSAGE_ID_LIMIT = 500;
 

@@ -4,8 +4,8 @@ This module renders the friends list page. It sorts friendship rows, formats deb
 It also owns the add-friend button behavior and keeps accepted, pending, and rejected friendships visually distinct so the list remains useful after realtime friend requests are introduced.
 */
 
-import { formatCurrency, formatSigned } from "../../js/utils/format.js";
-import { getConnectedPeerIds } from "../../js/realtime/peer-status.js";
+import { formatCurrency, formatSigned } from "../../js/ui/format.js";
+import { getConnectedPeerIds } from "../../js/peer/status.js";
 import {
   FRIENDSHIP_STATUS_ACCEPTED,
   FRIENDSHIP_STATUS_PENDING_INCOMING,

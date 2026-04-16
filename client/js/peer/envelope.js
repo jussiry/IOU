@@ -59,25 +59,6 @@ export const signInnerMessage = async (innerMessage, { privateKeyHex }) => {
   return schnorrSignHex(digestHex, privateKeyHex);
 };
 
-// Reconstruct the inner-message shape from a stored ledger entry and verify
-// its Schnorr signature. Ledger entries hold the sender-asserted timestamp
-// under `originated_at` (the local `timestamp` is set on receive and is not
-// part of the signed digest).
-export const verifyLedgerEntrySignature = async (entry) => {
-  if (!entry || typeof entry !== "object") return false;
-  if (typeof entry.signature !== "string" || !entry.signature) return false;
-  const innerShape = {
-    id: entry.id,
-    type: entry.type,
-    from_user_id: entry.from_user_id,
-    to_user_id: entry.to_user_id,
-    created_at: entry.originated_at || entry.timestamp || "",
-    payload: entry.payload || {},
-    signature: entry.signature,
-  };
-  return verifyInnerSignature(innerShape);
-};
-
 export const verifyInnerSignature = async (innerMessage) => {
   if (!innerMessage || typeof innerMessage.signature !== "string" || !innerMessage.signature) {
     return false;

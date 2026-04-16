@@ -8,8 +8,8 @@ focused while this module owns display concerns.
 */
 
 import { formatMarkdownish } from "../../js/utils/markdownish.js";
-import { getConnectedPeerIds } from "../../js/realtime/peer-status.js";
-import { initInfiniteList } from "../../js/utils/infinite-list.js";
+import { getConnectedPeerIds } from "../../js/peer/status.js";
+import { initInfiniteList } from "../../js/ui/infinite-list.js";
 
 const formatEur = (amount) => {
   const value = Number(amount);

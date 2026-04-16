@@ -4,7 +4,8 @@ This module binds settings interactions for the app. It renders user/version met
 By centralizing settings behavior here, the app shell only needs to pass data and version context without owning button logic.
 */
 
-import { resetState, updateUserName } from "../../js/data.js";
+import { resetState } from "../../js/app-state.js";
+import { updateUserName } from "../../js/commands/user.js";
 
 export const bindSettings = (root, data, appVersion) => {
   const userNameEl = root.querySelector('[data-bind="user-name"]');

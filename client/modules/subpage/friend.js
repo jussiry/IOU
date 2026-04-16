@@ -6,15 +6,19 @@ It also exposes navigation triggers to related subpages by wiring the trust tile
 
 import {
   acceptFriend,
-  cancelTrustLimitSuggestion,
-  dismissNameChangeNotification,
-  dismissPaymentRequest,
-  dismissTrustLimitNotification,
   rejectFriend,
   removeFriendRequest,
-  respondToPaymentRequest,
+} from "../../js/commands/friendship.js";
+import {
+  cancelTrustLimitSuggestion,
+  dismissTrustLimitNotification,
   respondToTrustLimitSuggestion,
-} from "../../js/data.js";
+} from "../../js/commands/trust-limit.js";
+import {
+  dismissPaymentRequest,
+  respondToPaymentRequest,
+} from "../../js/commands/payment-request.js";
+import { dismissNameChangeNotification } from "../../js/commands/user.js";
 import {
   FRIENDSHIP_STATUS_ACCEPTED,
   FRIENDSHIP_STATUS_PENDING_INCOMING,
@@ -22,9 +26,9 @@ import {
   FRIENDSHIP_STATUS_REJECTED,
   isAcceptedFriendshipStatus,
 } from "../../js/utils/friendships.js";
-import { formatCurrency, formatDate, formatSigned } from "../../js/utils/format.js";
-import { initInfiniteList } from "../../js/utils/infinite-list.js";
-import { getConnectedPeerIds } from "../../js/realtime/peer-status.js";
+import { formatCurrency, formatDate, formatSigned } from "../../js/ui/format.js";
+import { initInfiniteList } from "../../js/ui/infinite-list.js";
+import { getConnectedPeerIds } from "../../js/peer/status.js";
 
 export const bindFriendDetail = (root, data, friendId) => {
   const titleEl = root.querySelector('[data-bind="page-title"]');

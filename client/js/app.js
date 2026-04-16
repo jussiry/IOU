@@ -5,16 +5,16 @@ It also coordinates shared startup concerns such as icon sprite injection, versi
 */
 
 import {
-  createFriend,
-  createTransaction,
   createUser,
   ensureVersion,
   hasUserData,
   loadData,
-  requestPayment,
   subscribeToDataChanges,
-  updateTrustLimit,
-} from "./data.js";
+} from "./app-state.js";
+import { createFriend } from "./commands/friendship.js";
+import { createTransaction } from "./commands/transaction.js";
+import { requestPayment } from "./commands/payment-request.js";
+import { updateTrustLimit } from "./commands/trust-limit.js";
 import { bindBalance, initBalanceToggles } from "../modules/balance-page/index.js";
 import { bindFriends } from "../modules/friends-page/index.js";
 import { bindLogs } from "../modules/logs-page/index.js";
@@ -27,13 +27,13 @@ import { bindSend } from "../modules/subpage/send.js";
 import { bindRequest } from "../modules/subpage/request.js";
 import { bindTrust } from "../modules/subpage/trust.js";
 import { applyDevSeedIfRequested } from "./dev/seed.js";
-import { createRealtimeClient } from "./realtime/client.js";
-import { subscribeToPeerStatusChanges } from "./realtime/peer-status.js";
-import { ensureIconSprite } from "./utils/icons.js";
-import { setActiveNav, updateNavBadges } from "./utils/nav.js";
-import { getSlideDirection, swapPage } from "./page-transitions.js";
+import { createRealtimeClient } from "./peer/client.js";
+import { subscribeToPeerStatusChanges } from "./peer/status.js";
+import { ensureIconSprite } from "./ui/icons.js";
+import { setActiveNav, updateNavBadges } from "./ui/nav.js";
+import { getSlideDirection, swapPage } from "./ui/page-transitions.js";
 import { getAppVersion } from "./version.js";
-import { initSwipeNavigation } from "./swipe.js";
+import { initSwipeNavigation } from "./ui/swipe.js";
 
 const navButtons = Array.from(document.querySelectorAll(".nav-item[data-page]"));
 const contentRoot = document.getElementById("page-content");
