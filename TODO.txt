@@ -1,38 +1,18 @@
 
 
-
-
-VIESTI: Jaana Vainio
-
-
-
-
 NOT DONE YET:
 
 
 signature commands/questions:
 
-  Unify ledger code under ledger.js ?
-
   Check my own undestranding of signatures and public/private key (ECDH)
 
 
-SIGNATURES reply
-  The current implementation is a hand-rolled BigInt double-and-add scalar multiplication — naive but correct. That's fine for ECDH because the result is cached per peer connection. For per-message signing it's a problem.
+If i connect a new friend to preview browser's Alice and then seed it (reset Alices data), the system should be able to recover the new friendship from the friends ledger. It tries to, but ends up in error state:
 
-  Rough benchmarks for one secp256k1 point multiplication (which is the core of both sign and verify):
+It notices that Alice is back online (from server) and tries to form peer connection but fails. In console: "[WebRTC] Establishing peer connection", "[Realtime] Peer disconnected (server)", "[WebRTC] Peer connection disconnecting" starts looping.
 
-  Implementation	One point mul	Sign	Verify
-  Current hand-rolled BigInt	~100–300ms	~150ms	~300ms
-  @noble/secp256k1 (optimized pure JS)	~2ms	~3ms	~5ms
-  WASM (libsecp256k1)	<1ms	~1ms	~1ms
-  The existing ECDH call is that same ~100–300ms — it only gets away with it because it's cached after the first connection.
-
-  The practical answer: adding signatures per-message with the current code would add ~150ms to every send and ~300ms to every receive, which is perceptible. The fix is to bring in @noble/secp256k1 (or @noble/curves) alongside the existing code — it uses field arithmetic and Wasm-assisted multiplication, bringing sign+verify to a combined ~8ms per message. That's invisible to the user.
-
-  The existing hand-rolled code can stay for key generation and ECDH (still cached), and @noble handles the per-message signature work. They use the same curve and the same key format (32-byte hex private key → x-only public key), so the two coexist without changes to key storage.
-
-  Worth noting: npm/bundling would need to be added if it's not already there, since @noble/secp256k1 is a package. Is there a bundler in this project currently?
+Sometimes it also throws: Uncaught (in promise) InvalidStateError: Failed to execute 'setRemoteDescription' on 'RTCPeerConnection': Failed to set remote answer sdp: Called in wrong state: stable
 
 
 Syncing multiple devices with same user
@@ -40,7 +20,12 @@ Syncing multiple devices with same user
 
   Same user with different keys possible / worth implementing?
 
+- WebRTC keeps connecting/dissconnecting
+  * happened when creted connection from Alice to Brave for the first time...
 
+
+- Default on debt
+--> remove friend
 
 - on a friend page highlight latest transaction(s) since the page was last visited
 

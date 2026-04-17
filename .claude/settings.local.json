@@ -24,8 +24,10 @@
       "Bash(export *)",
       "Bash(sleep *)",
       "Bash(wc *)",
+      "Bash(sed *)",
       "Bash(md5 *)",
       "Bash(for f *)",
+      "Bash(head *)",
       "Bash(gh search:*)",
       "Bash(gh issue:*)",
       "Bash(xargs kill:*)",
@@ -43,7 +45,9 @@
       "Bash(/Users/jussi/.nvm/versions/node/v24.14.0/bin/node tests/two-client-e2e/run.cjs --scenario reload-reconnect)",
       "Bash(/Users/jussi/.nvm/versions/node/v24.14.0/bin/node tests/two-client-e2e/run.cjs --scenario reload-reconnect-double-quick)",
       "Bash(/Users/jussi/.nvm/versions/node/v24.14.0/bin/node tests/two-client-e2e/run.cjs --scenario server-queue-delivery)",
-      "Bash(/Users/jussi/.nvm/versions/node/v24.14.0/bin/node tests/two-client-e2e/run.cjs --scenario turn-relay)"
+      "Bash(/Users/jussi/.nvm/versions/node/v24.14.0/bin/node tests/two-client-e2e/run.cjs --scenario turn-relay)",
+      "Read(//tmp/**)",
+      "Read(//private/tmp/**)"
     ]
   }
 }
