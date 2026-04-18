@@ -1,5 +1,5 @@
 ## Shortcuts
-"deploy": add and commit all file changes and push
+"deploy": add and commit all file changes with concise comment and push
 
 ## Code style
 - Make DRY code: find patterns that repeat in code and wrap them into a function or other construct that can be reused to produce the same functionality in many places.

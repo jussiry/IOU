@@ -52,6 +52,13 @@ export const bindSettings = (root, data, appVersion) => {
   if (versionEl && appVersion) {
     versionEl.textContent = `Version ${appVersion}`;
   }
+  const transferButton = root.querySelector('[data-action="transfer-user"]');
+  if (transferButton) {
+    transferButton.addEventListener("click", () => {
+      window.location.hash = "transfer";
+    });
+  }
+
   const removeUserButton = root.querySelector('[data-action="remove-user"]');
   if (!removeUserButton) return;
   removeUserButton.addEventListener("click", async () => {

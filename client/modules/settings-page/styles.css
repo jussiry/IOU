@@ -96,7 +96,7 @@
   text-transform: uppercase;
 }
 
-.settings-remove {
+.settings-big-button {
   --surface-radius: 14px;
   margin-top: 14px;
   width: 100%;
@@ -106,12 +106,15 @@
   justify-content: center;
   gap: 8px;
   padding: 12px 14px;
-  color: var(--danger);
   font-weight: 600;
   cursor: pointer;
 }
 
-.settings-remove-icon {
+.settings-remove {
+  color: var(--danger);
+}
+
+.settings-icon {
   width: 17px;
   height: 17px;
 }

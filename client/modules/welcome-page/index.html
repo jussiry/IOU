@@ -18,13 +18,13 @@
         data-bind="welcome-name"
       />
       <div class="welcome-toggle-row">
-        <span class="welcome-label">Use existing private key</span>
+        <span class="welcome-label">Login with existing user</span>
         <button
           class="check-toggle"
           type="button"
           data-bind="existing-key-toggle"
           aria-pressed="false"
-          aria-label="Use existing private key"
+          aria-label="Login with existing user"
         >
           <span class="check-toggle-track">
             <span class="check-toggle-thumb"></span>
@@ -32,15 +32,24 @@
         </button>
       </div>
       <div data-section="existing-key-panel" hidden>
-        <p class="welcome-key-hint">NOSTR key can be used as identity</p>
+        <p class="welcome-key-hint">You can also use a NOSTR passphrase and ncryptsec</p>
+        <input
+          class="welcome-input"
+          type="password"
+          placeholder="Passphrase"
+          autocapitalize="off"
+          autocomplete="current-password"
+          spellcheck="false"
+          data-bind="login-passphrase-input"
+        />
         <textarea
           class="welcome-input welcome-textarea"
-          placeholder="nsec1..."
+          placeholder="ncryptsec1..."
           autocapitalize="off"
           autocomplete="off"
           spellcheck="false"
           rows="3"
-          data-bind="private-key-input"
+          data-bind="login-ncryptsec-input"
         ></textarea>
       </div>
       <p class="welcome-error" data-bind="welcome-error" hidden></p>

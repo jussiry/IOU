@@ -15,6 +15,7 @@
   background: var(--surface-background);
   border-radius: var(--surface-radius);
   box-shadow: var(--surface-shadow);
+  overflow: hidden;
 }
 
 * {

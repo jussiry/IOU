@@ -189,6 +189,26 @@ export const deriveNostrPublicKeyHex = (privateKeyHex) => derivePublicKeyHex(pri
 export const deriveSharedSecretXHex = (privateKeyHex, peerPublicKeyHex) =>
   deriveSharedSecretXHexImpl(privateKeyHex, peerPublicKeyHex);
 
+// ---------------------------------------------------------------------------
+// Generic bech32 byte encode/decode — used by NIP-49 (ncryptsec) which packs
+// a 91-byte binary payload rather than a 32-byte key. Exported here rather
+// than duplicated so the same bech32 implementation covers every format.
+// ---------------------------------------------------------------------------
+
+export const encodeBech32FromBytes = (humanReadablePart, bytes) => {
+  const fiveBitWords = convertBits(Array.from(bytes), 8, 5, true);
+  return encodeBech32(humanReadablePart, fiveBitWords);
+};
+
+export const decodeBech32ToBytes = (encodedValue, expectedHrp) => {
+  const { humanReadablePart, dataWords } = decodeBech32(encodedValue);
+  if (humanReadablePart !== expectedHrp) {
+    throw new Error(`Expected a ${expectedHrp}-encoded value.`);
+  }
+  const decodedBytes = convertBits(dataWords, 5, 8, false);
+  return new Uint8Array(decodedBytes);
+};
+
 export const generateNostrKeyPair = () => {
   const privateKeyHex = generatePrivateKeyHex();
   const publicKeyHex = derivePublicKeyHex(privateKeyHex);

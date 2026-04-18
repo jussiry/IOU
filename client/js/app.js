@@ -26,6 +26,7 @@ import { initIouActions } from "../modules/components/iou-actions.js";
 import { bindSend } from "../modules/subpage/send.js";
 import { bindRequest } from "../modules/subpage/request.js";
 import { bindTrust } from "../modules/subpage/trust.js";
+import { bindTransfer } from "../modules/subpage/transfer.js";
 import { applyDevSeedIfRequested } from "./dev/seed.js";
 import { createRealtimeClient } from "./peer/client.js";
 import { subscribeToPeerStatusChanges } from "./peer/status.js";
@@ -59,6 +60,7 @@ const templatePaths = {
   send: "modules/subpage/send.html",
   request: "modules/subpage/request.html",
   trust: "modules/subpage/trust.html",
+  transfer: "modules/subpage/transfer.html",
   trustLimitField: "modules/subpage/trust-limit-field.html",
   trustExplainer: "modules/subpage/trust-explainer.html",
   iouActions: "modules/components/iou-actions.html",
@@ -198,6 +200,9 @@ const parseRoute = () => {
   if (hash.startsWith("trust/")) {
     const friendId = hash.replace("trust/", "");
     return createSubpageRoute("trust", friendId);
+  }
+  if (hash === "transfer") {
+    return createSubpageRoute("transfer");
   }
   return pageTitles[hash] ? { type: "page", page: hash } : { type: "page", page: "balance" };
 };
@@ -343,6 +348,12 @@ const loadPage = async (route) => {
           navigateTo(`friend/${payload.friendId}`);
         });
       }
+    } else if (route.type === "transfer") {
+      const transferHtml = await fetchTemplate(templatePaths.transfer);
+      renderSubpageContent(pageView, transferHtml);
+      bindTransfer(pageView, data);
+      document.title = "IOU — Transfer";
+      setFallbackBackNavigation(pageView);
     } else if (route.type === "trust") {
       const [trustHtml, trustLimitFieldHtml, trustExplainerHtml] = await Promise.all([
         fetchTemplate(templatePaths.trust),

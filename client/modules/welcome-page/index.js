@@ -1,11 +1,11 @@
 /*
-This module binds the first-run welcome screen. It validates the initial username, optionally accepts an existing private key, handles submit state, and delegates user creation to the app shell callback.
+This module binds the first-run welcome screen. It validates the initial username, optionally accepts an existing NIP-49 (ncryptsec + passphrase) login, handles submit state, and delegates user creation to the app shell callback.
 
-By containing the welcome form behavior here, the router only needs to provide a create-user action and can keep route orchestration independent from UI input details.
+Login uses NIP-49 exclusively: the user pastes the encoded key (`ncryptsec1...`) produced by another device's "Transfer" flow (or any other Nostr client that exports the same format) together with the passphrase set during that export. The passphrase is never transmitted; it is combined with the encoded key locally to recover the private key via scrypt + XChaCha20-Poly1305.
 */
 
 import { initCheckToggle } from "../components/check-toggle.js";
-import { isValidNsec } from "../../js/utils/nostr-keys.js";
+import { isValidNcryptsec } from "../../js/crypto/nip49.js";
 
 export const bindWelcome = (root, { onCreateUser } = {}) => {
   const formElement = root.querySelector('[data-form="welcome"]');
@@ -14,7 +14,8 @@ export const bindWelcome = (root, { onCreateUser } = {}) => {
   const createButton = root.querySelector('[data-action="create-user"]');
   const toggleButton = root.querySelector('[data-bind="existing-key-toggle"]');
   const keyPanel = root.querySelector('[data-section="existing-key-panel"]');
-  const privateKeyInput = root.querySelector('[data-bind="private-key-input"]');
+  const passphraseInput = root.querySelector('[data-bind="login-passphrase-input"]');
+  const ncryptsecInput = root.querySelector('[data-bind="login-ncryptsec-input"]');
 
   if (!formElement || !nameInput || !createButton || typeof onCreateUser !== "function") {
     return;
@@ -25,8 +26,8 @@ export const bindWelcome = (root, { onCreateUser } = {}) => {
     onChange: (isChecked) => {
       if (keyPanel) keyPanel.hidden = !isChecked;
       createButton.textContent = isChecked ? "Login" : "Create a user";
-      if (isChecked && privateKeyInput) {
-        setTimeout(() => privateKeyInput.focus(), 0);
+      if (isChecked && passphraseInput) {
+        setTimeout(() => passphraseInput.focus(), 0);
       }
     },
   });
@@ -64,27 +65,44 @@ export const bindWelcome = (root, { onCreateUser } = {}) => {
       return;
     }
 
-    let existingNsec = null;
+    let loginOptions = null;
     if (isLogin) {
-      const keyValue = privateKeyInput ? privateKeyInput.value.trim() : "";
-      if (!keyValue) {
-        setError("Please enter your private key.");
-        if (privateKeyInput) privateKeyInput.focus();
+      const passphrase = passphraseInput ? passphraseInput.value : "";
+      const ncryptsec = ncryptsecInput ? ncryptsecInput.value.trim() : "";
+
+      if (!passphrase) {
+        setError("Please enter your passphrase.");
+        if (passphraseInput) passphraseInput.focus();
         return;
       }
-      if (!isValidNsec(keyValue)) {
-        setError("Invalid private key. Expected format: nsec1...");
-        if (privateKeyInput) privateKeyInput.focus();
+      if (!ncryptsec) {
+        setError("Please paste your encoded key.");
+        if (ncryptsecInput) ncryptsecInput.focus();
         return;
       }
-      existingNsec = keyValue;
+      if (!isValidNcryptsec(ncryptsec)) {
+        setError("Invalid encoded key. Expected format: ncryptsec1...");
+        if (ncryptsecInput) ncryptsecInput.focus();
+        return;
+      }
+      loginOptions = { ncryptsec, passphrase };
     }
 
     try {
       setBusy(true);
-      await onCreateUser(enteredName, { existingNsec });
+      // scrypt blocks for ~1s — yield a frame so the "Logging in..." label paints.
+      if (isLogin) {
+        await new Promise((resolve) => window.setTimeout(resolve, 0));
+      }
+      await onCreateUser(enteredName, loginOptions || {});
     } catch (error) {
-      setError("Could not create user. Please try again.");
+      if (isLogin && /passphrase/i.test(String(error?.message || ""))) {
+        setError("Incorrect passphrase.");
+      } else if (isLogin) {
+        setError("Could not log in. Check your passphrase and encoded key.");
+      } else {
+        setError("Could not create user. Please try again.");
+      }
       setBusy(false);
     }
   };

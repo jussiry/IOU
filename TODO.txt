@@ -8,12 +8,6 @@ signature commands/questions:
   Check my own undestranding of signatures and public/private key (ECDH)
 
 
-If i connect a new friend to preview browser's Alice and then seed it (reset Alices data), the system should be able to recover the new friendship from the friends ledger. It tries to, but ends up in error state:
-
-It notices that Alice is back online (from server) and tries to form peer connection but fails. In console: "[WebRTC] Establishing peer connection", "[Realtime] Peer disconnected (server)", "[WebRTC] Peer connection disconnecting" starts looping.
-
-Sometimes it also throws: Uncaught (in promise) InvalidStateError: Failed to execute 'setRemoteDescription' on 'RTCPeerConnection': Failed to set remote answer sdp: Called in wrong state: stable
-
 
 Syncing multiple devices with same user
   Another case is when same user has many devices online. When one device makes an action, this should proagate to other devices of the same user, so that they stay in the same state. This also needs to be handled on server side. Maybe but

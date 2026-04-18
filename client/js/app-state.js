@@ -28,7 +28,9 @@ import {
   decodeNsecToHex,
   deriveNostrPublicKeyHex,
   encodeNpubFromPublicKeyHex,
+  encodeNsecFromPrivateKeyHex,
 } from "./utils/nostr-keys.js";
+import { decryptNcryptsec } from "./crypto/nip49.js";
 import { asTrimmedString, hasUser } from "./state-utils.js";
 import { buildView } from "./ui/view-model.js";
 
@@ -103,12 +105,18 @@ export const loadData = async () => {
   return buildView(state);
 };
 
-export const createUser = async (name, { existingNsec } = {}) => {
+export const createUser = async (name, { existingNsec, ncryptsec, passphrase } = {}) => {
   const trimmedName = asTrimmedString(name);
 
   let privateKeyHex, privateKeyNsec, publicKeyHex, publicKeyNpub;
 
-  if (existingNsec) {
+  if (ncryptsec) {
+    // Throws "Incorrect passphrase." on Poly1305 tag mismatch — caller handles.
+    privateKeyHex = decryptNcryptsec(ncryptsec, passphrase);
+    privateKeyNsec = encodeNsecFromPrivateKeyHex(privateKeyHex);
+    publicKeyHex = deriveNostrPublicKeyHex(privateKeyHex);
+    publicKeyNpub = encodeNpubFromPublicKeyHex(publicKeyHex);
+  } else if (existingNsec) {
     privateKeyHex = decodeNsecToHex(existingNsec);
     privateKeyNsec = existingNsec;
     publicKeyHex = deriveNostrPublicKeyHex(privateKeyHex);
@@ -131,6 +139,15 @@ export const createUser = async (name, { existingNsec } = {}) => {
 
   const state = createEmptyAppState(user);
   return persistAndBuildView(state);
+};
+
+// Private-key readers are deliberately separate from `loadData`/`buildView`,
+// which strip private keys via `createPublicPersonModel` before they ever
+// reach UI code. Only the transfer flow needs this — everything else should
+// continue using the sanitized view.
+export const loadCurrentUserPrivateKeyHex = async () => {
+  const state = await loadState();
+  return state?.user?.private_key_hex || "";
 };
 
 export const ensureVersion = async (version) => {

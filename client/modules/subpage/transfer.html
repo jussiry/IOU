@@ -1,0 +1,82 @@
+<div class="send-content">
+  <div class="balance-hero trust-hero send-card">
+    <form class="send-form transfer-form" aria-label="Transfer user form">
+      <p class="form-hint">
+        Create a passphrase to transfer user key securely. Keep passphrase in your mind and copy encrypted key to new device.
+      </p>
+      <label class="form-field">
+        <span class="form-label">Passphrase</span>
+        <span class="add-friend-key-display">
+          <input
+            class="form-input add-friend-key-input"
+            type="password"
+            autocapitalize="off"
+            autocomplete="new-password"
+            spellcheck="false"
+            data-bind="transfer-passphrase"
+            placeholder="e.g. stars on pond"
+          />
+          <button
+            class="add-friend-copy-button"
+            type="button"
+            data-action="toggle-passphrase"
+            aria-label="Show passphrase"
+            aria-pressed="false"
+          >
+            <svg class="add-friend-copy-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path
+                d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+              <circle cx="12" cy="12" r="3"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              />
+            </svg>
+          </button>
+        </span>
+      </label>
+      <p class="form-error" data-bind="passphrase-error" hidden></p>
+      <button class="primary-button" type="button" data-bind="encrypt-submit" aria-disabled="true">
+        Encrypt key
+      </button>
+      <div class="transfer-result" data-section="transfer-result" hidden>
+        <label class="form-field">
+          <span class="form-label">Encoded key</span>
+          <span class="add-friend-key-display">
+            <input
+              class="form-input add-friend-key-input add-friend-key-input--readonly"
+              type="text"
+              readonly
+              aria-readonly="true"
+              data-bind="ncryptsec-display"
+            />
+            <button
+              class="add-friend-copy-button"
+              type="button"
+              data-action="copy-ncryptsec"
+              aria-label="Copy encoded key"
+            >
+              <svg class="add-friend-copy-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <use href="#icon-copy" />
+              </svg>
+            </button>
+          </span>
+        </label>
+        <p class="form-hint" data-bind="copy-feedback" hidden>Copied to clipboard.</p>
+        <ol class="transfer-instructions">
+          <li>Copy encrypted key and move it to a new device.</li>
+          <li>Open IOU app on Welcome page.</li>
+          <li>Enter passphrase and paste the encoded key on the Welcome page.</li>
+          <li>Keep this app open until the new device has connected and transferred all data to it.</li>
+          <li>You can keep using two devices or delete user from old device.</li>
+        </ol>
+      </div>
+    </form>
+  </div>
+</div>
