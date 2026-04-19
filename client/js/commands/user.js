@@ -16,6 +16,7 @@ import {
   persistAndBuildView,
 } from "../app-state.js";
 import { queuePeerMessage } from "../peer/outbox.js";
+import { appendLedgerEntryFromMessage } from "../ledger.js";
 import {
   getUserConnection,
   syncUserNameAcrossContacts,
@@ -40,11 +41,14 @@ export const updateUserName = async (name) => {
     isPeerEligibleFriendshipStatus(connection.friendship_status)
   );
   for (const connection of eligibleConnections) {
-    await queuePeerMessage(state, {
+    const message = await queuePeerMessage(state, {
       toUserId: connection.person_id,
       type: PEER_MESSAGE_TYPE_NAME_CHANGED,
       payload: { name: trimmedName },
     });
+    if (message) {
+      appendLedgerEntryFromMessage(state, message);
+    }
   }
 
   return persistAndBuildView(state);

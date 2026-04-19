@@ -81,6 +81,8 @@
   display: grid;
   place-items: center;
   cursor: pointer;
+  position: absolute;
+  right: 25px;
 }
 
 .settings-edit-name svg {

@@ -14,7 +14,9 @@ The core ideas are:
 
 - **User** — a participant identified by a long-lived secp256k1 public key (x-only, 32 bytes, as per BIP-340 / Nostr).
 - **Client** — a program acting on behalf of one user. A user MAY run multiple clients; this document treats each client as if it holds the user's private key.
-- **Peer** — another user a client wants to talk to. "Peer" is a role, not a network concept.
+- **Device** — one live connection of a client to a relay server. The relay assigns each connection an ephemeral `device_id`. A user may have several devices (different browsers, phone + laptop, two tabs) online at once, all sharing the same `user_id` but each with a distinct `device_id`.
+- **Peer** — another user a client wants to talk to. "Peer" is a role, not a network concept. When a user is online on multiple devices, *each* remote device is an independent peer at the transport layer even though they share a single `user_id`.
+- **Self-peer** — another device of the *same* user. Self-peers share the sending user's private key and therefore already derive the same ECDH shared secret with every contact. Self-peers exist to keep the user's own devices in sync. See §13.
 - **Direct channel** — any transport that carries bytes directly between two clients without a relay learning the contents (for example a WebRTC data channel, a LAN link, a Bluetooth link).
 - **Relay server** — a server that accepts envelopes from one client and delivers them to another. It does not need to be trusted with message contents.
 - **Envelope** — the ciphertext container exchanged on the wire. See §4.
@@ -222,6 +224,18 @@ The relay server is an untrusted intermediary. It learns `from`, `to`, and `id` 
 ### 6.3 Signaling for direct channels
 
 When direct channels are WebRTC-based, the relay server also acts as a signaling relay: it announces peer presence, tells two clients to open a direct channel (`peer_connect` / `peer_disconnect` signals), and forwards WebRTC offer/answer/ICE payloads between them. Application messages — as opposed to signaling — always travel inside envelopes.
+
+Signaling is **device-scoped**. Because a user MAY be online on several devices at the same time (same `user_id`, different WebSocket sessions), every peer-scoped signaling message carries both `peer_user_id` and `peer_device_id`:
+
+| Message           | Required fields                                                     |
+|-------------------|---------------------------------------------------------------------|
+| `peer_connect`    | `peer_user_id`, `peer_device_id`, `initiator` (bool)               |
+| `peer_disconnect` | `peer_user_id`, `peer_device_id`                                    |
+| `webrtc_signal`   | `peer_user_id`, `peer_device_id`, `signal` (offer / answer / ICE)  |
+
+Clients MUST thread the `peer_device_id` they received on `peer_connect` through every subsequent `webrtc_signal` so the relay can route the ICE candidates to the exact device that sent the matching offer. The relay MAY fall back to user-level routing when the target user has a single active device, but clients MUST NOT rely on this.
+
+Envelopes (`peer_envelope`) are *not* device-scoped: when a sender hands an envelope to the relay, the relay MUST deliver a copy to every online device of the recipient user. Each recipient device independently decrypts and dedups against its own `processed_peer_message_ids` (§7) so overlapping deliveries are safe.
 
 ### 6.4 Server queue bounds
 
@@ -476,7 +490,7 @@ When a client receives `sync_data`, it classifies each entry:
 
 Entries that fail Schnorr signature verification are silently dropped. A compromised or malicious peer cannot inject forged history.
 
-### 12.8 Remote peer allowance
+### 12.8 Remote peer allowance (friend mesh only)
 
 When a client receives a `peer_connect` signal from the relay for a peer it does not currently recognise (the peer's id is not in its accepted friendships), it:
 
@@ -486,3 +500,67 @@ When a client receives a `peer_connect` signal from the relay for a peer it does
 4. If the timer expires before the peer is recognised, the connection is closed.
 
 This lets a resetting client recover friendships from arriving peers without opening a permanent connection to unknown parties.
+
+The allowance timer applies only to the **friend mesh**. Self-peers (§13) are always allowed and are never reaped by this mechanism.
+
+## 13. Multi-device (same-user) sync
+
+A single user MAY be online on multiple devices at the same time. Those devices MUST converge to the same local state so that an action taken on one device is visible on every other device — even if the triggering peer message was received on only one of them.
+
+This is achieved by running a second **self-mesh** overlay alongside the friend mesh. The two overlays share almost all machinery; this section describes the differences.
+
+### 13.1 Connection establishment
+
+The relay server signals `peer_connect` whenever it has two or more connected clients with the same `user_id` (one `peer_connect` per remote device). The client routes the signal to one of two meshes based on the claimed `peer_user_id`:
+
+| Condition                       | Mesh        | Key used inside the mesh |
+|---------------------------------|-------------|--------------------------|
+| `peer_user_id !== my_user_id`   | Friend mesh | `peer_user_id`           |
+| `peer_user_id === my_user_id`   | Self-mesh   | `peer_device_id`         |
+
+Using `peer_device_id` as the self-mesh key ensures that each remote device gets its own peer entry even though they all share the same user id.
+
+WebRTC negotiation, data channels, JSON framing, and envelope encoding are identical to the friend mesh. The polite/impolite role is still decided by lexicographic comparison of the local and remote key; on the self-mesh this compares device ids.
+
+### 13.2 Encryption for self-envelopes
+
+The envelope format (§4) and the ECDH key derivation (§5.1) are unchanged. Because the "peer" is another device of the same user, both ends hold the same private key, so:
+
+```
+shared = ECDH(my_priv, my_pub)
+key    = SHA-256(shared)
+```
+
+Both devices derive identical keys from the local key pair alone and can decrypt each other's envelopes with no additional key exchange. `from_user_id` and `to_user_id` inside the envelope are both set to the user's own npub.
+
+### 13.3 Signatures on self-messages
+
+Self-mesh messages MUST still carry valid Schnorr signatures (§3.3). Reuse of the same signing code keeps the inner-message construction identical to friend-mesh messages and lets any ledger entry delivered via self-sync pass the same verification on the receiving device (§12.7 of the Ledger spec).
+
+### 13.4 Remote allowance
+
+Self-peers are trusted on arrival: there is no 15-second allowance timer and no requirement that they appear in any "accepted" set. A self-peer connection persists for as long as the relay reports the other device online.
+
+### 13.5 Live ledger broadcast
+
+Whenever the local client appends a new ledger entry (outbound or inbound), it MUST also broadcast that entry to every currently-connected self-peer so all of the user's devices converge on the same ledger. The broadcast piggybacks on the existing sync protocol:
+
+- Transport: a `sync_data` inner message (§12.6) sent over each self-peer data channel.
+- Scope: the broadcast carries every *new* ledger entry — entries from all conversations, not just a bilateral slice, because self-peers are entitled to see the full ledger.
+- Loop prevention: the sender keeps a local set of already-broadcast ledger entry ids. A receiving self-peer seeds this set with the inbound ids *before* applying them so the resulting ledger-change tick does not echo them back.
+
+### 13.6 Initial self-sync (on connection)
+
+Immediately after a self-peer data channel opens, both devices exchange a `sync_hello` (§12.5) carrying the ids they already hold, and respond with `sync_data` carrying the missing entries. Unlike friend-mesh sync, the entry filter is **not bilateral**: a self-peer returns *all* ledger entries whose id is not in the initiator's `known_ids`.
+
+On receipt, entries are classified using the same rule as friend sync (§12.7): inbound-like entries run through the application message handler; outbound-only entries are inserted into the ledger without re-application. Chronological replay is still required so dependent entries apply in order.
+
+### 13.7 Receipts
+
+Inner messages delivered via self-sync (both the initial catch-up and live broadcast) do **not** generate receipts. After convergence both devices share identical `processed_peer_message_ids`, so acknowledgement is redundant and a receipt from device A to device A' would itself need to be broadcast, causing an unbounded fan-out.
+
+### 13.8 Security considerations
+
+- Self-sync inherits the same signature and AEAD guarantees as friend sync: a hostile relay or network observer cannot forge or read self-mesh traffic.
+- A device that is **not** actually the same user cannot masquerade as a self-peer because the relay allocates `device_id` only for connections that authenticated with the matching `user_id` in `register` (see §6.2 and the signaling server implementation).
+- Signature verification at the receiver still runs on every entry, so even if the self-mesh were somehow spoofed, entries with invalid signatures for the claimed `from_user_id` would be rejected.

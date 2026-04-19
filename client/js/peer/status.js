@@ -6,6 +6,7 @@ Keeping peer connection status in a tiny shared store lets page binders read onl
 
 const peerStatusListeners = new Set();
 let connectedPeerIds = new Set();
+let connectedSelfDeviceIds = new Set();
 
 const emitPeerStatusChange = () => {
   const snapshot = Array.from(connectedPeerIds);
@@ -47,6 +48,24 @@ export const replaceConnectedPeerIds = (peerIds) => {
   }
 
   connectedPeerIds = nextConnectedPeerIds;
+  emitPeerStatusChange();
+};
+
+export const getConnectedSelfDeviceIds = () => {
+  return Array.from(connectedSelfDeviceIds);
+};
+
+export const replaceConnectedSelfDeviceIds = (deviceIds) => {
+  const nextDeviceIds = normalizePeerIds(deviceIds);
+  const nextConnectedSelfDeviceIds = new Set(nextDeviceIds);
+  const didChange =
+    nextConnectedSelfDeviceIds.size !== connectedSelfDeviceIds.size ||
+    nextDeviceIds.some((deviceId) => !connectedSelfDeviceIds.has(deviceId));
+  if (!didChange) {
+    return;
+  }
+
+  connectedSelfDeviceIds = nextConnectedSelfDeviceIds;
   emitPeerStatusChange();
 };
 

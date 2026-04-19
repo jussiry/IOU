@@ -20,6 +20,7 @@ import {
 } from "./models/data-model.js";
 import {
   clearAppState,
+  deleteDatabase,
   loadAppState,
   saveAppState,
 } from "./storage/indexeddb.js";
@@ -31,8 +32,12 @@ import {
   encodeNsecFromPrivateKeyHex,
 } from "./utils/nostr-keys.js";
 import { decryptNcryptsec } from "./crypto/nip49.js";
-import { asTrimmedString, hasUser } from "./state-utils.js";
+import { asTrimmedString, createId, hasUser } from "./state-utils.js";
 import { buildView } from "./ui/view-model.js";
+import { appendLedgerEntryFromMessage } from "./ledger.js";
+import { signInnerMessage } from "./peer/envelope.js";
+import { createPeerMessageModel } from "./models/data-model.js";
+import { PEER_MESSAGE_TYPE_NAME_CHANGED } from "./peer/messages.js";
 
 const VERSION_KEY = "iou_version";
 
@@ -138,6 +143,31 @@ export const createUser = async (name, { existingNsec, ncryptsec, passphrase } =
   });
 
   const state = createEmptyAppState(user);
+
+  // Seed the ledger with a self-addressed name_changed entry only when this is
+  // a genuinely new identity (fresh keypair). When the user is logging in with
+  // an existing nsec/ncryptsec the real name lives in ledger entries already
+  // synced from their other devices — creating a new entry here with the
+  // current timestamp would make it the most-recent one, causing
+  // applyOwnNameFromLedger to overwrite the actual name with the public key.
+  const isNewIdentity = !existingNsec && !ncryptsec;
+  if (isNewIdentity) {
+    const initMsg = createPeerMessageModel({
+      id: createId("peer"),
+      type: PEER_MESSAGE_TYPE_NAME_CHANGED,
+      from_user_id: publicKeyNpub,
+      to_user_id: publicKeyNpub,
+      created_at: new Date().toISOString(),
+      payload: { name: userName },
+    });
+    try {
+      const signature = await signInnerMessage(initMsg, { privateKeyHex });
+      appendLedgerEntryFromMessage(state, { ...initMsg, signature });
+    } catch {
+      // Non-fatal: name entry will be missing until the user renames themselves.
+    }
+  }
+
   return persistAndBuildView(state);
 };
 
@@ -164,14 +194,14 @@ export const ensureVersion = async (version) => {
 export const resetState = async () => {
   cachedState = null;
   try {
-    await clearAppState();
+    await deleteDatabase();
   } catch {
-    // ignore clear failures
+    // ignore — reload handles any residual data
   }
 
   try {
     window.localStorage.removeItem(VERSION_KEY);
   } catch {
-    // ignore clear failures
+    // ignore
   }
 };

@@ -190,4 +190,24 @@ export const clearAppState = async () => {
   );
 };
 
+// Drops the entire database. Use this for "remove user" flows so no residual
+// data can be written back by another tab before the page reloads.
+export const deleteDatabase = () =>
+  new Promise((resolve) => {
+    // Close any cached connection first so the delete request is not blocked
+    // by our own open handle. Other tabs may still block it briefly; we resolve
+    // on onblocked too because the page is about to reload anyway.
+    if (databasePromise) {
+      databasePromise
+        .then((db) => { try { db?.close(); } catch { /* ignore */ } })
+        .catch(() => {})
+        .finally(() => { databasePromise = null; });
+    }
+
+    const request = window.indexedDB.deleteDatabase(DATABASE_NAME);
+    request.onsuccess = () => resolve();
+    request.onerror = () => resolve();   // non-fatal — reload handles it
+    request.onblocked = () => resolve(); // another tab open; reload handles it
+  });
+
 window.clearAppState = clearAppState

@@ -83,6 +83,14 @@ export const getLedgerEntriesForPeer = (ledger, myId, peerId) => {
   );
 };
 
+// The full ledger as-is — used for same-user (device-to-device) sync where
+// every entry is in-scope because every entry was authored or received by
+// *this* user regardless of which friend it concerned.
+export const getAllLedgerEntries = (ledger) => {
+  if (!Array.isArray(ledger)) return [];
+  return ledger.slice();
+};
+
 // ---------------------------------------------------------------------------
 // Signature verification for untrusted entries
 // ---------------------------------------------------------------------------

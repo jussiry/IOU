@@ -1,10 +1,27 @@
 /*
-This module owns the backend websocket signaling server for the IOU app. It keeps track of online users, their eligible peer targets, and the signaling messages needed to establish direct WebRTC sessions.
+This module owns the backend websocket signaling server for the IOU app. It
+keeps track of online devices, their eligible peer targets, and the signaling
+messages needed to establish direct WebRTC sessions.
 
-The server intentionally limits itself to presence and offer/answer/ICE routing. Once peers are connected, application data stays on the WebRTC data channel and the websocket layer only needs to reconnect or re-initiate peer setup when availability changes.
+A single user may be connected from multiple devices at the same time. Every
+websocket gets its own server-assigned `deviceId` (opaque to the client — it
+just gets routed back in peer_connect / webrtc_signal payloads). Routing is
+device-scoped so the right device's RTCPeerConnection gets the right ICE
+candidate, even when two of the user's devices are negotiating in parallel.
+
+The server intentionally limits itself to presence and offer/answer/ICE
+routing. Once peers are connected, application data stays on the WebRTC data
+channel and the websocket layer only needs to reconnect or re-initiate peer
+setup when availability changes.
+
+Cross-user peering uses the existing `peer_candidates` eligibility rule
+(mutual opt-in). Same-user device pairs are *always* eligible — the user
+naturally trusts their own other devices, and they sync ledger state over
+WebRTC the same way peers do during recovery.
 */
 
 const { WebSocket, WebSocketServer } = require("ws");
+const { randomUUID } = require("crypto");
 
 const SIGNALING_PATH = "/ws";
 
@@ -48,8 +65,39 @@ const PER_RECIPIENT_ENVELOPE_LIMIT = 500;
 const createSignalingServer = (server) => {
   const websocketServer = new WebSocketServer({ noServer: true });
   const clientsBySocket = new Map();
+  // userId -> Set<client>. Multiple devices of the same user coexist here.
   const clientsByUserId = new Map();
+  // deviceId -> client. Used to route webrtc_signal to a specific device when
+  // a user has more than one online.
+  const clientsByDeviceId = new Map();
   const envelopesByRecipient = new Map();
+
+  const getUserClients = (userId) => {
+    if (!userId) return [];
+    const set = clientsByUserId.get(userId);
+    if (!set) return [];
+    return Array.from(set);
+  };
+
+  const addUserClient = (userId, client) => {
+    if (!userId || !client) return;
+    let set = clientsByUserId.get(userId);
+    if (!set) {
+      set = new Set();
+      clientsByUserId.set(userId, set);
+    }
+    set.add(client);
+  };
+
+  const removeUserClient = (userId, client) => {
+    if (!userId || !client) return;
+    const set = clientsByUserId.get(userId);
+    if (!set) return;
+    set.delete(client);
+    if (set.size === 0) {
+      clientsByUserId.delete(userId);
+    }
+  };
 
   const getStoredEnvelopes = (userId) => {
     const existing = envelopesByRecipient.get(userId);
@@ -119,11 +167,21 @@ const createSignalingServer = (server) => {
       return;
     }
 
-    const recipientClient = clientsByUserId.get(recipientUserId);
-    const delivered = recipientClient
-      ? sendJson(recipientClient.socket, { type: "peer_envelope", envelope })
-      : false;
-    if (!delivered) {
+    // Deliver to every online device of the recipient. Each device's
+    // processed_peer_message_ids dedupes the same envelope.id so the
+    // overlap is harmless, and it keeps all devices in lock-step even
+    // before they've opened a same-user WebRTC channel to each other.
+    const recipientClients = getUserClients(recipientUserId);
+    let deliveredToAny = false;
+    recipientClients.forEach((recipientClient) => {
+      const ok = sendJson(recipientClient.socket, {
+        type: "peer_envelope",
+        envelope,
+      });
+      if (ok) deliveredToAny = true;
+    });
+
+    if (!deliveredToAny) {
       storeEnvelopeForRecipient(recipientUserId, envelope);
     }
   };
@@ -137,7 +195,7 @@ const createSignalingServer = (server) => {
       return;
     }
 
-    clientsByUserId.forEach((otherClient) => {
+    clientsBySocket.forEach((otherClient) => {
       if (!otherClient || otherClient === client) {
         return;
       }
@@ -146,6 +204,7 @@ const createSignalingServer = (server) => {
         sendJson(otherClient.socket, {
           type: "peer_disconnect",
           peer_user_id: client.userId,
+          peer_device_id: client.deviceId,
         });
       }
     });
@@ -158,8 +217,11 @@ const createSignalingServer = (server) => {
 
     notifyPeersOfDisconnect(client);
     clientsBySocket.delete(client.socket);
-    if (client.userId && clientsByUserId.get(client.userId) === client) {
-      clientsByUserId.delete(client.userId);
+    if (client.deviceId) {
+      clientsByDeviceId.delete(client.deviceId);
+    }
+    if (client.userId) {
+      removeUserClient(client.userId, client);
     }
   };
 
@@ -168,26 +230,40 @@ const createSignalingServer = (server) => {
       return false;
     }
 
+    // Same user, different devices: always eligible — a user's own devices
+    // sync ledger state over WebRTC just like peers do.
+    if (leftClient.userId === rightClient.userId) {
+      return leftClient !== rightClient;
+    }
+
     return (
       leftClient.peerIds.has(rightClient.userId) ||
       rightClient.peerIds.has(leftClient.userId)
     );
   };
 
-  const getInitiatorUserId = (leftClient, rightClient) => {
+  const getInitiatorClient = (leftClient, rightClient) => {
+    // Same user: pick by device id so both sides agree deterministically.
+    if (leftClient.userId === rightClient.userId) {
+      return leftClient.deviceId < rightClient.deviceId ? leftClient : rightClient;
+    }
+
     const leftWantsRight = leftClient.peerIds.has(rightClient.userId);
     const rightWantsLeft = rightClient.peerIds.has(leftClient.userId);
 
     if (leftWantsRight && !rightWantsLeft) {
-      return leftClient.userId;
+      return leftClient;
     }
     if (rightWantsLeft && !leftWantsRight) {
-      return rightClient.userId;
+      return rightClient;
     }
 
-    return leftClient.userId < rightClient.userId
-      ? leftClient.userId
-      : rightClient.userId;
+    // Tie-break by user id, then by device id for determinism when two
+    // devices of the same friend both request each other simultaneously.
+    if (leftClient.userId !== rightClient.userId) {
+      return leftClient.userId < rightClient.userId ? leftClient : rightClient;
+    }
+    return leftClient.deviceId < rightClient.deviceId ? leftClient : rightClient;
   };
 
   const initiatePeerConnection = (leftClient, rightClient) => {
@@ -195,16 +271,18 @@ const createSignalingServer = (server) => {
       return;
     }
 
-    const initiatorUserId = getInitiatorUserId(leftClient, rightClient);
+    const initiatorClient = getInitiatorClient(leftClient, rightClient);
     sendJson(leftClient.socket, {
       type: "peer_connect",
       peer_user_id: rightClient.userId,
-      initiator: leftClient.userId === initiatorUserId,
+      peer_device_id: rightClient.deviceId,
+      initiator: leftClient === initiatorClient,
     });
     sendJson(rightClient.socket, {
       type: "peer_connect",
       peer_user_id: leftClient.userId,
-      initiator: rightClient.userId === initiatorUserId,
+      peer_device_id: leftClient.deviceId,
+      initiator: rightClient === initiatorClient,
     });
   };
 
@@ -213,7 +291,7 @@ const createSignalingServer = (server) => {
       return;
     }
 
-    clientsByUserId.forEach((otherClient) => {
+    clientsBySocket.forEach((otherClient) => {
       if (!otherClient || otherClient === sourceClient) {
         return;
       }
@@ -228,18 +306,15 @@ const createSignalingServer = (server) => {
       return;
     }
 
-    const previousClient = clientsByUserId.get(normalizedUserId);
-    if (previousClient && previousClient !== client) {
-      unregisterClient(previousClient);
-      previousClient.socket.close();
-    }
-
+    // Unlike the single-device era, we no longer kick out existing clients
+    // for the same user — the server now supports multiple devices per user
+    // and same-user pairs get their own WebRTC mesh.
     if (client.userId && client.userId !== normalizedUserId) {
-      clientsByUserId.delete(client.userId);
+      removeUserClient(client.userId, client);
     }
 
     client.userId = normalizedUserId;
-    clientsByUserId.set(normalizedUserId, client);
+    addUserClient(normalizedUserId, client);
     flushStoredEnvelopes(client);
     sendJson(client.socket, { type: "queue_drained" });
     syncClientPeers(client);
@@ -257,22 +332,32 @@ const createSignalingServer = (server) => {
       return;
     }
 
-    const targetClient = clientsByUserId.get(normalizedPeerUserId);
-    if (!targetClient) {
-      return;
-    }
-
-    initiatePeerConnection(client, targetClient);
+    // Trigger a peer_connect with every device of the requested user id.
+    // In the common single-device-per-friend case this is exactly one client.
+    getUserClients(normalizedPeerUserId).forEach((targetClient) => {
+      initiatePeerConnection(client, targetClient);
+    });
   };
 
-  const handlePeerSignal = (client, peerUserId, signal) => {
+  const handlePeerSignal = (client, peerUserId, peerDeviceId, signal) => {
     const normalizedPeerUserId =
       typeof peerUserId === "string" ? peerUserId.trim() : "";
+    const normalizedPeerDeviceId =
+      typeof peerDeviceId === "string" ? peerDeviceId.trim() : "";
     if (!client?.userId || !normalizedPeerUserId || !signal) {
       return;
     }
 
-    const targetClient = clientsByUserId.get(normalizedPeerUserId);
+    // Prefer device-id routing so two devices of the same user get their
+    // own ICE candidates. Fall back to user-id lookup for legacy clients.
+    let targetClient = null;
+    if (normalizedPeerDeviceId) {
+      targetClient = clientsByDeviceId.get(normalizedPeerDeviceId) || null;
+    }
+    if (!targetClient) {
+      const candidates = getUserClients(normalizedPeerUserId);
+      targetClient = candidates.length === 1 ? candidates[0] : null;
+    }
     if (!targetClient || !areClientsEligiblePeers(client, targetClient)) {
       return;
     }
@@ -280,6 +365,7 @@ const createSignalingServer = (server) => {
     sendJson(targetClient.socket, {
       type: "webrtc_signal",
       peer_user_id: client.userId,
+      peer_device_id: client.deviceId,
       signal,
     });
   };
@@ -297,12 +383,15 @@ const createSignalingServer = (server) => {
   });
 
   websocketServer.on("connection", (socket) => {
+    const deviceId = randomUUID();
     const client = {
       socket,
+      deviceId,
       userId: "",
       peerIds: new Set(),
     };
     clientsBySocket.set(socket, client);
+    clientsByDeviceId.set(deviceId, client);
 
     socket.on("message", (rawMessage) => {
       const payload = safeParseJson(rawMessage.toString());
@@ -326,7 +415,12 @@ const createSignalingServer = (server) => {
       }
 
       if (payload.type === "webrtc_signal") {
-        handlePeerSignal(client, payload.peer_user_id, payload.signal);
+        handlePeerSignal(
+          client,
+          payload.peer_user_id,
+          payload.peer_device_id,
+          payload.signal
+        );
         return;
       }
 

@@ -1,7 +1,17 @@
 /*
-This module owns the browser-side websocket signaling connection used by the IOU app for online presence and WebRTC signaling.
+This module owns the browser-side websocket signaling connection used by the
+IOU app for online presence and WebRTC signaling.
 
-It keeps websocket lifecycle concerns isolated from the peer transport layer, so higher-level realtime code can focus on peer sessions and queued delivery instead of reconnect and JSON routing details.
+Signaling is *device-scoped*: every WebRTC offer/answer/candidate must be
+routed to a specific remote device, because one user may have multiple
+devices connected at the same time (same npub, different WebSocket session).
+The server assigns each device a `deviceId` and includes it in every
+peer-scoped message; the client threads it back on outgoing `webrtc_signal`
+so ICE candidates reach the exact device that sent the matching offer.
+
+It keeps websocket lifecycle concerns isolated from the peer transport layer,
+so higher-level realtime code can focus on peer sessions and queued delivery
+instead of reconnect and JSON routing details.
 */
 
 const RECONNECT_DELAY_MS = 2500;
@@ -106,6 +116,7 @@ const createSignalingClient = (
     if (payload.type === "peer_connect" && typeof onPeerConnect === "function") {
       onPeerConnect({
         peerUserId: payload.peer_user_id,
+        peerDeviceId: payload.peer_device_id || "",
         initiator: payload.initiator === true,
       });
       return;
@@ -114,6 +125,7 @@ const createSignalingClient = (
     if (payload.type === "peer_disconnect" && typeof onPeerDisconnect === "function") {
       onPeerDisconnect({
         peerUserId: payload.peer_user_id,
+        peerDeviceId: payload.peer_device_id || "",
       });
       return;
     }
@@ -121,6 +133,7 @@ const createSignalingClient = (
     if (payload.type === "webrtc_signal" && typeof onPeerSignal === "function") {
       onPeerSignal({
         peerUserId: payload.peer_user_id,
+        peerDeviceId: payload.peer_device_id || "",
         signal: payload.signal || null,
       });
       return;
@@ -182,9 +195,11 @@ const createSignalingClient = (
         peer_user_id: normalizedPeerUserId,
       });
     },
-    sendPeerSignal: (peerUserId, signal) => {
+    sendPeerSignal: (peerUserId, peerDeviceId, signal) => {
       const normalizedPeerUserId =
         typeof peerUserId === "string" ? peerUserId.trim() : "";
+      const normalizedPeerDeviceId =
+        typeof peerDeviceId === "string" ? peerDeviceId.trim() : "";
       if (!normalizedPeerUserId || !signal) {
         return;
       }
@@ -192,6 +207,7 @@ const createSignalingClient = (
       sendJson(socket, {
         type: "webrtc_signal",
         peer_user_id: normalizedPeerUserId,
+        peer_device_id: normalizedPeerDeviceId,
         signal,
       });
     },

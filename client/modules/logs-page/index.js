@@ -8,7 +8,10 @@ focused while this module owns display concerns.
 */
 
 import { formatMarkdownish } from "../../js/utils/markdownish.js";
-import { getConnectedPeerIds } from "../../js/peer/status.js";
+import {
+  getConnectedPeerIds,
+  getConnectedSelfDeviceIds,
+} from "../../js/peer/status.js";
 import { initInfiniteList } from "../../js/ui/infinite-list.js";
 
 const formatEur = (amount) => {
@@ -81,12 +84,20 @@ const formatLedgerEntry = (entry, myId, namesById) => {
 
 export const bindLogs = (root, data) => {
   const peerConnectionsEl = root.querySelector('[data-bind="peer-connections"]');
+  const selfDeviceConnectionsEl = root.querySelector(
+    '[data-bind="self-device-connections"]'
+  );
   const listEl = root.querySelector('[data-list="logs"]');
   const itemTemplate = root.querySelector('[data-template="log-item"]');
   if (!listEl || !itemTemplate) return;
 
   if (peerConnectionsEl) {
     peerConnectionsEl.textContent = String(getConnectedPeerIds().length);
+  }
+  if (selfDeviceConnectionsEl) {
+    selfDeviceConnectionsEl.textContent = String(
+      getConnectedSelfDeviceIds().length
+    );
   }
 
   listEl.innerHTML = "";

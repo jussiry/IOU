@@ -26,7 +26,7 @@ import {
   persistState,
 } from "../app-state.js";
 import { removeQueuedPeerMessage } from "./outbox.js";
-import { findConnection } from "../connection-helpers.js";
+import { findConnection, syncUserNameAcrossContacts } from "../connection-helpers.js";
 import {
   createInboundProcessingResult,
   routeInboundMessage,
@@ -128,6 +128,38 @@ export const markPeerMessageReceived = async (messageId) => {
   }
 
   return persistAndBuildView(state);
+};
+
+// Scans the full persisted ledger for name_changed entries authored by the
+// local user and applies the most recently-originated one as the display name.
+// Called after any self-mesh sync so both devices converge on the same name
+// without relying on in-flight entry classification being perfect.
+export const applyOwnNameFromLedger = async () => {
+  const state = await loadState();
+  if (!hasUser(state)) return;
+
+  const myId = state.user.id;
+  const nameEntries = (Array.isArray(state.ledger) ? state.ledger : []).filter(
+    (e) =>
+      e.type === "name_changed" &&
+      e.from_user_id === myId &&
+      typeof e.payload?.name === "string" &&
+      e.payload.name.trim()
+  );
+  if (nameEntries.length === 0) return;
+
+  nameEntries.sort((a, b) => {
+    const aTs = a.originated_at || a.timestamp || "";
+    const bTs = b.originated_at || b.timestamp || "";
+    return aTs < bTs ? -1 : aTs > bTs ? 1 : 0;
+  });
+  const latestName = nameEntries[nameEntries.length - 1].payload.name.trim();
+
+  if (!latestName || state.user.name === latestName) return;
+
+  state.user.name = latestName;
+  syncUserNameAcrossContacts(state);
+  await persistAndBuildView(state);
 };
 
 export const applyInboundPeerMessage = async (incomingMessage) => {

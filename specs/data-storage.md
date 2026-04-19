@@ -1,13 +1,15 @@
 # IOU Data Storage Specification
 
 **Version:** 1  
-**Last updated:** 2026-04-17
+**Last updated:** 2026-04-18
 
 ---
 
 ## 1. Overview
 
 The IOU client stores all application state in a single IndexedDB record. There is no remote database; every piece of user data — identity, friends, transactions, and the peer-message ledger — lives exclusively in the browser. Peers synchronise directly with each other over WebRTC; the signalling server is stateless beyond a short delivery queue.
+
+A single user MAY be logged in on several devices at the same time — each browser tab / install gets its own IndexedDB record. Convergence between those records is not a storage concern; it is handled at the peer layer (see `specs/peer-communication.md §13` and `specs/ledger.md §8`). Each device is assigned an ephemeral `device_id` by the relay server on every WebSocket connection; this id is **not** persisted in IndexedDB.
 
 This document describes:
 - the IndexedDB layout,

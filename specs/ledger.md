@@ -1,7 +1,7 @@
 # IOU Ledger Specification
 
-**Version:** 1  
-**Last updated:** 2026-04-17
+**Version:** 2  
+**Last updated:** 2026-04-18
 
 ---
 
@@ -61,7 +61,11 @@ Convenience wrapper for the common case of mirroring an outbound or freshly-appl
 
 ### 4.1 `getLedgerEntriesForPeer(ledger, myId, peerId)`
 
-Returns all entries where `(from_user_id === myId && to_user_id === peerId) || (from_user_id === peerId && to_user_id === myId)`. This is the bilateral slice offered to a sync peer — entries involving third parties are never forwarded.
+Returns all entries where `(from_user_id === myId && to_user_id === peerId) || (from_user_id === peerId && to_user_id === myId)`. This is the bilateral slice offered to a **friend** sync peer — entries involving third parties are never forwarded.
+
+### 4.2 `getAllLedgerEntries(ledger)`
+
+Returns a shallow copy of the full ledger. Used by the **self-mesh** (same-user devices) during initial catch-up and live broadcast (see §9): a self-peer is entitled to the full ledger because it represents another device of the same user.
 
 ---
 
@@ -162,7 +166,33 @@ When a wiped user reconnects, peers who do not yet have a `peer_connect` signal 
 
 ---
 
-## 8. Security Properties
+## 8. Multi-Device Live Broadcast
+
+Beyond recovery-after-wipe, the ledger is also the convergence substrate for a single user running multiple devices (laptop + phone, two browsers, etc.). Each device keeps its own IndexedDB record; the ledger is what brings them into agreement.
+
+The mechanism has two halves:
+
+1. **Initial catch-up (on self-peer connection).** As soon as a WebRTC data channel opens between two devices of the same user, they exchange `sync_hello` / `sync_data` exactly as friend sync would, except the sender returns *all* ledger entries whose id is missing from the initiator's `known_ids` (not the bilateral slice). Entries are verified, classified, and replayed identically to §7.
+2. **Live broadcast (on every append).** Whenever the local client appends a ledger entry — whether from an outbound action or a freshly-applied inbound peer message — it MUST push that entry to every currently connected self-peer as a `sync_data` batch containing a single entry (or a small tail).
+
+### 8.1 Loop Prevention
+
+Without guardrails the live broadcast would echo forever: A broadcasts to B, B appends and broadcasts back to A, A appends and broadcasts again. Two cooperating rules break the cycle:
+
+- The sender maintains a `broadcastedLedgerIds` set and skips any entry already in it.
+- On receiving `sync_data` via the self-mesh, the receiver **seeds this set with each inbound id before applying the entries**. The resulting data-change tick therefore sees the id as "already broadcast" and the entry is not echoed back.
+
+### 8.2 No Receipts on Self-Sync
+
+Self-sync inner messages do not generate receipts (see `specs/peer-communication.md §13.7`). After convergence, both devices share identical `processed_peer_message_ids` maps, so an acknowledgement would be redundant; moreover, a receipt from device A to device A' would itself trigger a broadcast, causing unbounded fan-out.
+
+### 8.3 Signature Handling
+
+Every self-sync entry still carries its original BIP-340 Schnorr signature and is verified by the receiver exactly like a friend-sync entry. Reusing the signature path keeps the merge code DRY and guarantees that even if the self-mesh were somehow spoofed, forged entries with invalid signatures would be rejected before touching local state.
+
+---
+
+## 9. Security Properties
 
 | Property | Mechanism |
 |---|---|
@@ -172,7 +202,7 @@ When a wiped user reconnects, peers who do not yet have a `peer_connect` signal 
 | **Replay-safe deduplication** | `processed_peer_message_ids` prevents the same entry from being applied twice, even across multiple sync cycles |
 | **Bilateral isolation** | `getLedgerEntriesForPeer` only shares entries involving both parties; third-party conversations are never forwarded |
 
-### 8.1 Limitations
+### 9.1 Limitations
 
 - **Key compromise** — if a user's private key is stolen, an attacker can produce valid signatures for arbitrary messages. There is currently no key rotation mechanism.
 - **Timestamp forgery** — `originated_at` is sender-asserted and covered by the signature, so it cannot be altered after signing; however, a malicious sender can choose any timestamp at signing time.

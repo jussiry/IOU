@@ -1,9 +1,21 @@
 /*
-This module manages WebRTC peer connections and JSON data channels between eligible IOU clients.
+This module manages WebRTC peer connections and JSON data channels between
+eligible IOU clients. It's used for two parallel overlays:
 
-It keeps peer session state, offer/answer exchange, and data-channel delivery concerns in one place so the higher-level realtime coordinator can focus on queued application messages, state sync, and UI-facing connection status.
+  1. Friend mesh — one peer per friend npub (the key is the peer user id).
+  2. Self-mesh — one peer per *other device* of the same user (the key is
+     the server-assigned peer device id; peerUserId is always my own npub).
 
-Offer/answer negotiation follows the "perfect negotiation" pattern: peers are assigned polite or impolite roles by comparing user IDs so both sides independently agree on who yields during simultaneous offer collisions.
+Both overlays are instances of `createPeerMesh` with different `peerKey`
+conventions. The mesh is agnostic to the key's meaning — it just maps a
+key to an RTCPeerConnection + data channel, and every signalling message
+carries both `peerUserId` and `peerDeviceId` so the server can route to
+the exact remote device even when a user has several connected.
+
+Offer/answer negotiation follows the "perfect negotiation" pattern: peers
+are assigned polite or impolite roles by comparing the peer key so both
+sides independently agree on who yields during simultaneous offer
+collisions.
 */
 
 const RTC_CONFIGURATION = {
@@ -39,36 +51,54 @@ const logPeerEvent = (title, detail) => {
 };
 
 // The polite peer yields during offer collisions by accepting implicit rollback.
-// Determined by comparing user IDs so both sides always agree on roles.
-const isPoliteRole = (localUserId, peerUserId) => localUserId < peerUserId;
+// Determined by comparing the peer key so both sides always agree on roles.
+const isPoliteRole = (localKey, peerKey) => localKey < peerKey;
 
 const createPeerMesh = (
   {
-    getLocalUserId = () => "",
+    // Returns the local key ("self identifier"). For the friend mesh this is
+    // our own user id (so we never connect to ourselves at the user level);
+    // for the self-mesh it can be empty — the server already guarantees we
+    // never get a peer_connect for our own device.
+    getLocalKey = () => "",
+    // getLocalUserId is retained as an alias for callers that pre-date the
+    // peerKey rename; kept for callsite DRY only.
+    getLocalUserId = null,
     sendSignal = () => {},
     onPeerMessage = null,
     onPeerReady = null,
     onPeerStatusChange = null,
+    // If true, remote-initiated peers are trusted on arrival and never
+    // subject to the 15-second allowance timer. Used by the self-mesh:
+    // same-user devices are always welcome and shouldn't be reaped.
+    alwaysAllow = false,
   } = {}
 ) => {
+  const resolveLocalKey = typeof getLocalKey === "function"
+    ? getLocalKey
+    : (typeof getLocalUserId === "function" ? getLocalUserId : () => "");
   const peers = new Map();
 
-  const getConnectedPeerIds = () => {
+  const getConnectedPeerKeys = () => {
     return Array.from(peers.values())
       .filter((peer) => peer?.channel?.readyState === "open")
-      .map((peer) => peer.peerUserId)
+      .map((peer) => peer.peerKey)
       .filter(Boolean);
   };
 
   const notifyPeerStatusChange = () => {
     if (typeof onPeerStatusChange === "function") {
-      onPeerStatusChange(getConnectedPeerIds());
+      onPeerStatusChange(getConnectedPeerKeys());
     }
   };
 
-  const notifyPeerReady = (peerUserId) => {
+  const notifyPeerReady = (peer) => {
     if (typeof onPeerReady === "function") {
-      onPeerReady(peerUserId);
+      onPeerReady({
+        peerKey: peer.peerKey,
+        peerUserId: peer.peerUserId,
+        peerDeviceId: peer.peerDeviceId,
+      });
     }
   };
 
@@ -97,18 +127,18 @@ const createPeerMesh = (
 
     peer.remoteAllowanceTimer = window.setTimeout(() => {
       peer.remoteAllowanceTimer = null;
-      if (!peers.has(peer.peerUserId) || peer.allowedBySnapshot) {
+      if (!peers.has(peer.peerKey) || peer.allowedBySnapshot) {
         return;
       }
 
-      closePeer(peer.peerUserId, {
+      closePeer(peer.peerKey, {
         reason: "remote_allowance_timeout",
       });
     }, REMOTE_INITIATED_PEER_GRACE_PERIOD_MS);
   };
 
-  const closePeer = (peerUserId, detail = {}) => {
-    const peer = peers.get(peerUserId);
+  const closePeer = (peerKey, detail = {}) => {
+    const peer = peers.get(peerKey);
     if (!peer) {
       return;
     }
@@ -116,17 +146,19 @@ const createPeerMesh = (
     clearDisconnectTimer(peer);
     clearRemoteAllowanceTimer(peer);
     logPeerEvent("Peer connection disconnecting", {
-      peerUserId,
+      peerKey,
+      peerUserId: peer.peerUserId,
+      peerDeviceId: peer.peerDeviceId,
       ...detail,
     });
     peer.channel?.close();
     peer.connection?.close();
-    peers.delete(peerUserId);
+    peers.delete(peerKey);
     notifyPeerStatusChange();
   };
 
-  const bindChannel = (peerUserId, channel) => {
-    const peer = peers.get(peerUserId);
+  const bindChannel = (peerKey, channel) => {
+    const peer = peers.get(peerKey);
     if (!peer) {
       return;
     }
@@ -134,33 +166,37 @@ const createPeerMesh = (
     peer.channel = channel;
     channel.addEventListener("open", () => {
       logPeerEvent("Peer connection established", {
-        peerUserId,
+        peerKey,
+        peerUserId: peer.peerUserId,
+        peerDeviceId: peer.peerDeviceId,
         channelLabel: channel.label,
       });
       notifyPeerStatusChange();
-      notifyPeerReady(peerUserId);
+      notifyPeerReady(peer);
     });
     channel.addEventListener("close", () => {
       logPeerEvent("Peer connection disconnected", {
-        peerUserId,
+        peerKey,
+        peerUserId: peer.peerUserId,
         channelLabel: channel.label,
       });
       peer.inflightMessageIds.clear();
       peer.channel = null;
       clearDisconnectTimer(peer);
       notifyPeerStatusChange();
-      if (peers.get(peerUserId) !== peer) {
+      if (peers.get(peerKey) !== peer) {
         return;
       }
 
-      closePeer(peerUserId, {
+      closePeer(peerKey, {
         reason: "channel_closed",
       });
     });
     channel.addEventListener("message", (event) => {
       const message = safeParseJson(event.data);
       logPeerEvent("Peer data received", {
-        peerUserId,
+        peerKey,
+        peerUserId: peer.peerUserId,
         data: message ?? event.data,
       });
       if (!message || typeof onPeerMessage !== "function") {
@@ -168,37 +204,56 @@ const createPeerMesh = (
       }
 
       onPeerMessage({
-        peerUserId,
+        peerKey,
+        peerUserId: peer.peerUserId,
+        peerDeviceId: peer.peerDeviceId,
         message,
       });
     });
   };
 
-  const ensurePeer = (peerUserId, { initiator = false } = {}) => {
-    const normalizedPeerUserId =
-      typeof peerUserId === "string" ? peerUserId.trim() : "";
-    if (!normalizedPeerUserId || normalizedPeerUserId === getLocalUserId()) {
+  const dispatchSignal = (peer, signal) => {
+    sendSignal(peer.peerKey, signal, {
+      peerUserId: peer.peerUserId,
+      peerDeviceId: peer.peerDeviceId,
+    });
+  };
+
+  const ensurePeer = (peerKey, {
+    initiator = false,
+    peerUserId = "",
+    peerDeviceId = "",
+  } = {}) => {
+    const normalizedPeerKey =
+      typeof peerKey === "string" ? peerKey.trim() : "";
+    if (!normalizedPeerKey || normalizedPeerKey === resolveLocalKey()) {
       return null;
     }
 
-    if (peers.has(normalizedPeerUserId)) {
-      const existingPeer = peers.get(normalizedPeerUserId);
+    if (peers.has(normalizedPeerKey)) {
+      const existingPeer = peers.get(normalizedPeerKey);
+      // Refresh metadata in case the remote device's id/user id arrived
+      // in a later signal (e.g. the first peer_connect landed without it).
+      if (peerUserId) existingPeer.peerUserId = peerUserId;
+      if (peerDeviceId) existingPeer.peerDeviceId = peerDeviceId;
       const state = existingPeer.connection?.connectionState;
       if (state === "closed" || state === "failed") {
         logPeerEvent("Replacing stale peer connection", {
-          peerUserId: normalizedPeerUserId,
+          peerKey: normalizedPeerKey,
           connectionState: state,
         });
-        closePeer(normalizedPeerUserId, { reason: "stale_replaced" });
+        closePeer(normalizedPeerKey, { reason: "stale_replaced" });
       } else {
         return existingPeer;
       }
     }
 
     const connection = new RTCPeerConnection(RTC_CONFIGURATION);
-    const isPolite = isPoliteRole(getLocalUserId(), normalizedPeerUserId);
+    const isPolite = isPoliteRole(resolveLocalKey(), normalizedPeerKey);
     const peer = {
-      peerUserId: normalizedPeerUserId,
+      peerKey: normalizedPeerKey,
+      peerUserId: typeof peerUserId === "string" ? peerUserId : "",
+      peerDeviceId: typeof peerDeviceId === "string" ? peerDeviceId : "",
       connection,
       channel: null,
       isPolite,
@@ -207,16 +262,18 @@ const createPeerMesh = (
       makingOffer: false,
       disconnectTimer: null,
       remoteAllowanceTimer: null,
-      allowedBySnapshot: initiator,
+      allowedBySnapshot: initiator || alwaysAllow,
     };
-    peers.set(normalizedPeerUserId, peer);
+    peers.set(normalizedPeerKey, peer);
     logPeerEvent("Establishing peer connection", {
-      peerUserId: normalizedPeerUserId,
+      peerKey: normalizedPeerKey,
+      peerUserId: peer.peerUserId,
+      peerDeviceId: peer.peerDeviceId,
       initiator,
       isPolite,
     });
 
-    if (!initiator) {
+    if (!initiator && !alwaysAllow) {
       scheduleRemoteAllowanceTimeout(peer);
     }
 
@@ -228,16 +285,16 @@ const createPeerMesh = (
         peer.makingOffer = true;
         await connection.setLocalDescription();
         logPeerEvent("Sending peer offer", {
-          peerUserId: normalizedPeerUserId,
+          peerKey: normalizedPeerKey,
           description: connection.localDescription,
         });
-        sendSignal(normalizedPeerUserId, {
+        dispatchSignal(peer, {
           type: "description",
           description: connection.localDescription,
         });
       } catch (error) {
         logPeerEvent("Offer creation failed", {
-          peerUserId: normalizedPeerUserId,
+          peerKey: normalizedPeerKey,
           error: String(error?.message || error),
         });
       } finally {
@@ -250,7 +307,7 @@ const createPeerMesh = (
         return;
       }
 
-      sendSignal(normalizedPeerUserId, {
+      dispatchSignal(peer, {
         type: "candidate",
         candidate: event.candidate,
       });
@@ -258,7 +315,7 @@ const createPeerMesh = (
 
     connection.addEventListener("connectionstatechange", () => {
       logPeerEvent("Peer connection state changed", {
-        peerUserId: normalizedPeerUserId,
+        peerKey: normalizedPeerKey,
         connectionState: connection.connectionState,
       });
 
@@ -277,7 +334,7 @@ const createPeerMesh = (
 
         // Attempt ICE restart before giving up. restartIce() fires
         // negotiationneeded which sends a new offer with fresh ICE credentials.
-        logPeerEvent("Attempting ICE restart", { peerUserId: normalizedPeerUserId });
+        logPeerEvent("Attempting ICE restart", { peerKey: normalizedPeerKey });
         try {
           connection.restartIce();
         } catch {
@@ -286,7 +343,7 @@ const createPeerMesh = (
 
         peer.disconnectTimer = window.setTimeout(() => {
           peer.disconnectTimer = null;
-          if (!peers.has(normalizedPeerUserId)) {
+          if (!peers.has(normalizedPeerKey)) {
             return;
           }
           if (
@@ -296,7 +353,7 @@ const createPeerMesh = (
             return;
           }
 
-          closePeer(normalizedPeerUserId, {
+          closePeer(normalizedPeerKey, {
             reason: "disconnected_timeout",
           });
         }, DISCONNECTED_PEER_GRACE_PERIOD_MS);
@@ -304,19 +361,19 @@ const createPeerMesh = (
       }
 
       if (["failed", "closed"].includes(connection.connectionState)) {
-        closePeer(normalizedPeerUserId, {
+        closePeer(normalizedPeerKey, {
           reason: connection.connectionState,
         });
       }
     });
 
     connection.addEventListener("datachannel", (event) => {
-      bindChannel(normalizedPeerUserId, event.channel);
+      bindChannel(normalizedPeerKey, event.channel);
     });
 
     if (initiator) {
       const channel = connection.createDataChannel(DATA_CHANNEL_LABEL);
-      bindChannel(normalizedPeerUserId, channel);
+      bindChannel(normalizedPeerKey, channel);
       // createDataChannel triggers negotiationneeded, which sends the initial offer
     }
 
@@ -337,12 +394,12 @@ const createPeerMesh = (
       (peer.makingOffer || peer.connection.signalingState !== "stable");
 
     if (offerCollision && !peer.isPolite) {
-      logPeerEvent("Ignoring colliding offer (impolite peer)", { peerUserId: peer.peerUserId });
+      logPeerEvent("Ignoring colliding offer (impolite peer)", { peerKey: peer.peerKey });
       return;
     }
 
     logPeerEvent("Received peer description", {
-      peerUserId: peer.peerUserId,
+      peerKey: peer.peerKey,
       description,
     });
     await peer.connection.setRemoteDescription(description);
@@ -350,10 +407,10 @@ const createPeerMesh = (
     if (description.type === "offer") {
       await peer.connection.setLocalDescription();
       logPeerEvent("Sending peer answer", {
-        peerUserId: peer.peerUserId,
+        peerKey: peer.peerKey,
         description: peer.connection.localDescription,
       });
-      sendSignal(peer.peerUserId, {
+      dispatchSignal(peer, {
         type: "description",
         description: peer.connection.localDescription,
       });
@@ -372,7 +429,7 @@ const createPeerMesh = (
     }
 
     logPeerEvent("Received peer ICE candidate", {
-      peerUserId: peer.peerUserId,
+      peerKey: peer.peerKey,
       candidate,
     });
     if (!peer.connection.remoteDescription) {
@@ -383,30 +440,35 @@ const createPeerMesh = (
     await peer.connection.addIceCandidate(candidate);
   };
 
+  const normalizeKey = (value) =>
+    typeof value === "string" ? value.trim() : "";
+
   return {
     ensurePeer,
-    closePeer: (peerUserId) => {
-      const normalizedPeerUserId =
-        typeof peerUserId === "string" ? peerUserId.trim() : "";
-      if (normalizedPeerUserId) {
-        closePeer(normalizedPeerUserId, { reason: "server_disconnect" });
+    closePeer: (peerKey) => {
+      const normalizedPeerKey = normalizeKey(peerKey);
+      if (normalizedPeerKey) {
+        closePeer(normalizedPeerKey, { reason: "server_disconnect" });
       }
     },
-    hasPeer: (peerUserId) => {
-      const normalizedPeerUserId =
-        typeof peerUserId === "string" ? peerUserId.trim() : "";
-      if (!normalizedPeerUserId) {
+    hasPeer: (peerKey) => {
+      const normalizedPeerKey = normalizeKey(peerKey);
+      if (!normalizedPeerKey) {
         return false;
       }
 
-      return peers.has(normalizedPeerUserId);
+      return peers.has(normalizedPeerKey);
     },
-    handleSignal: async (peerUserId, signal) => {
+    handleSignal: async (peerKey, signal, context = {}) => {
       if (!signal || typeof signal !== "object") {
         return;
       }
 
-      const peer = ensurePeer(peerUserId, { initiator: false });
+      const peer = ensurePeer(peerKey, {
+        initiator: false,
+        peerUserId: context.peerUserId || "",
+        peerDeviceId: context.peerDeviceId || "",
+      });
       if (!peer) {
         return;
       }
@@ -417,12 +479,12 @@ const createPeerMesh = (
         await handleCandidate(peer, signal.candidate);
       }
     },
-    canSend: (peerUserId) => {
-      const peer = peers.get(peerUserId);
+    canSend: (peerKey) => {
+      const peer = peers.get(peerKey);
       return peer?.channel?.readyState === "open";
     },
-    hasInflightMessage: (peerUserId, messageId) => {
-      const peer = peers.get(peerUserId);
+    hasInflightMessage: (peerKey, messageId) => {
+      const peer = peers.get(peerKey);
       if (!peer) {
         return false;
       }
@@ -434,14 +496,14 @@ const createPeerMesh = (
         peer.inflightMessageIds.delete(messageId);
       });
     },
-    sendPeerMessage: (peerUserId, message) => {
-      const peer = peers.get(peerUserId);
+    sendPeerMessage: (peerKey, message) => {
+      const peer = peers.get(peerKey);
       if (!peer?.channel || peer.channel.readyState !== "open") {
         return false;
       }
 
       logPeerEvent("Peer data sent", {
-        peerUserId,
+        peerKey,
         data: message,
       });
       peer.channel.send(JSON.stringify(message));
@@ -450,23 +512,35 @@ const createPeerMesh = (
       }
       return true;
     },
-    sendControlMessage: (peerUserId, message) => {
-      const peer = peers.get(peerUserId);
+    sendControlMessage: (peerKey, message) => {
+      const peer = peers.get(peerKey);
       if (!peer?.channel || peer.channel.readyState !== "open") {
         return false;
       }
 
       logPeerEvent("Peer control data sent", {
-        peerUserId,
+        peerKey,
         data: message,
       });
       peer.channel.send(JSON.stringify(message));
       return true;
     },
-    closePeersNotInSet: (allowedPeerIds) => {
-      const allowedIds = new Set(Array.isArray(allowedPeerIds) ? allowedPeerIds : []);
-      Array.from(peers.entries()).forEach(([peerUserId, peer]) => {
-        peer.allowedBySnapshot = allowedIds.has(peerUserId);
+    // Iterate currently-open peers. The self-mesh uses this to broadcast
+    // fresh ledger entries to every other connected device in one pass.
+    forEachConnectedPeer: (callback) => {
+      peers.forEach((peer) => {
+        if (peer?.channel?.readyState !== "open") return;
+        callback({
+          peerKey: peer.peerKey,
+          peerUserId: peer.peerUserId,
+          peerDeviceId: peer.peerDeviceId,
+        });
+      });
+    },
+    closePeersNotInSet: (allowedPeerKeys) => {
+      const allowedIds = new Set(Array.isArray(allowedPeerKeys) ? allowedPeerKeys : []);
+      Array.from(peers.entries()).forEach(([peerKey, peer]) => {
+        peer.allowedBySnapshot = allowedIds.has(peerKey) || alwaysAllow;
         if (peer.allowedBySnapshot) {
           clearRemoteAllowanceTimer(peer);
           return;
@@ -476,12 +550,12 @@ const createPeerMesh = (
           return;
         }
 
-        closePeer(peerUserId);
+        closePeer(peerKey);
       });
     },
     destroy: () => {
-      Array.from(peers.keys()).forEach((peerUserId) => {
-        closePeer(peerUserId);
+      Array.from(peers.keys()).forEach((peerKey) => {
+        closePeer(peerKey);
       });
       notifyPeerStatusChange();
     },
