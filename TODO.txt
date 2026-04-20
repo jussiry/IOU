@@ -1,22 +1,5 @@
 
 
-NOT DONE YET:
-
-
-signature commands/questions:
-
-  Check my own undestranding of signatures and public/private key (ECDH)
-
-
-
-Syncing multiple devices with same user
-  Another case is when same user has many devices online. When one device makes an action, this should proagate to other devices of the same user, so that they stay in the same state. This also needs to be handled on server side. Maybe but
-
-  Same user with different keys possible / worth implementing?
-
-- WebRTC keeps connecting/dissconnecting
-  * happened when creted connection from Alice to Brave for the first time...
-
 
 - Default on debt
 --> remove friend

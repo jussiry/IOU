@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /*
 Client build pipeline — esbuild per-file transpile of every .ts / .js under
-`client/js/**` and `client/modules/**` into `client/dist/`, preserving the
+`client/js/**` and `client/ui-modules/**` into `client/dist/`, preserving the
 source directory layout.
 
 Why per-file (bundle: false):
@@ -54,7 +54,7 @@ const collectEntryPoints = (dir, extensions) => {
 const buildOptions = () => {
   const entryPoints = [
     ...collectEntryPoints(path.join(CLIENT_DIR, "js"), [".ts", ".js"]),
-    ...collectEntryPoints(path.join(CLIENT_DIR, "modules"), [".ts", ".js"]),
+    ...collectEntryPoints(path.join(CLIENT_DIR, "ui-modules"), [".ts", ".js"]),
   ];
 
   return {

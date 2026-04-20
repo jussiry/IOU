@@ -30,7 +30,7 @@
       "Bash(head *)",
       "Bash(gh search:*)",
       "Bash(gh issue:*)",
-      "Bash(xargs kill:*)",
+      "Bash(xargs *)",
       "mcp__Claude_Preview__preview_start",
       "Bash(source ~/.zshrc)",
       "Bash(source ~/.bash_profile)",

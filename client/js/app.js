@@ -15,18 +15,18 @@ import { createFriend } from "./commands/friendship.js";
 import { createTransaction } from "./commands/transaction.js";
 import { requestPayment } from "./commands/payment-request.js";
 import { updateTrustLimit } from "./commands/trust-limit.js";
-import { bindBalance, initBalanceToggles } from "../modules/balance-page/index.js";
-import { bindFriends } from "../modules/friends-page/index.js";
-import { bindLogs } from "../modules/logs-page/index.js";
-import { bindSettings } from "../modules/settings-page/index.js";
-import { bindWelcome } from "../modules/welcome-page/index.js";
-import { bindFriendDetail } from "../modules/subpage/friend.js";
-import { bindAddFriend } from "../modules/subpage/add-friend.js";
-import { initIouActions } from "../modules/components/iou-actions.js";
-import { bindSend } from "../modules/subpage/send.js";
-import { bindRequest } from "../modules/subpage/request.js";
-import { bindTrust } from "../modules/subpage/trust.js";
-import { bindTransfer } from "../modules/subpage/transfer.js";
+import { bindBalance, initBalanceToggles } from "../ui-modules/balance-page/index.js";
+import { bindFriends } from "../ui-modules/friends-page/index.js";
+import { bindLogs } from "../ui-modules/logs-page/index.js";
+import { bindSettings } from "../ui-modules/settings-page/index.js";
+import { bindWelcome } from "../ui-modules/welcome-page/index.js";
+import { bindFriendDetail } from "../ui-modules/subpage/friend.js";
+import { bindAddFriend } from "../ui-modules/subpage/add-friend.js";
+import { initIouActions } from "../ui-modules/components/iou-actions.js";
+import { bindSend } from "../ui-modules/subpage/send.js";
+import { bindRequest } from "../ui-modules/subpage/request.js";
+import { bindTrust } from "../ui-modules/subpage/trust.js";
+import { bindTransfer } from "../ui-modules/subpage/transfer.js";
 import { applyDevSeedIfRequested } from "./dev/seed.js";
 import { createRealtimeClient } from "./peer/client.js";
 import { subscribeToPeerStatusChanges } from "./peer/status.js";
@@ -49,21 +49,21 @@ const pageTitles = {
 };
 
 const templatePaths = {
-  welcome: "modules/welcome-page/index.html",
-  balance: "modules/balance-page/index.html",
-  friends: "modules/friends-page/index.html",
-  logs: "modules/logs-page/index.html",
-  settings: "modules/settings-page/index.html",
-  subpage: "modules/subpage/index.html",
-  friend: "modules/subpage/friend.html",
-  addFriend: "modules/subpage/add-friend.html",
-  send: "modules/subpage/send.html",
-  request: "modules/subpage/request.html",
-  trust: "modules/subpage/trust.html",
-  transfer: "modules/subpage/transfer.html",
-  trustLimitField: "modules/subpage/trust-limit-field.html",
-  trustExplainer: "modules/subpage/trust-explainer.html",
-  iouActions: "modules/components/iou-actions.html",
+  welcome: "ui-modules/welcome-page/index.html",
+  balance: "ui-modules/balance-page/index.html",
+  friends: "ui-modules/friends-page/index.html",
+  logs: "ui-modules/logs-page/index.html",
+  settings: "ui-modules/settings-page/index.html",
+  subpage: "ui-modules/subpage/index.html",
+  friend: "ui-modules/subpage/friend.html",
+  addFriend: "ui-modules/subpage/add-friend.html",
+  send: "ui-modules/subpage/send.html",
+  request: "ui-modules/subpage/request.html",
+  trust: "ui-modules/subpage/trust.html",
+  transfer: "ui-modules/subpage/transfer.html",
+  trustLimitField: "ui-modules/subpage/trust-limit-field.html",
+  trustExplainer: "ui-modules/subpage/trust-explainer.html",
+  iouActions: "ui-modules/components/iou-actions.html",
 };
 
 const pageBinders = {
