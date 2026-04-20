@@ -135,9 +135,35 @@ exports `{ name, run }` and register it in `tests/two-client-e2e/run.cjs`.
 | Path | Purpose |
 |------|---------|
 | `client/js/dev/seed.js` | Dev seed — user identities and starting states |
-| `client/js/models/data-model.js` | `createConnectionModel` — register new connection fields here |
+| `client/js/models/data-model.ts` | `createConnectionModel` — register new connection fields here |
 | `client/modules/subpage/friend.js` | Friend detail page binding |
 | `client/modules/subpage/friend.html` | Actionable box templates |
 | `tests/peer-helper/run.cjs` | Headless secondary-user driver |
 | `tests/two-client-e2e/fixtures/paired-friends.cjs` | Shared keypairs (Alice / Bob / Carol) |
 | `tests/two-client-e2e/scenarios/` | E2E scenario modules |
+
+---
+
+## TypeScript vs JavaScript strategy
+
+The codebase is gradually migrating from JavaScript to TypeScript. Currently **5 core data modules are in TypeScript**, and the rest remain in JavaScript.
+
+**Write in TypeScript when:**
+- The module is **data-heavy** — defines or processes structured application state (models, schemas, state normalization).
+- The module is **already imported by TypeScript files** or is a dependency of files you're migrating to TS (keeps the dependency graph typed).
+- Examples: `models/data-model.ts`, `storage/indexeddb.ts`, `ledger.ts`, state utilities.
+
+**Write in JavaScript when:**
+- The module is **UI code** — page binders, event handlers, DOM manipulation (`client/modules/**/*.js`).
+- The module is **transport or signaling code** — WebRTC, WebSocket, envelope handling, where dynamic data is common and types would add friction without preventing real bugs.
+- The module is **loosely coupled** — command handlers, device-specific logic, utilities that don't feed into typed core state.
+
+**Migration order** (if continuing):
+1. ✅ `state-utils.ts`, `models/data-model.ts`, `ledger.ts`, `peer/status.ts`, `storage/indexeddb.ts` — done
+2. Next candidates: `connection-helpers.js` (imports from data-model, feeds it to handlers), `app-state.js` (orchestrates typed state).
+3. UI and handlers can stay JS indefinitely — they consume the typed core, but don't need full type safety themselves.
+
+**Build pipeline** (`npm run dev` uses esbuild watch):
+- TS → JS (per-file, no bundling)
+- Import paths stay unchanged (callers write `from "./foo.js"` even for `.ts` sources; esbuild emits `.js`)
+- `npm run typecheck` for zero-friction type checking across all `client/**`
