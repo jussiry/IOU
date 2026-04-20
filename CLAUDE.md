@@ -8,16 +8,20 @@ npm run dev   # starts server at http://localhost:3000 with auto-reload
 
 ---
 
+## Code style
+- Make DRY code: find patterns that repeat in code and wrap them into a function or other construct that can be reused to produce the same functionality in many places.
+  * Be forward thinking: e.g. when creating commonly used UI components, make them first as a reusable component, and then use that component to implement requested feature.
+- At the beginning of each JS file describe that code in few paragraphs.
+- In UI modules (or "components") put related JS, HTML and CSS files inside the same folder.
+
 ## Commits and deploys
 
 Do **not** run `git commit` or `git push` automatically after finishing a
 task. When work is complete, propose a commit message and ask the user
-whether to commit and push — wait for explicit confirmation before running
-any git write commands.
+whether to commit and push.
 
-**Exception:** if the user says "deploy" (or otherwise explicitly asks to
-commit/push), that is the trigger to run `git add` + `git commit` +
-`git push origin main` with a well-crafted message.
+If the user says "deploy", that is the trigger to run `git add` + `git commit` +
+`git push origin main` with a short message.
 
 ---
 
@@ -137,9 +141,7 @@ exports `{ name, run }` and register it in `tests/two-client-e2e/run.cjs`.
 | `client/js/dev/seed.js` | Dev seed — user identities and starting states |
 | `client/js/models/data-model.ts` | `createConnectionModel` — register new connection fields here |
 | `client/ui-modules/subpage/friend.js` | Friend detail page binding |
-| `client/ui-modules/subpage/friend.html` | Actionable box templates |
 | `tests/peer-helper/run.cjs` | Headless secondary-user driver |
-| `tests/two-client-e2e/fixtures/paired-friends.cjs` | Shared keypairs (Alice / Bob / Carol) |
 | `tests/two-client-e2e/scenarios/` | E2E scenario modules |
 
 ---
@@ -149,10 +151,9 @@ exports `{ name, run }` and register it in `tests/two-client-e2e/run.cjs`.
 The codebase is gradually migrating from JavaScript to TypeScript.
 
 **Write in TypeScript when:**
-- The module is **data-heavy** — defines or processes structured application state (models, schemas, state normalization).
-
+- The module is **data-heavy** — defines or processes structured application state (models, schemas, state normalization) and is connected to modules already written in TypeScript.
 
 **Write in JavaScript when:**
-- The module is **UI code** — page binders, event handlers, DOM manipulation (`client/ui-modules/**/*.js`).
-- The module is **transport or signaling code** — WebRTC, WebSocket, envelope handling.
-- The module is **loosely coupled** — command handlers, device-specific logic, utilities.
+- The module is **UI code**, specifically in:
+  * `js/ui/**/*.js`
+  * `client/ui-modules/**/*.js`
