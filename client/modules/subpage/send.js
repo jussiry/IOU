@@ -189,7 +189,7 @@ export const bindSend = (root, data, friendId) => {
   scanQrButtonEl?.addEventListener("click", async () => {
     try {
       const lib = await loadVendorScript(
-        "js/vendor/html5-qrcode.min.js",
+        "dist/js/vendor/html5-qrcode.min.js",
         "__Html5QrcodeLibrary__"
       );
       const Html5Qrcode = lib.Html5Qrcode;

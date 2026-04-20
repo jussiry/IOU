@@ -166,6 +166,35 @@ When a wiped user reconnects, peers who do not yet have a `peer_connect` signal 
 
 ---
 
+## 7.7 Self-Authored Seed Entry on Identity Creation
+
+When a new identity is created (a fresh keypair — **not** when logging in with an existing nsec or ncryptsec), the client appends a self-addressed `name_changed` ledger entry as part of `createUser`:
+
+```
+from_user_id = to_user_id = <new user's npub>
+payload      = { name: <chosen display name, or npub if empty> }
+originated_at = <now>
+signature     = Schnorr over the canonical inner-message digest
+```
+
+This seed entry ensures that the *first* device of a new user ships with the authoritative name already in the ledger. When the user later pairs a second device of the same identity, the self-mesh sync (§8) delivers the entry and the second device can derive the display name from the ledger without a round-trip.
+
+The seed entry MUST NOT be created during login with an existing `nsec` / `ncryptsec`. Doing so would insert a fresh `name_changed` entry timestamped *now* and addressed from the user to themselves — which `applyOwnNameFromLedger` (§7.8) would then pick as the most-recent name and overwrite the real name already carried in the user's older ledger entries from their other devices.
+
+## 7.8 `applyOwnNameFromLedger`
+
+After any self-mesh sync completes, the client scans the ledger for entries where:
+
+- `type === "name_changed"`
+- `from_user_id === myId`
+- `payload.name` is a non-empty trimmed string
+
+Entries are sorted ascending by `originated_at` (falling back to `timestamp`), and the most recent one wins. The resulting name is assigned to `state.user.name` and propagated to every contact's stored `person_name` via `syncUserNameAcrossContacts` so the user's own devices and every friend's copy of the user's display name agree after convergence.
+
+This pass is idempotent: if the derived name already matches `state.user.name`, nothing is persisted.
+
+---
+
 ## 8. Multi-Device Live Broadcast
 
 Beyond recovery-after-wipe, the ledger is also the convergence substrate for a single user running multiple devices (laptop + phone, two browsers, etc.). Each device keeps its own IndexedDB record; the ledger is what brings them into agreement.

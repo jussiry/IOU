@@ -13,7 +13,12 @@ owns how entries are shaped, how they're filtered for sync, and how
 untrusted entries are vetted before they enter the local log.
 */
 
-import { createLedgerEntryModel } from "./models/data-model.js";
+import {
+  createLedgerEntryModel,
+  type LedgerEntryModel,
+  type PeerMessageModel,
+  type RootState,
+} from "./models/data-model.js";
 import { verifyInnerSignature } from "./peer/envelope.js";
 import { createId } from "./state-utils.js";
 
@@ -21,11 +26,21 @@ import { createId } from "./state-utils.js";
 // Local appends
 // ---------------------------------------------------------------------------
 
+export interface AppendLedgerEntryOptions {
+  id?: string;
+  type?: string;
+  fromUserId?: string;
+  toUserId?: string;
+  payload?: Record<string, unknown>;
+  signature?: string;
+  originatedAt?: string;
+}
+
 // Primitive append. Callers pass the domain fields; this normalizes through
 // the model factory so shape drift can only happen in one place. The local
 // `timestamp` is set here — peer-asserted timing lives in `originated_at`.
 export const appendLedgerEntry = (
-  state,
+  state: RootState,
   {
     id,
     type,
@@ -34,8 +49,8 @@ export const appendLedgerEntry = (
     payload = {},
     signature = "",
     originatedAt = "",
-  } = {},
-) => {
+  }: AppendLedgerEntryOptions = {}
+): void => {
   state.ledger = Array.isArray(state.ledger) ? state.ledger : [];
   state.ledger.unshift(
     createLedgerEntryModel({
@@ -47,14 +62,17 @@ export const appendLedgerEntry = (
       signature,
       originated_at: originatedAt,
       payload,
-    }),
+    })
   );
 };
 
 // Convenience wrapper: mirror an outbound or verified inbound peer message
 // into the ledger. The message's `created_at` becomes `originated_at` so the
 // Schnorr digest remains reproducible from the stored entry.
-export const appendLedgerEntryFromMessage = (state, message) => {
+export const appendLedgerEntryFromMessage = (
+  state: RootState,
+  message: PeerMessageModel | null | undefined
+): void => {
   if (!message) return;
   appendLedgerEntry(state, {
     id: message.id,
@@ -74,19 +92,25 @@ export const appendLedgerEntryFromMessage = (state, message) => {
 // Entries that belong to the conversation between `myId` and `peerId` — the
 // slice we offer during sync. Entries involving third parties never flow to
 // this peer.
-export const getLedgerEntriesForPeer = (ledger, myId, peerId) => {
+export const getLedgerEntriesForPeer = (
+  ledger: LedgerEntryModel[] | null | undefined,
+  myId: string,
+  peerId: string
+): LedgerEntryModel[] => {
   if (!Array.isArray(ledger)) return [];
   return ledger.filter(
     (entry) =>
       (entry.from_user_id === myId && entry.to_user_id === peerId) ||
-      (entry.from_user_id === peerId && entry.to_user_id === myId),
+      (entry.from_user_id === peerId && entry.to_user_id === myId)
   );
 };
 
 // The full ledger as-is — used for same-user (device-to-device) sync where
 // every entry is in-scope because every entry was authored or received by
 // *this* user regardless of which friend it concerned.
-export const getAllLedgerEntries = (ledger) => {
+export const getAllLedgerEntries = (
+  ledger: LedgerEntryModel[] | null | undefined
+): LedgerEntryModel[] => {
   if (!Array.isArray(ledger)) return [];
   return ledger.slice();
 };
@@ -100,7 +124,9 @@ export const getAllLedgerEntries = (ledger) => {
 // messages. AES-GCM on the sync envelope only proves the *transport* peer
 // produced the batch — for forwarded or third-party entries we also need
 // this signature check to trust authorship.
-export const verifyLedgerEntrySignature = async (entry) => {
+export const verifyLedgerEntrySignature = async (
+  entry: LedgerEntryModel | null | undefined
+): Promise<boolean> => {
   if (!entry || typeof entry !== "object") return false;
   if (typeof entry.signature !== "string" || !entry.signature) return false;
   const innerShape = {
@@ -126,7 +152,10 @@ export const verifyLedgerEntrySignature = async (entry) => {
 //
 // Does not persist; callers own persistence so a single save can cover
 // whatever else changed in the same tick.
-export const mergeSyncedLedgerEntries = async (state, entries) => {
+export const mergeSyncedLedgerEntries = async (
+  state: RootState,
+  entries: unknown
+): Promise<number> => {
   if (!Array.isArray(entries) || entries.length === 0) return 0;
 
   state.ledger = Array.isArray(state.ledger) ? state.ledger : [];
@@ -140,7 +169,7 @@ export const mergeSyncedLedgerEntries = async (state, entries) => {
     if (!signatureValid) {
       console.warn(
         "[Ledger] Rejected synced entry with missing or invalid signature:",
-        normalized.id,
+        normalized.id
       );
       continue;
     }

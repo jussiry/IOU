@@ -138,7 +138,7 @@ export const bindAddFriend = (root, data) => {
 
   // --- QR code generation ---
   if (myKeyQrEl && userPublicKey) {
-    loadVendorScript("js/vendor/qrcode.js", "QRCode").then((QRCode) => {
+    loadVendorScript("dist/js/vendor/qrcode.js", "QRCode").then((QRCode) => {
       const canvas = document.createElement("canvas");
       QRCode.toCanvas(canvas, encodeAddFriendUri(userPublicKey), {
         width: 180,
@@ -182,7 +182,7 @@ export const bindAddFriend = (root, data) => {
   scanQrButtonEl?.addEventListener("click", async () => {
     try {
       const lib = await loadVendorScript(
-        "js/vendor/html5-qrcode.min.js",
+        "dist/js/vendor/html5-qrcode.min.js",
         "__Html5QrcodeLibrary__"
       );
       const Html5Qrcode = lib.Html5Qrcode;

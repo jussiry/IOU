@@ -44,7 +44,7 @@ const CAROL_IOU_AMOUNT = 15;
 const callData = async (client, fnName, ...args) => {
   return client.page.evaluate(
     async ({ name, params }) => {
-      const mod = await import("/js/commands/index.js");
+      const mod = await import("/dist/js/commands/index.js");
       const fn = mod[name];
       if (typeof fn !== "function") {
         throw new Error(`commands/index.js has no export '${name}'`);
@@ -60,7 +60,7 @@ const callData = async (client, fnName, ...args) => {
 
 const readSnapshot = async (client) => {
   return client.page.evaluate(async () => {
-    const mod = await import("/js/storage/indexeddb.js");
+    const mod = await import("/dist/js/storage/indexeddb.js");
     const state = await mod.loadAppState();
     if (!state) return null;
     return {

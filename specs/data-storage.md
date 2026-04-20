@@ -42,6 +42,12 @@ Reads time out after **2 seconds** and return `null` on timeout. Writes time out
 
 `window.clearAppState` is exposed on the global object as a convenience for developer console use.
 
+### 2.2 Multi-tab safety for reset
+
+When the user asks to be "removed" from the device, the implementation deletes the **entire IndexedDB database** (`deleteDatabase()`), not just the `root_state` record. A per-record `delete` is unsafe while other tabs of the same origin may still hold the previous `RootState` in their in-memory `cachedState`: any save from such a tab would resurrect a stale record immediately after the reset tab wipes it. Dropping the database forces every tab to go through `openDatabase` again, and the reset tab's subsequent reload then determines what (if anything) gets written back.
+
+`deleteDatabase()` closes the local connection first so the deletion is not blocked by its own open handle. `onblocked` and `onerror` still resolve the promise — the caller is expected to reload the page immediately after, which drops any other open handle.
+
 ---
 
 ## 3. Root State (`RootState`)
@@ -185,7 +191,8 @@ All storage access goes through `client/js/storage/indexeddb.js`.
 |---|---|---|
 | `loadAppState` | `() → RootState \| null` | Reads the record; returns `null` on miss or 2 s timeout |
 | `saveAppState` | `(state) → state` | Overwrites the record; throws on 4 s timeout |
-| `clearAppState` | `() → void` | Deletes the record entirely |
+| `clearAppState` | `() → void` | Deletes the `root_state` record from the object store (single-tab scenarios only) |
+| `deleteDatabase` | `() → void` | Drops the entire `iou_client_db` database; used by the "remove user" flow for the multi-tab-safe reset described in §2.2 |
 
 There is no partial-update API; the entire root state is always written atomically as a single IndexedDB `put`. Callers load state, mutate in memory, then call `saveAppState`.
 

@@ -2,16 +2,22 @@
   "name": "iou",
   "private": true,
   "scripts": {
-    "dev": "nodemon --watch backend --watch client --ext js,html,css,json backend/server.js",
-    "start": "node backend/server.js",
+    "build": "node scripts/build-client.cjs",
+    "build:watch": "node scripts/build-client.cjs --watch",
+    "dev": "concurrently --kill-others-on-fail --names build,server --prefix-colors blue,green \"npm:build:watch\" \"nodemon --watch backend --ext js,cjs,json backend/server.js\"",
+    "start": "npm run build && node backend/server.js",
+    "typecheck": "tsc --noEmit",
     "test:e2e:two-client": "node tests/two-client-e2e/run.cjs",
     "test:e2e:friend-request-online": "node tests/two-client-e2e/run.cjs --scenario friend-request-online",
     "test:e2e:reload-reconnect": "node tests/two-client-e2e/run.cjs --scenario reload-reconnect",
     "peer": "node tests/peer-helper/run.cjs"
   },
   "devDependencies": {
+    "concurrently": "^9.2.1",
+    "esbuild": "^0.28.0",
     "nodemon": "^3.1.10",
-    "playwright": "^1.58.2"
+    "playwright": "^1.58.2",
+    "typescript": "^6.0.3"
   },
   "dependencies": {
     "html5-qrcode": "^2.3.8",

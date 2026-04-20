@@ -4,6 +4,8 @@ This module provides a minimal IndexedDB wrapper for the IOU app state. It centr
 By isolating IndexedDB transaction boilerplate here, data modules can focus on business logic and state shape instead of browser storage wiring details.
 */
 
+import type { RootState } from "../models/data-model.js";
+
 const DATABASE_NAME = "iou_client_db";
 const DATABASE_VERSION = 1;
 const STORE_NAME = "app_state";
@@ -11,32 +13,40 @@ const APP_STATE_KEY = "root_state";
 const APP_STATE_LOAD_TIMEOUT_MS = 2000;
 const APP_STATE_WRITE_TIMEOUT_MS = 4000;
 
-let databasePromise = null;
+let databasePromise: Promise<IDBDatabase> | null = null;
 
-const ensureIndexedDb = () => {
+const ensureIndexedDb = (): void => {
   if (!window.indexedDB) {
     throw new Error("IndexedDB is not available in this browser.");
   }
 };
 
-const waitForRequest = (request) =>
+const waitForRequest = <T = unknown>(request: IDBRequest<T>): Promise<T> =>
   new Promise((resolve, reject) => {
     request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error || new Error("IndexedDB request failed."));
+    request.onerror = () =>
+      reject(request.error || new Error("IndexedDB request failed."));
   });
 
-const waitForTransaction = (transaction) =>
+const waitForTransaction = (transaction: IDBTransaction): Promise<void> =>
   new Promise((resolve, reject) => {
     transaction.oncomplete = () => resolve();
-    transaction.onerror = () => reject(transaction.error || new Error("IndexedDB transaction failed."));
-    transaction.onabort = () => reject(transaction.error || new Error("IndexedDB transaction aborted."));
+    transaction.onerror = () =>
+      reject(transaction.error || new Error("IndexedDB transaction failed."));
+    transaction.onabort = () =>
+      reject(transaction.error || new Error("IndexedDB transaction aborted."));
   });
 
-const withTimeoutFallback = (promise, timeoutMs, fallbackValue, onTimeout = null) =>
+const withTimeoutFallback = <T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  fallbackValue: T,
+  onTimeout: (() => void) | null = null
+): Promise<T> =>
   new Promise((resolve, reject) => {
     let settled = false;
 
-    const settle = (callback) => {
+    const settle = (callback: () => void) => {
       if (settled) return;
       settled = true;
       window.clearTimeout(timer);
@@ -58,11 +68,16 @@ const withTimeoutFallback = (promise, timeoutMs, fallbackValue, onTimeout = null
     );
   });
 
-const withTimeoutError = (promise, timeoutMs, errorFactory, onTimeout = null) =>
+const withTimeoutError = <T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  errorFactory: () => Error,
+  onTimeout: (() => void) | null = null
+): Promise<T> =>
   new Promise((resolve, reject) => {
     let settled = false;
 
-    const settle = (callback) => {
+    const settle = (callback: () => void) => {
       if (settled) return;
       settled = true;
       window.clearTimeout(timer);
@@ -84,7 +99,7 @@ const withTimeoutError = (promise, timeoutMs, errorFactory, onTimeout = null) =>
     );
   });
 
-const openDatabase = () => {
+const openDatabase = (): Promise<IDBDatabase> => {
   ensureIndexedDb();
 
   return new Promise((resolve, reject) => {
@@ -116,7 +131,7 @@ const openDatabase = () => {
   });
 };
 
-const getDatabase = async () => {
+const getDatabase = (): Promise<IDBDatabase> => {
   if (!databasePromise) {
     databasePromise = openDatabase().catch((error) => {
       databasePromise = null;
@@ -126,7 +141,18 @@ const getDatabase = async () => {
   return databasePromise;
 };
 
-const withStore = async (mode, runOperation, { timeoutMs = null, timeoutFallback = null } = {}) => {
+type StoreOperation<T> = (store: IDBObjectStore) => IDBRequest<T>;
+
+interface WithStoreOptions<T> {
+  timeoutMs?: number | null;
+  timeoutFallback?: T | null;
+}
+
+async function withStore<T>(
+  mode: IDBTransactionMode,
+  runOperation: StoreOperation<T>,
+  { timeoutMs = null, timeoutFallback = null }: WithStoreOptions<T> = {}
+): Promise<T | null> {
   const currentDatabasePromise = getDatabase();
   const resetStalledPromise = () => {
     if (databasePromise === currentDatabasePromise) {
@@ -134,19 +160,25 @@ const withStore = async (mode, runOperation, { timeoutMs = null, timeoutFallback
     }
   };
 
-  const database = timeoutMs == null
-    ? await currentDatabasePromise
-    : timeoutFallback !== null
-    ? await withTimeoutFallback(currentDatabasePromise, timeoutMs, timeoutFallback, resetStalledPromise)
-    : await withTimeoutError(
-        currentDatabasePromise,
-        timeoutMs,
-        () => new Error("Timed out while opening IndexedDB database."),
-        resetStalledPromise
-      );
+  const database: IDBDatabase | null =
+    timeoutMs == null
+      ? await currentDatabasePromise
+      : timeoutFallback !== null
+      ? await withTimeoutFallback<IDBDatabase | null>(
+          currentDatabasePromise,
+          timeoutMs,
+          timeoutFallback as unknown as IDBDatabase | null,
+          resetStalledPromise
+        )
+      : await withTimeoutError<IDBDatabase>(
+          currentDatabasePromise,
+          timeoutMs,
+          () => new Error("Timed out while opening IndexedDB database."),
+          resetStalledPromise
+        );
 
   if (!database) {
-    return timeoutFallback;
+    return timeoutFallback ?? null;
   }
 
   const transaction = database.transaction(STORE_NAME, mode);
@@ -156,25 +188,26 @@ const withStore = async (mode, runOperation, { timeoutMs = null, timeoutFallback
   const requestResult = await waitForRequest(request);
   await transactionDone;
   return requestResult;
-};
+}
 
-export const loadAppState = async () => {
+export const loadAppState = async (): Promise<RootState | null> => {
   try {
-    return await withStore(
+    const result = await withStore<RootState | undefined>(
       "readonly",
-      (store) => store.get(APP_STATE_KEY),
+      (store) => store.get(APP_STATE_KEY) as IDBRequest<RootState | undefined>,
       {
         timeoutMs: APP_STATE_LOAD_TIMEOUT_MS,
         timeoutFallback: null,
       }
     );
+    return result ?? null;
   } catch (error) {
     return null;
   }
 };
 
-export const saveAppState = async (state) => {
-  await withStore(
+export const saveAppState = async (state: RootState): Promise<RootState> => {
+  await withStore<IDBValidKey>(
     "readwrite",
     (store) => store.put(state, APP_STATE_KEY),
     { timeoutMs: APP_STATE_WRITE_TIMEOUT_MS }
@@ -182,32 +215,42 @@ export const saveAppState = async (state) => {
   return state;
 };
 
-export const clearAppState = async () => {
-  await withStore(
+export const clearAppState = async (): Promise<void> => {
+  await withStore<undefined>(
     "readwrite",
-    (store) => store.delete(APP_STATE_KEY),
+    (store) => store.delete(APP_STATE_KEY) as IDBRequest<undefined>,
     { timeoutMs: APP_STATE_WRITE_TIMEOUT_MS }
   );
 };
 
 // Drops the entire database. Use this for "remove user" flows so no residual
 // data can be written back by another tab before the page reloads.
-export const deleteDatabase = () =>
+export const deleteDatabase = (): Promise<void> =>
   new Promise((resolve) => {
     // Close any cached connection first so the delete request is not blocked
     // by our own open handle. Other tabs may still block it briefly; we resolve
     // on onblocked too because the page is about to reload anyway.
     if (databasePromise) {
       databasePromise
-        .then((db) => { try { db?.close(); } catch { /* ignore */ } })
+        .then((db) => {
+          try {
+            db?.close();
+          } catch {
+            /* ignore */
+          }
+        })
         .catch(() => {})
-        .finally(() => { databasePromise = null; });
+        .finally(() => {
+          databasePromise = null;
+        });
     }
 
     const request = window.indexedDB.deleteDatabase(DATABASE_NAME);
     request.onsuccess = () => resolve();
-    request.onerror = () => resolve();   // non-fatal — reload handles it
+    request.onerror = () => resolve(); // non-fatal — reload handles it
     request.onblocked = () => resolve(); // another tab open; reload handles it
   });
 
-window.clearAppState = clearAppState
+// Dev-console escape hatch — keep the global the legacy JS code exposed.
+(window as unknown as { clearAppState: () => Promise<void> }).clearAppState =
+  clearAppState;

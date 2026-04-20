@@ -146,7 +146,7 @@ const bindQrCode = (root, data) => {
   amountEl?.addEventListener("input", scheduleRender);
   messageEl?.addEventListener("input", scheduleRender);
 
-  loadVendorScript("js/vendor/qrcode.js", "QRCode")
+  loadVendorScript("dist/js/vendor/qrcode.js", "QRCode")
     .then((lib) => {
       QRCode = lib;
       renderQr();
