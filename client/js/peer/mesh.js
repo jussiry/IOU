@@ -32,8 +32,11 @@ const RTC_CONFIGURATION = {
 };
 
 const DATA_CHANNEL_LABEL = "iou-json";
-const DISCONNECTED_PEER_GRACE_PERIOD_MS = 15000;
-const REMOTE_INITIATED_PEER_GRACE_PERIOD_MS = 15000;
+// Single grace period used both for ICE-restart recovery on a disconnected
+// peer and for the remote-initiated allowance check. One value keeps the
+// mental model simple — "how long a peer is allowed to linger in a not-yet-
+// good state before we give up".
+const PEER_GRACE_PERIOD_MS = 10000;
 // Wake-from-suspend detector. A setInterval tick that's more than
 // WAKE_GAP_THRESHOLD_MS late means the tab/device was suspended (laptop lid
 // closed, mobile screen off, OS throttled the tab). On wake, existing
@@ -52,13 +55,21 @@ const safeParseJson = (value) => {
   }
 };
 
-const logPeerEvent = (title, detail) => {
-  if (typeof detail === "undefined") {
-    console.log(`[WebRTC] ${title}`);
-    return;
-  }
+// One-line WebRTC log. Call sites are responsible for composing a useful
+// single string — pick the one detail that matters (reason, state, peer)
+// and let the noise fall away. No object payloads: console logs flood fast
+// during ICE and SDP exchanges, and objects are hard to scan.
+const logPeerEvent = (message) => {
+  console.log(`[WebRTC] ${message}`);
+};
 
-  console.log(`[WebRTC] ${title}`, detail);
+// Compact a long identifier (npub, device UUID, message id) for log output.
+// npub keys are ~63 chars, UUIDs are 36 — the first 10 chars are almost
+// always unique enough to correlate across log lines.
+const shortKey = (key) => {
+  if (typeof key !== "string" || !key) return "—";
+  if (key.length <= 12) return key;
+  return `${key.slice(0, 10)}…`;
 };
 
 const createPeerMesh = (
@@ -81,7 +92,7 @@ const createPeerMesh = (
     // (ICE fails outright without ever establishing).
     onPeerClosed = null,
     // If true, remote-initiated peers are trusted on arrival and never
-    // subject to the 15-second allowance timer. Used by the self-mesh:
+    // subject to the remote-allowance timer. Used by the self-mesh:
     // same-user devices are always welcome and shouldn't be reaped.
     alwaysAllow = false,
   } = {}
@@ -144,7 +155,7 @@ const createPeerMesh = (
       closePeer(peer.peerKey, {
         reason: "remote_allowance_timeout",
       });
-    }, REMOTE_INITIATED_PEER_GRACE_PERIOD_MS);
+    }, PEER_GRACE_PERIOD_MS);
   };
 
   const closePeer = (peerKey, detail = {}) => {
@@ -155,12 +166,9 @@ const createPeerMesh = (
 
     clearDisconnectTimer(peer);
     clearRemoteAllowanceTimer(peer);
-    logPeerEvent("Peer connection disconnecting", {
-      peerKey,
-      peerUserId: peer.peerUserId,
-      peerDeviceId: peer.peerDeviceId,
-      ...detail,
-    });
+    logPeerEvent(
+      `Closing ${shortKey(peerKey)} — ${detail.reason || "no reason"}`
+    );
     peer.channel?.close();
     peer.connection?.close();
     peers.delete(peerKey);
@@ -185,21 +193,12 @@ const createPeerMesh = (
 
     peer.channel = channel;
     channel.addEventListener("open", () => {
-      logPeerEvent("Peer connection established", {
-        peerKey,
-        peerUserId: peer.peerUserId,
-        peerDeviceId: peer.peerDeviceId,
-        channelLabel: channel.label,
-      });
+      logPeerEvent(`Channel open with ${shortKey(peerKey)}`);
       notifyPeerStatusChange();
       notifyPeerReady(peer);
     });
     channel.addEventListener("close", () => {
-      logPeerEvent("Peer connection disconnected", {
-        peerKey,
-        peerUserId: peer.peerUserId,
-        channelLabel: channel.label,
-      });
+      logPeerEvent(`Channel closed with ${shortKey(peerKey)}`);
       peer.inflightMessageIds.clear();
       peer.channel = null;
       clearDisconnectTimer(peer);
@@ -214,11 +213,9 @@ const createPeerMesh = (
     });
     channel.addEventListener("message", (event) => {
       const message = safeParseJson(event.data);
-      logPeerEvent("Peer data received", {
-        peerKey,
-        peerUserId: peer.peerUserId,
-        data: message ?? event.data,
-      });
+      logPeerEvent(
+        `Received ${message?.type || "data"} from ${shortKey(peerKey)}`
+      );
       if (!message || typeof onPeerMessage !== "function") {
         return;
       }
@@ -258,10 +255,9 @@ const createPeerMesh = (
       if (peerDeviceId) existingPeer.peerDeviceId = peerDeviceId;
       const state = existingPeer.connection?.connectionState;
       if (state === "closed" || state === "failed") {
-        logPeerEvent("Replacing stale peer connection", {
-          peerKey: normalizedPeerKey,
-          connectionState: state,
-        });
+        logPeerEvent(
+          `Replacing stale peer ${shortKey(normalizedPeerKey)} (${state})`
+        );
         closePeer(normalizedPeerKey, { reason: "stale_replaced" });
       } else {
         return existingPeer;
@@ -293,13 +289,9 @@ const createPeerMesh = (
       wasConnected: false,
     };
     peers.set(normalizedPeerKey, peer);
-    logPeerEvent("Establishing peer connection", {
-      peerKey: normalizedPeerKey,
-      peerUserId: peer.peerUserId,
-      peerDeviceId: peer.peerDeviceId,
-      initiator,
-      isPolite,
-    });
+    logPeerEvent(
+      `Establishing ${initiator ? "outbound" : "inbound"} peer ${shortKey(normalizedPeerKey)}`
+    );
 
     if (!initiator && !alwaysAllow) {
       scheduleRemoteAllowanceTimeout(peer);
@@ -312,19 +304,15 @@ const createPeerMesh = (
       try {
         peer.makingOffer = true;
         await connection.setLocalDescription();
-        logPeerEvent("Sending peer offer", {
-          peerKey: normalizedPeerKey,
-          description: connection.localDescription,
-        });
+        logPeerEvent(`Sending offer to ${shortKey(normalizedPeerKey)}`);
         dispatchSignal(peer, {
           type: "description",
           description: connection.localDescription,
         });
       } catch (error) {
-        logPeerEvent("Offer creation failed", {
-          peerKey: normalizedPeerKey,
-          error: String(error?.message || error),
-        });
+        logPeerEvent(
+          `Offer failed for ${shortKey(normalizedPeerKey)}: ${String(error?.message || error)}`
+        );
       } finally {
         peer.makingOffer = false;
       }
@@ -342,10 +330,9 @@ const createPeerMesh = (
     });
 
     connection.addEventListener("connectionstatechange", () => {
-      logPeerEvent("Peer connection state changed", {
-        peerKey: normalizedPeerKey,
-        connectionState: connection.connectionState,
-      });
+      logPeerEvent(
+        `${shortKey(normalizedPeerKey)} → ${connection.connectionState}`
+      );
 
       if (connection.connectionState === "connected") {
         peer.wasConnected = true;
@@ -365,7 +352,7 @@ const createPeerMesh = (
 
         // Attempt ICE restart before giving up. restartIce() fires
         // negotiationneeded which sends a new offer with fresh ICE credentials.
-        logPeerEvent("Attempting ICE restart", { peerKey: normalizedPeerKey });
+        logPeerEvent(`ICE restart for ${shortKey(normalizedPeerKey)}`);
         try {
           connection.restartIce();
         } catch {
@@ -387,7 +374,7 @@ const createPeerMesh = (
           closePeer(normalizedPeerKey, {
             reason: "disconnected_timeout",
           });
-        }, DISCONNECTED_PEER_GRACE_PERIOD_MS);
+        }, PEER_GRACE_PERIOD_MS);
         return;
       }
 
@@ -425,7 +412,9 @@ const createPeerMesh = (
       (peer.makingOffer || peer.connection.signalingState !== "stable");
 
     if (offerCollision && !peer.isPolite) {
-      logPeerEvent("Ignoring colliding offer (impolite peer)", { peerKey: peer.peerKey });
+      logPeerEvent(
+        `Ignoring colliding offer from ${shortKey(peer.peerKey)} (impolite)`
+      );
       return;
     }
 
@@ -437,25 +426,20 @@ const createPeerMesh = (
       description.type === "answer" &&
       peer.connection.signalingState !== "have-local-offer"
     ) {
-      logPeerEvent("Ignoring stale answer", {
-        peerKey: peer.peerKey,
-        signalingState: peer.connection.signalingState,
-      });
+      logPeerEvent(
+        `Ignoring stale answer from ${shortKey(peer.peerKey)} (state: ${peer.connection.signalingState})`
+      );
       return;
     }
 
-    logPeerEvent("Received peer description", {
-      peerKey: peer.peerKey,
-      description,
-    });
+    logPeerEvent(
+      `Received ${description.type} from ${shortKey(peer.peerKey)}`
+    );
     await peer.connection.setRemoteDescription(description);
 
     if (description.type === "offer") {
       await peer.connection.setLocalDescription();
-      logPeerEvent("Sending peer answer", {
-        peerKey: peer.peerKey,
-        description: peer.connection.localDescription,
-      });
+      logPeerEvent(`Sending answer to ${shortKey(peer.peerKey)}`);
       dispatchSignal(peer, {
         type: "description",
         description: peer.connection.localDescription,
@@ -474,10 +458,10 @@ const createPeerMesh = (
       return;
     }
 
-    logPeerEvent("Received peer ICE candidate", {
-      peerKey: peer.peerKey,
-      candidate,
-    });
+    // ICE candidates fire frequently during negotiation; the individual
+    // candidate payload isn't useful in normal debugging, so we log only
+    // the fact that one arrived.
+    logPeerEvent(`ICE candidate from ${shortKey(peer.peerKey)}`);
     if (!peer.connection.remoteDescription) {
       peer.pendingCandidates.push(candidate);
       return;
@@ -507,10 +491,9 @@ const createPeerMesh = (
       return;
     }
 
-    logPeerEvent("Detected wake from suspend, resetting peers", {
-      gapMs: gap,
-      peerCount: peerKeys.length,
-    });
+    logPeerEvent(
+      `Wake from suspend (gap ${gap}ms), resetting ${peerKeys.length} peer(s)`
+    );
     peerKeys.forEach((peerKey) => {
       closePeer(peerKey, { reason: "wake_from_suspend" });
     });
@@ -575,10 +558,9 @@ const createPeerMesh = (
         return false;
       }
 
-      logPeerEvent("Peer data sent", {
-        peerKey,
-        data: message,
-      });
+      logPeerEvent(
+        `Sent ${message?.type || "data"} to ${shortKey(peerKey)}`
+      );
       peer.channel.send(JSON.stringify(message));
       if (message?.id) {
         peer.inflightMessageIds.add(message.id);
@@ -591,10 +573,9 @@ const createPeerMesh = (
         return false;
       }
 
-      logPeerEvent("Peer control data sent", {
-        peerKey,
-        data: message,
-      });
+      logPeerEvent(
+        `Sent control ${message?.type || "data"} to ${shortKey(peerKey)}`
+      );
       peer.channel.send(JSON.stringify(message));
       return true;
     },
