@@ -11,13 +11,11 @@ Inactive frient
   * as long as either retains inactive state, reactivation can be suggested
 
 
+- add e2e test case for multiple devices online (fanning messages)
 
 - test deleting user and make sure indexdb is fully removed
 - getting name when cloning user still bugs.. (brave user with incognito firefox)
 
-
-- Default on debt
---> remove friend
 
 - on a friend page highlight latest transaction(s) since the page was last visited
 

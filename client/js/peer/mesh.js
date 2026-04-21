@@ -34,6 +34,15 @@ const RTC_CONFIGURATION = {
 const DATA_CHANNEL_LABEL = "iou-json";
 const DISCONNECTED_PEER_GRACE_PERIOD_MS = 15000;
 const REMOTE_INITIATED_PEER_GRACE_PERIOD_MS = 15000;
+// Wake-from-suspend detector. A setInterval tick that's more than
+// WAKE_GAP_THRESHOLD_MS late means the tab/device was suspended (laptop lid
+// closed, mobile screen off, OS throttled the tab). On wake, existing
+// RTCPeerConnections report stale state for several seconds before their
+// underlying ICE events catch up, and any signaling that arrived during
+// suspend is applied against a stale PC. Tearing down all peers on wake
+// lets the normal reconnect flow rebuild them cleanly.
+const WAKE_CHECK_INTERVAL_MS = 1000;
+const WAKE_GAP_THRESHOLD_MS = 5000;
 
 const safeParseJson = (value) => {
   try {
@@ -420,6 +429,21 @@ const createPeerMesh = (
       return;
     }
 
+    // Guard against stale answers. Applying an answer SDP when the PC is
+    // already "stable" (no in-flight local offer) throws InvalidStateError.
+    // This happens after a suspend/resume when queued signaling from a prior
+    // negotiation arrives against a PC whose state has already settled.
+    if (
+      description.type === "answer" &&
+      peer.connection.signalingState !== "have-local-offer"
+    ) {
+      logPeerEvent("Ignoring stale answer", {
+        peerKey: peer.peerKey,
+        signalingState: peer.connection.signalingState,
+      });
+      return;
+    }
+
     logPeerEvent("Received peer description", {
       peerKey: peer.peerKey,
       description,
@@ -464,6 +488,33 @@ const createPeerMesh = (
 
   const normalizeKey = (value) =>
     typeof value === "string" ? value.trim() : "";
+
+  // Wake-from-suspend detector: if more than WAKE_GAP_THRESHOLD_MS elapses
+  // between ticks, the runtime was frozen (laptop lid, phone sleep, tab
+  // throttled). Close every peer so the reconnect flow rebuilds them with
+  // fresh PeerConnections instead of reusing ones whose state is stale.
+  let lastWakeCheckAt = Date.now();
+  const wakeCheckInterval = window.setInterval(() => {
+    const now = Date.now();
+    const gap = now - lastWakeCheckAt;
+    lastWakeCheckAt = now;
+    if (gap <= WAKE_GAP_THRESHOLD_MS) {
+      return;
+    }
+
+    const peerKeys = Array.from(peers.keys());
+    if (peerKeys.length === 0) {
+      return;
+    }
+
+    logPeerEvent("Detected wake from suspend, resetting peers", {
+      gapMs: gap,
+      peerCount: peerKeys.length,
+    });
+    peerKeys.forEach((peerKey) => {
+      closePeer(peerKey, { reason: "wake_from_suspend" });
+    });
+  }, WAKE_CHECK_INTERVAL_MS);
 
   return {
     ensurePeer,
