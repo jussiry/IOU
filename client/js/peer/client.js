@@ -413,10 +413,16 @@ const createRealtimeClient = () => {
       // Track server presence so the UI can show a "partly online" state
       // when the relay sees the friend but WebRTC hasn't established yet.
       addServerPresentPeer(peerUserId, peerDeviceId);
+      // If this peer is already in our friend snapshot, tell the mesh to skip
+      // the remote-allowance timer. Otherwise ICE negotiation after a lid-open
+      // (which can take > 10s) would trip the timer before the channel opens.
+      const allowed = Array.isArray(currentSnapshot?.peerIds)
+        && currentSnapshot.peerIds.includes(peerUserId);
       peerMesh.ensurePeer(peerUserId, {
         initiator,
         peerUserId,
         peerDeviceId,
+        allowed,
       });
     },
     onPeerDisconnect: ({ peerUserId, peerDeviceId }) => {
@@ -441,9 +447,12 @@ const createRealtimeClient = () => {
         });
         return;
       }
+      const allowed = Array.isArray(currentSnapshot?.peerIds)
+        && currentSnapshot.peerIds.includes(peerUserId);
       void peerMesh.handleSignal(peerUserId, signal, {
         peerUserId,
         peerDeviceId,
+        allowed,
       });
     },
     onPeerEnvelopeFromServer: ({ envelope }) => {

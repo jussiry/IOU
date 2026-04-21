@@ -240,6 +240,12 @@ const createPeerMesh = (
     initiator = false,
     peerUserId = "",
     peerDeviceId = "",
+    // Caller-asserted snapshot allowance: true when the caller has already
+    // verified this peer is in the current friend list at the time
+    // peer_connect arrived. Lets us skip the remote_allowance_timeout entirely
+    // for known friends — relevant after wake-from-suspend when ICE can take
+    // longer than the grace period to finish.
+    allowed = false,
   } = {}) => {
     const normalizedPeerKey =
       typeof peerKey === "string" ? peerKey.trim() : "";
@@ -281,7 +287,7 @@ const createPeerMesh = (
       makingOffer: false,
       disconnectTimer: null,
       remoteAllowanceTimer: null,
-      allowedBySnapshot: initiator || alwaysAllow,
+      allowedBySnapshot: initiator || alwaysAllow || allowed,
       // Flipped to true the first time the RTCPeerConnection reaches the
       // "connected" state. Used by onPeerClosed listeners to distinguish
       // between "network was working but dropped" (worth retrying) and
@@ -293,7 +299,7 @@ const createPeerMesh = (
       `Establishing ${initiator ? "outbound" : "inbound"} peer ${shortKey(normalizedPeerKey)}`
     );
 
-    if (!initiator && !alwaysAllow) {
+    if (!initiator && !alwaysAllow && !allowed) {
       scheduleRemoteAllowanceTimeout(peer);
     }
 
@@ -524,6 +530,7 @@ const createPeerMesh = (
         initiator: false,
         peerUserId: context.peerUserId || "",
         peerDeviceId: context.peerDeviceId || "",
+        allowed: context.allowed === true,
       });
       if (!peer) {
         return;
