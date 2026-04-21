@@ -64,6 +64,13 @@ const createPeerMesh = (
     onPeerMessage = null,
     onPeerReady = null,
     onPeerStatusChange = null,
+    // Fired after a peer is removed from the mesh. The caller can use the
+    // reason + `wasConnected` flag to decide whether to ask the server for
+    // a fresh connection attempt. We only pass `wasConnected: true` when
+    // the connection reached the "connected" state at some point, which
+    // filters out cases where the network fundamentally blocks WebRTC
+    // (ICE fails outright without ever establishing).
+    onPeerClosed = null,
     // If true, remote-initiated peers are trusted on arrival and never
     // subject to the 15-second allowance timer. Used by the self-mesh:
     // same-user devices are always welcome and shouldn't be reaped.
@@ -149,6 +156,16 @@ const createPeerMesh = (
     peer.connection?.close();
     peers.delete(peerKey);
     notifyPeerStatusChange();
+
+    if (typeof onPeerClosed === "function") {
+      onPeerClosed({
+        peerKey,
+        peerUserId: peer.peerUserId,
+        peerDeviceId: peer.peerDeviceId,
+        reason: detail.reason || "",
+        wasConnected: peer.wasConnected === true,
+      });
+    }
   };
 
   const bindChannel = (peerKey, channel) => {
@@ -260,6 +277,11 @@ const createPeerMesh = (
       disconnectTimer: null,
       remoteAllowanceTimer: null,
       allowedBySnapshot: initiator || alwaysAllow,
+      // Flipped to true the first time the RTCPeerConnection reaches the
+      // "connected" state. Used by onPeerClosed listeners to distinguish
+      // between "network was working but dropped" (worth retrying) and
+      // "connection never established" (network likely blocks WebRTC).
+      wasConnected: false,
     };
     peers.set(normalizedPeerKey, peer);
     logPeerEvent("Establishing peer connection", {
@@ -316,10 +338,13 @@ const createPeerMesh = (
         connectionState: connection.connectionState,
       });
 
-      if (
-        connection.connectionState === "connecting" ||
-        connection.connectionState === "connected"
-      ) {
+      if (connection.connectionState === "connected") {
+        peer.wasConnected = true;
+        clearDisconnectTimer(peer);
+        return;
+      }
+
+      if (connection.connectionState === "connecting") {
         clearDisconnectTimer(peer);
         return;
       }

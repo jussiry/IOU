@@ -353,6 +353,25 @@ const createRealtimeClient = () => {
     onPeerMessage: ({ peerKey, peerUserId, message }) => {
       void handlePeerMessage(peerKey, peerUserId || peerKey, message, SCOPE_FRIEND);
     },
+    // When a friend peer drops unexpectedly, ask the server to re-pair us.
+    // We only retry if the connection had previously reached "connected" —
+    // otherwise the network likely blocks WebRTC outright and retrying in
+    // a tight loop is pointless. Intentional closes (server_disconnect,
+    // stale_replaced, remote_allowance_timeout) are skipped.
+    onPeerClosed: ({ peerUserId, peerKey, reason, wasConnected }) => {
+      if (!wasConnected) return;
+      if (
+        reason === "server_disconnect" ||
+        reason === "stale_replaced" ||
+        reason === "remote_allowance_timeout"
+      ) {
+        return;
+      }
+      requestPeerConnectionIfNeeded(
+        peerUserId || peerKey,
+        "Retrying peer connection after unexpected close"
+      );
+    },
   });
 
   // --- Self-mesh ----------------------------------------------------------
