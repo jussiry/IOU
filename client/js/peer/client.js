@@ -326,7 +326,17 @@ const createRealtimeClient = () => {
       void updateLastSyncedAt(pid);
       pendingFriendSync.add(pid);
       trySyncPendingPeers();
-      void syncRealtimeState();
+      // Mark all current snapshot peers as allowed so the remote_allowance_timeout
+      // timer is cleared for inbound-initiated connections. This is cheaper than
+      // calling the full syncRealtimeState() which would call
+      // requestPeerConnectionIfNeeded for every still-offline friend once per
+      // connecting peer, producing N duplicate connect_peer requests for N online
+      // friends.
+      if (currentSnapshot?.peerIds) {
+        peerMesh.closePeersNotInSet(currentSnapshot.peerIds);
+      }
+      // Flush any queued outbox messages to the newly connected peer.
+      void flushOutbox();
     },
     onPeerStatusChange: (connectedPeerKeys) => {
       replaceConnectedPeerIds(connectedPeerKeys);
