@@ -12,10 +12,12 @@ key to an RTCPeerConnection + data channel, and every signalling message
 carries both `peerUserId` and `peerDeviceId` so the server can route to
 the exact remote device even when a user has several connected.
 
-Offer/answer negotiation follows the "perfect negotiation" pattern: peers
-are assigned polite or impolite roles by comparing the peer key so both
-sides independently agree on who yields during simultaneous offer
-collisions.
+Offer/answer negotiation follows the "perfect negotiation" pattern: the
+non-initiator side is treated as polite and yields during simultaneous
+offer collisions (e.g. during an ICE restart). Because the signaling
+server assigns exactly one initiator per connection — deterministically
+picked from peer device ids — both sides always agree on who yields
+without any extra coordination.
 */
 
 const RTC_CONFIGURATION = {
@@ -50,20 +52,14 @@ const logPeerEvent = (title, detail) => {
   console.log(`[WebRTC] ${title}`, detail);
 };
 
-// The polite peer yields during offer collisions by accepting implicit rollback.
-// Determined by comparing the peer key so both sides always agree on roles.
-const isPoliteRole = (localKey, peerKey) => localKey < peerKey;
-
 const createPeerMesh = (
   {
-    // Returns the local key ("self identifier"). For the friend mesh this is
-    // our own user id (so we never connect to ourselves at the user level);
-    // for the self-mesh it can be empty — the server already guarantees we
-    // never get a peer_connect for our own device.
+    // Returns the local key ("self identifier"), used only as a sanity
+    // check so we never create a peer for our own key. For the friend mesh
+    // this is our own user id; for the self-mesh it can stay empty — the
+    // server already guarantees we never get a peer_connect for our own
+    // device.
     getLocalKey = () => "",
-    // getLocalUserId is retained as an alias for callers that pre-date the
-    // peerKey rename; kept for callsite DRY only.
-    getLocalUserId = null,
     sendSignal = () => {},
     onPeerMessage = null,
     onPeerReady = null,
@@ -74,9 +70,7 @@ const createPeerMesh = (
     alwaysAllow = false,
   } = {}
 ) => {
-  const resolveLocalKey = typeof getLocalKey === "function"
-    ? getLocalKey
-    : (typeof getLocalUserId === "function" ? getLocalUserId : () => "");
+  const resolveLocalKey = typeof getLocalKey === "function" ? getLocalKey : () => "";
   const peers = new Map();
 
   const getConnectedPeerKeys = () => {
@@ -249,7 +243,10 @@ const createPeerMesh = (
     }
 
     const connection = new RTCPeerConnection(RTC_CONFIGURATION);
-    const isPolite = isPoliteRole(resolveLocalKey(), normalizedPeerKey);
+    // Perfect negotiation: the non-initiator yields during offer collisions
+    // (e.g. on ICE restart). The server deterministically picks exactly one
+    // initiator per connection, so both sides always disagree on isPolite.
+    const isPolite = !initiator;
     const peer = {
       peerKey: normalizedPeerKey,
       peerUserId: typeof peerUserId === "string" ? peerUserId : "",

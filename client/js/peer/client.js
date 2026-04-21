@@ -255,20 +255,26 @@ const createRealtimeClient = () => {
 
     for (const entry of inboundLike) {
       // Seed the broadcast cache *before* the handler runs so the resulting
-      // subscribeToDataChanges tick doesn't echo this entry back.
+      // subscribeToDataChanges tick doesn't echo this entry back to peers.
+      // If processing fails we remove the id so a future sync can retry it.
       if (entry?.id) broadcastedLedgerIds.add(entry.id);
-      await applyInboundPeerMessage({
-        id: entry.id,
-        type: entry.type,
-        from_user_id: entry.from_user_id,
-        to_user_id: entry.to_user_id,
-        // Preserve the sender's original `created_at` — it's what the
-        // Schnorr signature was computed over, and what `originated_at`
-        // should track in the resulting ledger entry.
-        created_at: entry.originated_at || entry.timestamp,
-        payload: entry.payload,
-        signature: entry.signature,
-      });
+      try {
+        await applyInboundPeerMessage({
+          id: entry.id,
+          type: entry.type,
+          from_user_id: entry.from_user_id,
+          to_user_id: entry.to_user_id,
+          // Preserve the sender's original `created_at` — it's what the
+          // Schnorr signature was computed over, and what `originated_at`
+          // should track in the resulting ledger entry.
+          created_at: entry.originated_at || entry.timestamp,
+          payload: entry.payload,
+          signature: entry.signature,
+        });
+      } catch (err) {
+        if (entry?.id) broadcastedLedgerIds.delete(entry.id);
+        throw err;
+      }
     }
     if (outboundOnly.length > 0) {
       outboundOnly.forEach((entry) => {
@@ -352,8 +358,8 @@ const createRealtimeClient = () => {
   // --- Self-mesh ----------------------------------------------------------
 
   const selfMesh = createPeerMesh({
-    // The server never emits peer_connect for our own device id, so we
-    // don't need a self-check here — an empty string falls through.
+    // Self-check is a no-op for the self-mesh: the server never emits
+    // peer_connect for our own device id, so we leave the local key empty.
     getLocalKey: () => "",
     alwaysAllow: true,
     sendSignal: (peerKey, signal, ctx) => {
