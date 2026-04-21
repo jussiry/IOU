@@ -32,7 +32,7 @@ const RTC_CONFIGURATION = {
 };
 
 const DATA_CHANNEL_LABEL = "iou-json";
-const DISCONNECTED_PEER_GRACE_PERIOD_MS = 10000;
+const DISCONNECTED_PEER_GRACE_PERIOD_MS = 15000;
 const REMOTE_INITIATED_PEER_GRACE_PERIOD_MS = 15000;
 // Wake-from-suspend detector. A setInterval tick that's more than
 // WAKE_GAP_THRESHOLD_MS late means the tab/device was suspended (laptop lid
@@ -84,12 +84,6 @@ const createPeerMesh = (
     // subject to the 15-second allowance timer. Used by the self-mesh:
     // same-user devices are always welcome and shouldn't be reaped.
     alwaysAllow = false,
-    // Optional sync check used at peer creation to pre-authorize a
-    // remote-initiated peer based on the caller's current snapshot.
-    // Without this, after a wake-from-suspend a freshly-paired friend may
-    // arrive as remote-initiated before `closePeersNotInSet` has a chance
-    // to mark it allowed, and the allowance timer closes it prematurely.
-    isPeerAllowed = null,
   } = {}
 ) => {
   const resolveLocalKey = typeof getLocalKey === "function" ? getLocalKey : () => "";
@@ -291,10 +285,7 @@ const createPeerMesh = (
       makingOffer: false,
       disconnectTimer: null,
       remoteAllowanceTimer: null,
-      allowedBySnapshot:
-        initiator ||
-        alwaysAllow ||
-        (typeof isPeerAllowed === "function" && isPeerAllowed(normalizedPeerKey) === true),
+      allowedBySnapshot: initiator || alwaysAllow,
       // Flipped to true the first time the RTCPeerConnection reaches the
       // "connected" state. Used by onPeerClosed listeners to distinguish
       // between "network was working but dropped" (worth retrying) and
