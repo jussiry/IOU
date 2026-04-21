@@ -1,0 +1,138 @@
+.confirm-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: grid;
+  place-items: center;
+  z-index: 1000;
+  padding: 16px;
+  animation: confirm-modal-fade-in 120ms ease-out;
+}
+
+.confirm-modal-closing {
+  animation: confirm-modal-fade-out 140ms ease-in forwards;
+}
+
+@keyframes confirm-modal-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes confirm-modal-fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+.confirm-modal {
+  background: var(--surface, #fff);
+  color: var(--ink, #111);
+  border-radius: 16px;
+  width: 100%;
+  max-width: 420px;
+  padding: 20px 20px 16px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  animation: confirm-modal-pop 160ms cubic-bezier(0.2, 0.9, 0.3, 1.2);
+}
+
+@keyframes confirm-modal-pop {
+  from { transform: scale(0.96); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.confirm-modal-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.confirm-modal-body {
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--ink, #111);
+  white-space: pre-wrap;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+
+.confirm-modal-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.confirm-modal-cancel,
+.confirm-modal-confirm {
+  flex: 1;
+  border: none;
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.confirm-modal-cancel {
+  background: #f0f0f0;
+  color: var(--ink, #111);
+}
+
+.confirm-modal-cancel:hover {
+  background: #e6e6e6;
+}
+
+.confirm-modal-confirm {
+  position: relative;
+  overflow: hidden;
+  background: #f6e3e3;
+  color: var(--danger, #c23d3d);
+  user-select: none;
+  touch-action: none;
+  transition: background-color 120ms;
+}
+
+.confirm-modal-confirm-holding {
+  background: #f6e3e3;
+}
+
+.confirm-modal-confirm-fill {
+  position: absolute;
+  inset: 0;
+  background: var(--danger, #c23d3d);
+  transform: scaleX(0);
+  transform-origin: left center;
+  /* No CSS transition — JS drives the scale via rAF for a smooth fill. */
+  pointer-events: none;
+  z-index: 0;
+}
+
+.confirm-modal-confirm-holding .confirm-modal-confirm-fill {
+  /* Swap to white text when the fill is visible. */
+}
+
+.confirm-modal-confirm-label {
+  position: relative;
+  z-index: 1;
+  transition: color 150ms;
+}
+
+.confirm-modal-confirm-holding .confirm-modal-confirm-label {
+  color: #fff;
+}
+
+/* Success (green) variant — used for large-amount send confirmation */
+.confirm-modal-confirm--success {
+  background: #e3f6e8;
+  color: #27a857;
+}
+
+.confirm-modal-confirm--success .confirm-modal-confirm-fill {
+  background: #27a857;
+}
+
+.confirm-modal-confirm--success.confirm-modal-confirm-holding {
+  background: #e3f6e8;
+}

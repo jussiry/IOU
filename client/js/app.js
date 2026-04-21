@@ -23,6 +23,7 @@ import { bindWelcome } from "../ui-modules/welcome-page/index.js";
 import { bindFriendDetail } from "../ui-modules/subpage/friend.js";
 import { bindAddFriend } from "../ui-modules/subpage/add-friend.js";
 import { initIouActions } from "../ui-modules/components/iou-actions.js";
+import { showConfirmModal } from "../ui-modules/components/confirm-modal.js";
 import { bindSend } from "../ui-modules/subpage/send.js";
 import { bindRequest } from "../ui-modules/subpage/request.js";
 import { bindTrust } from "../ui-modules/subpage/trust.js";
@@ -327,6 +328,18 @@ const loadPage = async (route) => {
           const payload = sendHandlers.getPayload();
           if (!payload.friendId || !Number.isFinite(payload.amount) || payload.amount <= 0) {
             return;
+          }
+          if (payload.amount >= 100) {
+            const friend = data?.connections?.find((c) => c.person_id === payload.friendId);
+            const friendName = friend?.person_name || payload.friendId;
+            const confirmed = await showConfirmModal({
+              title: `Send €${payload.amount} to ${friendName}`,
+              body: "IOU app is in early development. For now it is recommended to use it only for small transactions, are you sure you want to continue?",
+              confirmLabel: "Send",
+              variant: "success",
+              holdMs: 750,
+            });
+            if (!confirmed) return;
           }
           await createTransaction(payload);
           navigateTo(`friend/${payload.friendId}`);
