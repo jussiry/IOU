@@ -70,13 +70,8 @@ import {
 const SCOPE_FRIEND = "friend";
 const SCOPE_SELF = "self";
 
-const logRealtimeEvent = (title, detail) => {
-  if (typeof detail === "undefined") {
-    console.log(`[Realtime] ${title}`);
-    return;
-  }
-
-  console.log(`[Realtime] ${title}`, detail);
+const logRealtimeEvent = (message) => {
+  console.log(`[Realtime] ${message}`);
 };
 
 const createRealtimeClient = () => {
@@ -127,12 +122,9 @@ const createRealtimeClient = () => {
       });
       mesh.sendPeerMessage(peerKey, envelope);
     } catch (error) {
-      logRealtimeEvent("Failed to wrap sync message", {
-        scope,
-        type,
-        peerKey,
-        error: String(error?.message || error),
-      });
+      logRealtimeEvent(
+        `Failed to wrap sync message (${scope}/${type}): ${String(error?.message || error)}`
+      );
     }
   };
 
@@ -156,12 +148,9 @@ const createRealtimeClient = () => {
     } else {
       syncedFriends.add(peerKey);
     }
-    logRealtimeEvent("Sending sync_hello", {
-      scope,
-      peerKey,
-      peerUserId,
-      knownCount: entries.length,
-    });
+    logRealtimeEvent(
+      `Sending sync_hello (${scope}, ${entries.length} known entries)`
+    );
     await sendSyncMessage(
       peerKey,
       { scope },
@@ -178,12 +167,9 @@ const createRealtimeClient = () => {
     );
     const myEntries = getScopeEntries(scope, peerUserId);
     const missing = myEntries.filter((entry) => !knownIds.has(entry.id));
-    logRealtimeEvent("Received sync_hello, replying with sync_data", {
-      scope,
-      peerKey,
-      peerKnownCount: knownIds.size,
-      sendingCount: missing.length,
-    });
+    logRealtimeEvent(
+      `Received sync_hello (${scope}), sending ${missing.length} missing of ${knownIds.size} known`
+    );
     // Seed the broadcast cache so we don't immediately re-push these entries
     // again through the subscribeToDataChanges path.
     if (scope === SCOPE_SELF) {
@@ -222,12 +208,9 @@ const createRealtimeClient = () => {
       // can't inject forged third-party history.
       const signatureValid = await verifyLedgerEntrySignature(entry);
       if (!signatureValid) {
-        logRealtimeEvent("Rejected synced ledger entry with invalid signature", {
-          scope,
-          peerKey,
-          entryId: entry?.id,
-          entryFrom: entry?.from_user_id,
-        });
+        logRealtimeEvent(
+          `Rejected entry with invalid signature (${scope}, from ${entry?.from_user_id?.slice(0, 10)}…)`
+        );
         continue;
       }
       if (entry.from_user_id === myId && entry.to_user_id === myId) {
@@ -247,14 +230,9 @@ const createRealtimeClient = () => {
       return aTs < bTs ? -1 : aTs > bTs ? 1 : 0;
     });
 
-    logRealtimeEvent("Received sync_data", {
-      scope,
-      peerKey,
-      total: entries.length,
-      inboundLike: inboundLike.length,
-      outboundOnly: outboundOnly.length,
-      selfAddressed: selfAddressed.length,
-    });
+    logRealtimeEvent(
+      `Received sync_data (${scope}): ${entries.length} entries — ${inboundLike.length} inbound, ${outboundOnly.length} outbound, ${selfAddressed.length} self`
+    );
 
     for (const entry of inboundLike) {
       // Seed the broadcast cache *before* the handler runs so the resulting
@@ -434,13 +412,13 @@ const createRealtimeClient = () => {
     onPeerDisconnect: ({ peerUserId, peerDeviceId }) => {
       const myUserId = currentSnapshot?.userId || "";
       if (myUserId && peerUserId === myUserId && peerDeviceId) {
-        logRealtimeEvent("Self-device disconnected (server)", { peerDeviceId });
+        logRealtimeEvent(`Self-device disconnected from server (${peerDeviceId?.slice(0, 8)}…)`);
         selfMesh.closePeer(peerDeviceId);
         syncedSelfDevices.delete(peerDeviceId);
         pendingSelfSync.delete(peerDeviceId);
         return;
       }
-      logRealtimeEvent("Peer disconnected (server)", { peerUserId });
+      logRealtimeEvent(`Peer disconnected from server (${peerUserId?.slice(0, 10)}…)`);
       removeServerPresentPeer(peerUserId, peerDeviceId);
       peerMesh.closePeer(peerUserId);
     },
@@ -485,9 +463,7 @@ const createRealtimeClient = () => {
       return;
     }
 
-    logRealtimeEvent(logTitle, {
-      peerUserId,
-    });
+    logRealtimeEvent(`${logTitle} (${peerUserId?.slice(0, 10)}…)`);
     signalingClient.requestPeerConnection(peerUserId);
   };
 
@@ -514,10 +490,9 @@ const createRealtimeClient = () => {
       try {
         envelope = await wrapPeerMessage(message, { privateKeyHex });
       } catch (error) {
-        logRealtimeEvent("Failed to wrap outgoing peer message", {
-          messageId: message.id,
-          error: String(error?.message || error),
-        });
+        logRealtimeEvent(
+          `Failed to wrap outgoing message ${message.id?.slice(0, 10)}…: ${String(error?.message || error)}`
+        );
         continue;
       }
 
@@ -529,10 +504,9 @@ const createRealtimeClient = () => {
       const queued = signalingClient.queuePeerEnvelopeOnServer(envelope);
       if (queued) {
         envelopesSentToServer.add(message.id);
-        logRealtimeEvent("Queued peer envelope on server", {
-          messageId: message.id,
-          peerUserId: message.to_user_id,
-        });
+        logRealtimeEvent(
+          `Queued envelope on server → ${message.to_user_id?.slice(0, 10)}…`
+        );
       }
     }
   };
@@ -569,10 +543,7 @@ const createRealtimeClient = () => {
         peerUserId || currentSnapshot.userId,
       );
     }
-    logRealtimeEvent("Broadcast ledger entries to self-devices", {
-      count: freshEntries.length,
-      deviceCount: connected.length,
-    });
+    logRealtimeEvent(`Broadcast ${freshEntries.length} ledger entries to ${connected.length} self-devices`);
   };
 
   const syncRealtimeState = async () => {
@@ -614,7 +585,7 @@ const createRealtimeClient = () => {
       return;
     }
 
-    logRealtimeEvent("Peer receipt received", { data: receiptMessage });
+    logRealtimeEvent(`Receipt received for msg ${receivedMessageId?.slice(0, 10)}…`);
     peerMesh.clearInflightMessage(receivedMessageId);
     envelopesSentToServer.delete(receivedMessageId);
     await markPeerMessageReceived(receivedMessageId);
@@ -638,19 +609,13 @@ const createRealtimeClient = () => {
     // the sender sees its own broadcast land on its own ledger, no ack needed.
     if (preferredPeerKey && peerMesh.canSend(preferredPeerKey)) {
       peerMesh.sendControlMessage(preferredPeerKey, receipt);
-      logRealtimeEvent("Sent peer receipt over WebRTC", {
-        peerKey: preferredPeerKey,
-        data: receipt,
-      });
+      logRealtimeEvent(`Sent receipt via WebRTC (preferred channel)`);
       return;
     }
     const fallbackKey = innerMessage.from_user_id;
     if (fallbackKey && peerMesh.canSend(fallbackKey)) {
       peerMesh.sendControlMessage(fallbackKey, receipt);
-      logRealtimeEvent("Sent peer receipt over WebRTC", {
-        peerKey: fallbackKey,
-        data: receipt,
-      });
+      logRealtimeEvent(`Sent receipt via WebRTC (fallback channel)`);
       return;
     }
 
@@ -665,13 +630,9 @@ const createRealtimeClient = () => {
         privateKeyHex: currentSnapshot.userPrivateKeyHex,
       });
       const queued = signalingClient.queuePeerEnvelopeOnServer(envelope);
-      logRealtimeEvent(queued ? "Queued peer receipt on server" : "Receipt queue rejected", {
-        receiptId: receipt.id,
-      });
+      logRealtimeEvent(queued ? "Queued receipt on server" : "Receipt queue rejected by server");
     } catch (error) {
-      logRealtimeEvent("Failed to wrap receipt for server delivery", {
-        error: String(error?.message || error),
-      });
+      logRealtimeEvent(`Failed to wrap receipt for server: ${String(error?.message || error)}`);
     }
   };
 
@@ -720,7 +681,7 @@ const createRealtimeClient = () => {
     }
 
     if (message.type === PEER_MESSAGE_TYPE_PING) {
-      logRealtimeEvent("Ping received", { scope, peerKey });
+      logRealtimeEvent(`Ping received (${scope})`);
       const mesh = scope === SCOPE_SELF ? selfMesh : peerMesh;
       mesh.sendControlMessage(peerKey, {
         type: PEER_MESSAGE_TYPE_PONG,
@@ -732,7 +693,7 @@ const createRealtimeClient = () => {
     if (message.type === PEER_MESSAGE_TYPE_PONG) {
       const sentAt = message.timestamp;
       const roundTripMs = sentAt ? Date.now() - sentAt : null;
-      logRealtimeEvent("Pong received", { scope, peerKey, roundTripMs });
+      logRealtimeEvent(`Pong received (${scope}, ${roundTripMs}ms RTT)`);
       const resolve = pendingPings.get(peerKey);
       if (resolve) {
         pendingPings.delete(peerKey);
@@ -749,11 +710,7 @@ const createRealtimeClient = () => {
     }
 
     if (!isPeerEnvelope(message)) {
-      logRealtimeEvent("Dropping non-envelope application message", {
-        scope,
-        peerKey,
-        type: message.type,
-      });
+      logRealtimeEvent(`Dropping non-envelope message (${scope}, type: ${message.type})`);
       return;
     }
 
@@ -782,11 +739,9 @@ const createRealtimeClient = () => {
         expectedRecipientId: currentSnapshot.userId,
       });
     } catch (error) {
-      logRealtimeEvent("Failed to unwrap peer envelope", {
-        peerKey: sourcePeerKey,
-        envelopeId: envelope?.id,
-        error: String(error?.message || error),
-      });
+      logRealtimeEvent(
+        `Failed to unwrap envelope from ${sourcePeerKey?.slice(0, 10)}…: ${String(error?.message || error)}`
+      );
       return null;
     }
   };
@@ -796,10 +751,9 @@ const createRealtimeClient = () => {
       return;
     }
 
-    logRealtimeEvent("Peer envelope received from server", {
-      envelopeId: envelope.id,
-      from: envelope.from_user_id,
-    });
+    logRealtimeEvent(
+      `Envelope received from server (from ${envelope.from_user_id?.slice(0, 10)}…)`
+    );
 
     const innerMessage = await unwrapEnvelopeOrLog(envelope, envelope.from_user_id);
     if (!innerMessage) {
