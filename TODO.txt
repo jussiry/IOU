@@ -1,5 +1,20 @@
 
 
+Add inactivate friend button.
+- defaulting / debt forgiveness
+- explain possible concequences
+Inactive frient
+- inactive but shows history
+- can be restored if both agree (suggest friendship - but also returns the old state)
+- can be fully removed (same button)
+  * no notification to other?
+  * as long as either retains inactive state, reactivation can be suggested
+
+
+
+- test deleting user and make sure indexdb is fully removed
+- getting name when cloning user still bugs.. (brave user with incognito firefox)
+
 
 - Default on debt
 --> remove friend

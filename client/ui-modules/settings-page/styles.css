@@ -112,10 +112,6 @@
   cursor: pointer;
 }
 
-.settings-remove {
-  color: var(--danger);
-}
-
 .settings-icon {
   width: 17px;
   height: 17px;

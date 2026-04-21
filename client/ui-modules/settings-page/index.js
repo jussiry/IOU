@@ -6,6 +6,9 @@ By centralizing settings behavior here, the app shell only needs to pass data an
 
 import { resetState } from "../../js/app-state.js";
 import { updateUserName } from "../../js/commands/user.js";
+import { isAcceptedFriendshipStatus } from "../../js/utils/friendships.js";
+import { formatCurrency } from "../../js/ui/format.js";
+import { showConfirmModal } from "../components/confirm-modal.js";
 
 export const bindSettings = (root, data, appVersion) => {
   const userNameEl = root.querySelector('[data-bind="user-name"]');
@@ -62,9 +65,27 @@ export const bindSettings = (root, data, appVersion) => {
   const removeUserButton = root.querySelector('[data-action="remove-user"]');
   if (!removeUserButton) return;
   removeUserButton.addEventListener("click", async () => {
-    const isConfirmed = window.confirm(
-      "Are you totally sure? This will permanently remove all your data in this application?"
+    const connections = Array.isArray(data?.connections) ? data.connections : [];
+    const unresolvedDebts = connections.filter(
+      (c) => isAcceptedFriendshipStatus(c.friendship_status) && c.debt_eur !== 0
     );
+
+    let debtWarning = "";
+    if (unresolvedDebts.length > 0) {
+      const lines = unresolvedDebts.map((c) => {
+        const amount = formatCurrency(c.debt_eur);
+        const direction = c.debt_eur > 0 ? `owes you ${amount}` : `you owe ${amount}`;
+        return `• ${c.person_name}: ${direction}`;
+      });
+      debtWarning = `\n\nUnresolved debts:\n${lines.join("\n")}\n`;
+    }
+
+    const body = `This is a SERIOUS step. This will permanently remove all local data. Unless you have transferred your user to another device, you will NOT be able to retrieve your user.${debtWarning}\nDo you still want to remove your user?`;
+    const isConfirmed = await showConfirmModal({
+      title: "Remove user data",
+      body,
+      confirmLabel: "Remove",
+    });
     if (!isConfirmed) return;
     await resetState();
     window.location.hash = "welcome";

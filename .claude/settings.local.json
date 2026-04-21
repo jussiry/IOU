@@ -47,7 +47,9 @@
       "Bash(/Users/jussi/.nvm/versions/node/v24.14.0/bin/node tests/two-client-e2e/run.cjs --scenario server-queue-delivery)",
       "Bash(/Users/jussi/.nvm/versions/node/v24.14.0/bin/node tests/two-client-e2e/run.cjs --scenario turn-relay)",
       "Read(//tmp/**)",
-      "Read(//private/tmp/**)"
+      "Read(//private/tmp/**)",
+      "Read(//Users/jussi/.claude/**)",
+      "Read(//Users/jussi/.claude/projects/**)"
     ]
   }
 }
