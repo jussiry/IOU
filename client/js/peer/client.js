@@ -338,6 +338,13 @@ const createRealtimeClient = () => {
 
   const peerMesh = createPeerMesh({
     getLocalKey: () => currentSnapshot?.userId || "",
+    // Pre-authorize a remote-initiated peer if the current snapshot already
+    // lists them as a friend. Without this, a friend paired after a
+    // wake-from-suspend arrives as remote-initiated before syncRealtimeState
+    // re-runs, and the allowance timer closes them as unauthorized.
+    isPeerAllowed: (peerKey) =>
+      Array.isArray(currentSnapshot?.peerIds) &&
+      currentSnapshot.peerIds.includes(peerKey),
     sendSignal: (peerKey, signal, ctx) => {
       // Friend mesh: peerKey is the peer user id, and we route the signal
       // via whatever peerDeviceId we captured on the incoming peer_connect.
