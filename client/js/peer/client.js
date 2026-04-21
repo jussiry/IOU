@@ -62,6 +62,9 @@ import { createPeerMesh } from "./mesh.js";
 import {
   replaceConnectedPeerIds,
   replaceConnectedSelfDeviceIds,
+  addServerPresentPeer,
+  removeServerPresentPeer,
+  clearServerPresentPeers,
 } from "./status.js";
 
 const SCOPE_FRIEND = "friend";
@@ -419,6 +422,9 @@ const createRealtimeClient = () => {
         return;
       }
       // Different user → friend mesh keyed by peerUserId.
+      // Track server presence so the UI can show a "partly online" state
+      // when the relay sees the friend but WebRTC hasn't established yet.
+      addServerPresentPeer(peerUserId, peerDeviceId);
       peerMesh.ensurePeer(peerUserId, {
         initiator,
         peerUserId,
@@ -435,6 +441,7 @@ const createRealtimeClient = () => {
         return;
       }
       logRealtimeEvent("Peer disconnected (server)", { peerUserId });
+      removeServerPresentPeer(peerUserId, peerDeviceId);
       peerMesh.closePeer(peerUserId);
     },
     onPeerSignal: ({ peerUserId, peerDeviceId, signal }) => {
@@ -576,6 +583,7 @@ const createRealtimeClient = () => {
       selfMesh.closePeersNotInSet([]);
       replaceConnectedPeerIds([]);
       replaceConnectedSelfDeviceIds([]);
+      clearServerPresentPeers();
       return;
     }
 
@@ -868,6 +876,7 @@ const createRealtimeClient = () => {
     destroy: () => {
       replaceConnectedPeerIds([]);
       replaceConnectedSelfDeviceIds([]);
+      clearServerPresentPeers();
       unsubscribe();
       peerMesh.destroy();
       selfMesh.destroy();

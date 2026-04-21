@@ -117,6 +117,10 @@ summary::-webkit-details-marker {
   color: #27a857;
 }
 
+.friend-icon--relay {
+  color: #e5a632;
+}
+
 .meta h3 {
   flex: 1;
   min-width: 0;

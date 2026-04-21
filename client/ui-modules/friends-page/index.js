@@ -5,7 +5,7 @@ It also owns the add-friend button behavior and keeps accepted, pending, and rej
 */
 
 import { formatCurrency, formatSigned } from "../../js/ui/format.js";
-import { getConnectedPeerIds } from "../../js/peer/status.js";
+import { getConnectedPeerIds, getServerPresentPeerIds } from "../../js/peer/status.js";
 import {
   FRIENDSHIP_STATUS_ACCEPTED,
   FRIENDSHIP_STATUS_PENDING_INCOMING,
@@ -145,6 +145,7 @@ export const bindFriends = (root, data) => {
   const friendTemplate = root.querySelector('[data-template="friend-item"]');
   const addFriendButton = root.querySelector('[data-action="add-friend"]');
   const connectedPeerIds = new Set(getConnectedPeerIds());
+  const serverPresentPeerIds = new Set(getServerPresentPeerIds());
   if (!listContainer || !friendTemplate) return;
 
   listContainer.innerHTML = "";
@@ -261,10 +262,10 @@ export const bindFriends = (root, data) => {
     });
     if (nameEl) nameEl.textContent = connection.person_name || connection.person_id;
     if (iconEl) {
-      iconEl.classList.toggle(
-        "friend-icon--online",
-        connectedPeerIds.has(connection.person_id)
-      );
+      const isOnline = connectedPeerIds.has(connection.person_id);
+      const isRelay = !isOnline && serverPresentPeerIds.has(connection.person_id);
+      iconEl.classList.toggle("friend-icon--online", isOnline);
+      iconEl.classList.toggle("friend-icon--relay", isRelay);
     }
     if (actionDotEl) {
       actionDotEl.hidden = !hasActionableNotification(connection);

@@ -8,6 +8,10 @@
   flex-shrink: 0;
 }
 
+.online-dot--relay {
+  background: #e5a632;
+}
+
 .friend-sync-status {
   text-align: center;
   font-size: 12px;

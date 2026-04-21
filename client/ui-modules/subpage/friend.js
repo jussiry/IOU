@@ -28,7 +28,7 @@ import {
 } from "../../js/utils/friendships.js";
 import { formatCurrency, formatDate, formatSigned } from "../../js/ui/format.js";
 import { initInfiniteList } from "../../js/ui/infinite-list.js";
-import { getConnectedPeerIds } from "../../js/peer/status.js";
+import { getConnectedPeerIds, getServerPresentPeerIds } from "../../js/peer/status.js";
 
 export const bindFriendDetail = (root, data, friendId) => {
   const titleEl = root.querySelector('[data-bind="page-title"]');
@@ -66,15 +66,14 @@ export const bindFriendDetail = (root, data, friendId) => {
   const friendFirstName = friendName.split(/\s+/)[0] || friendName;
   const friendshipStatus = connection?.friendship_status || FRIENDSHIP_STATUS_ACCEPTED;
   const isOnline = getConnectedPeerIds().includes(friendId);
+  const isRelay = !isOnline && getServerPresentPeerIds().includes(friendId);
 
   if (titleEl) {
-    if (isOnline) {
+    titleEl.textContent = friendName;
+    if (isOnline || isRelay) {
       const dot = document.createElement("span");
-      dot.className = "online-dot";
-      titleEl.textContent = friendName;
+      dot.className = isRelay ? "online-dot online-dot--relay" : "online-dot";
       titleEl.prepend(dot);
-    } else {
-      titleEl.textContent = friendName;
     }
   }
 
@@ -221,7 +220,7 @@ export const bindFriendDetail = (root, data, friendId) => {
       if (suggestionOkActionsEl) suggestionOkActionsEl.hidden = false;
     } else {
       if (suggestionExplainerEl) suggestionExplainerEl.hidden = false;
-      const amountText = `Suggested trust limit of ${formatCurrency(pendingLimit)}`;
+      const amountText = `Suggested trust limit* of ${formatCurrency(pendingLimit)}`;
       if (suggestionLabelEl) suggestionLabelEl.textContent = amountText;
       if (isIncoming === true && suggestionActionsEl) suggestionActionsEl.hidden = false;
       if (isIncoming === false && suggestionCancelActionsEl) suggestionCancelActionsEl.hidden = false;
