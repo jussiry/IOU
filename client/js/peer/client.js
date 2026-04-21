@@ -100,14 +100,6 @@ const createRealtimeClient = () => {
   // the loop.
   const broadcastedLedgerIds = new Set();
 
-  // Tracks peerUserIds for which a connect_peer request has been sent to the
-  // server but no peer_connect response has arrived yet. Without this,
-  // syncRealtimeState called from multiple sources in quick succession sends
-  // duplicate connect_peer messages before hasPeer() becomes true, causing
-  // the server to send duplicate peer_connect messages to both sides and
-  // creating two competing RTCPeerConnections.
-  const pendingPeerRequests = new Set();
-
   const sendSyncMessage = async (peerKey, { scope }, type, payload, peerUserId) => {
     if (!currentSnapshot?.userPrivateKeyHex || !currentSnapshot?.userId) return;
     const mesh = scope === SCOPE_SELF ? selfMesh : peerMesh;
@@ -348,8 +340,6 @@ const createRealtimeClient = () => {
     // a tight loop is pointless. Intentional closes (server_disconnect,
     // stale_replaced, remote_allowance_timeout) are skipped.
     onPeerClosed: ({ peerUserId, peerKey, reason, wasConnected }) => {
-      // Always clear the pending flag so the next request goes through.
-      pendingPeerRequests.delete(peerUserId || peerKey);
       if (!wasConnected) return;
       if (
         reason === "server_disconnect" ||
@@ -454,8 +444,6 @@ const createRealtimeClient = () => {
       // for us are about to arrive. Forget what we previously asked the server
       // to queue so a server restart doesn't strand undelivered messages.
       envelopesSentToServer.clear();
-      // All in-flight connect_peer requests are gone with the old session.
-      pendingPeerRequests.clear();
       // Wait for `queue_drained` before initiating sync_hello so we don't
       // re-request ledger entries the server is about to redeliver.
       serverQueueDrained = false;
@@ -474,11 +462,7 @@ const createRealtimeClient = () => {
     if (!peerUserId || peerMesh.canSend(peerUserId) || peerMesh.hasPeer(peerUserId)) {
       return;
     }
-    if (pendingPeerRequests.has(peerUserId)) {
-      return;
-    }
 
-    pendingPeerRequests.add(peerUserId);
     logRealtimeEvent(`${logTitle} (${peerUserId?.slice(0, 10)}…)`);
     signalingClient.requestPeerConnection(peerUserId);
   };
