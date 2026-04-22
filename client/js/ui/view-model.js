@@ -45,7 +45,7 @@ export const buildView = (state) => {
 
   return {
     you: createPublicPersonModel(user),
-    connections: friendsWithInbound,
+    friends: friendsWithInbound,
     totals: {
       netBalance,
       friendsOweTotal,
