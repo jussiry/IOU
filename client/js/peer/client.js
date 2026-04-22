@@ -326,15 +326,6 @@ const createRealtimeClient = () => {
       void updateLastSyncedAt(pid);
       pendingFriendSync.add(pid);
       trySyncPendingPeers();
-      // Mark all current snapshot peers as allowed so the remote_allowance_timeout
-      // timer is cleared for inbound-initiated connections. This is cheaper than
-      // calling the full syncRealtimeState() which would call
-      // requestPeerConnectionIfNeeded for every still-offline friend once per
-      // connecting peer, producing N duplicate connect_peer requests for N online
-      // friends.
-      if (currentSnapshot?.peerIds) {
-        peerMesh.closePeersNotInSet(currentSnapshot.peerIds);
-      }
       // Flush any queued outbox messages to the newly connected peer.
       void flushOutbox();
     },
@@ -348,13 +339,12 @@ const createRealtimeClient = () => {
     // We only retry if the connection had previously reached "connected" —
     // otherwise the network likely blocks WebRTC outright and retrying in
     // a tight loop is pointless. Intentional closes (server_disconnect,
-    // stale_replaced, remote_allowance_timeout) are skipped.
+    // stale_replaced) are skipped.
     onPeerClosed: ({ peerUserId, peerKey, reason, wasConnected }) => {
       if (!wasConnected) return;
       if (
         reason === "server_disconnect" ||
-        reason === "stale_replaced" ||
-        reason === "remote_allowance_timeout"
+        reason === "stale_replaced"
       ) {
         return;
       }
@@ -413,16 +403,10 @@ const createRealtimeClient = () => {
       // Track server presence so the UI can show a "partly online" state
       // when the relay sees the friend but WebRTC hasn't established yet.
       addServerPresentPeer(peerUserId, peerDeviceId);
-      // If this peer is already in our friend snapshot, tell the mesh to skip
-      // the remote-allowance timer. Otherwise ICE negotiation after a lid-open
-      // (which can take > 10s) would trip the timer before the channel opens.
-      const allowed = Array.isArray(currentSnapshot?.peerIds)
-        && currentSnapshot.peerIds.includes(peerUserId);
       peerMesh.ensurePeer(peerUserId, {
         initiator,
         peerUserId,
         peerDeviceId,
-        allowed,
       });
     },
     onPeerDisconnect: ({ peerUserId, peerDeviceId }) => {
@@ -447,12 +431,9 @@ const createRealtimeClient = () => {
         });
         return;
       }
-      const allowed = Array.isArray(currentSnapshot?.peerIds)
-        && currentSnapshot.peerIds.includes(peerUserId);
       void peerMesh.handleSignal(peerUserId, signal, {
         peerUserId,
         peerDeviceId,
-        allowed,
       });
     },
     onPeerEnvelopeFromServer: ({ envelope }) => {

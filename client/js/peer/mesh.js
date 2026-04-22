@@ -32,10 +32,8 @@ const RTC_CONFIGURATION = {
 };
 
 const DATA_CHANNEL_LABEL = "iou-json";
-// Single grace period used both for ICE-restart recovery on a disconnected
-// peer and for the remote-initiated allowance check. One value keeps the
-// mental model simple — "how long a peer is allowed to linger in a not-yet-
-// good state before we give up".
+// How long a peer is allowed to linger in the "disconnected" state while we
+// try an ICE restart before we give up and tear the connection down.
 const PEER_GRACE_PERIOD_MS = 10000;
 // Wake-from-suspend detector. A setInterval tick that's more than
 // WAKE_GAP_THRESHOLD_MS late means the tab/device was suspended (laptop lid
@@ -91,9 +89,9 @@ const createPeerMesh = (
     // filters out cases where the network fundamentally blocks WebRTC
     // (ICE fails outright without ever establishing).
     onPeerClosed = null,
-    // If true, remote-initiated peers are trusted on arrival and never
-    // subject to the remote-allowance timer. Used by the self-mesh:
-    // same-user devices are always welcome and shouldn't be reaped.
+    // If true, `closePeersNotInSet` is a no-op. Used by the self-mesh:
+    // same-user devices aren't in the friend snapshot, so the snapshot-
+    // driven cleanup doesn't apply to them.
     alwaysAllow = false,
   } = {}
 ) => {
@@ -132,32 +130,6 @@ const createPeerMesh = (
     peer.disconnectTimer = null;
   };
 
-  const clearRemoteAllowanceTimer = (peer) => {
-    if (!peer?.remoteAllowanceTimer) {
-      return;
-    }
-
-    window.clearTimeout(peer.remoteAllowanceTimer);
-    peer.remoteAllowanceTimer = null;
-  };
-
-  const scheduleRemoteAllowanceTimeout = (peer) => {
-    if (!peer || peer.allowedBySnapshot || peer.remoteAllowanceTimer) {
-      return;
-    }
-
-    peer.remoteAllowanceTimer = window.setTimeout(() => {
-      peer.remoteAllowanceTimer = null;
-      if (!peers.has(peer.peerKey) || peer.allowedBySnapshot) {
-        return;
-      }
-
-      closePeer(peer.peerKey, {
-        reason: "remote_allowance_timeout",
-      });
-    }, PEER_GRACE_PERIOD_MS);
-  };
-
   const closePeer = (peerKey, detail = {}) => {
     const peer = peers.get(peerKey);
     if (!peer) {
@@ -165,7 +137,6 @@ const createPeerMesh = (
     }
 
     clearDisconnectTimer(peer);
-    clearRemoteAllowanceTimer(peer);
     logPeerEvent(
       `Closing ${shortKey(peerKey)} — ${detail.reason || "no reason"}`
     );
@@ -240,12 +211,6 @@ const createPeerMesh = (
     initiator = false,
     peerUserId = "",
     peerDeviceId = "",
-    // Caller-asserted snapshot allowance: true when the caller has already
-    // verified this peer is in the current friend list at the time
-    // peer_connect arrived. Lets us skip the remote_allowance_timeout entirely
-    // for known friends — relevant after wake-from-suspend when ICE can take
-    // longer than the grace period to finish.
-    allowed = false,
   } = {}) => {
     const normalizedPeerKey =
       typeof peerKey === "string" ? peerKey.trim() : "";
@@ -286,8 +251,6 @@ const createPeerMesh = (
       pendingCandidates: [],
       makingOffer: false,
       disconnectTimer: null,
-      remoteAllowanceTimer: null,
-      allowedBySnapshot: initiator || alwaysAllow || allowed,
       // Flipped to true the first time the RTCPeerConnection reaches the
       // "connected" state. Used by onPeerClosed listeners to distinguish
       // between "network was working but dropped" (worth retrying) and
@@ -298,10 +261,6 @@ const createPeerMesh = (
     logPeerEvent(
       `Establishing ${initiator ? "outbound" : "inbound"} peer ${shortKey(normalizedPeerKey)}`
     );
-
-    if (!initiator && !alwaysAllow && !allowed) {
-      scheduleRemoteAllowanceTimeout(peer);
-    }
 
     // Perfect negotiation: onnegotiationneeded handles both initial offers and
     // ICE restarts. setLocalDescription() with no args creates offer or answer
@@ -530,7 +489,6 @@ const createPeerMesh = (
         initiator: false,
         peerUserId: context.peerUserId || "",
         peerDeviceId: context.peerDeviceId || "",
-        allowed: context.allowed === true,
       });
       if (!peer) {
         return;
@@ -599,19 +557,12 @@ const createPeerMesh = (
       });
     },
     closePeersNotInSet: (allowedPeerKeys) => {
+      if (alwaysAllow) return;
       const allowedIds = new Set(Array.isArray(allowedPeerKeys) ? allowedPeerKeys : []);
-      Array.from(peers.entries()).forEach(([peerKey, peer]) => {
-        peer.allowedBySnapshot = allowedIds.has(peerKey) || alwaysAllow;
-        if (peer.allowedBySnapshot) {
-          clearRemoteAllowanceTimer(peer);
-          return;
+      Array.from(peers.keys()).forEach((peerKey) => {
+        if (!allowedIds.has(peerKey)) {
+          closePeer(peerKey);
         }
-
-        if (peer.remoteAllowanceTimer) {
-          return;
-        }
-
-        closePeer(peerKey);
       });
     },
     destroy: () => {
