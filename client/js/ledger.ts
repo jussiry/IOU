@@ -50,31 +50,33 @@ export const appendLedgerEntry = (
     signature = "",
     originatedAt = "",
   }: AppendLedgerEntryOptions = {}
-): void => {
+): LedgerEntryModel => {
   state.ledger = Array.isArray(state.ledger) ? state.ledger : [];
-  state.ledger.unshift(
-    createLedgerEntryModel({
-      id: id || createId("ledger"),
-      timestamp: new Date().toISOString(),
-      type,
-      from_user_id: fromUserId || "",
-      to_user_id: toUserId || "",
-      signature,
-      originated_at: originatedAt,
-      payload,
-    })
-  );
+  const entry = createLedgerEntryModel({
+    id: id || createId("ledger"),
+    timestamp: new Date().toISOString(),
+    type,
+    from_user_id: fromUserId || "",
+    to_user_id: toUserId || "",
+    signature,
+    originated_at: originatedAt,
+    payload,
+  });
+  state.ledger.unshift(entry);
+  return entry;
 };
 
 // Convenience wrapper: mirror an outbound or verified inbound peer message
 // into the ledger. The message's `created_at` becomes `originated_at` so the
-// Schnorr digest remains reproducible from the stored entry.
+// Schnorr digest remains reproducible from the stored entry. Returns the
+// appended entry so callers can derive state directly from the ledger
+// representation (the same shape replay and sync will see).
 export const appendLedgerEntryFromMessage = (
   state: RootState,
   message: PeerMessageModel | null | undefined
-): void => {
-  if (!message) return;
-  appendLedgerEntry(state, {
+): LedgerEntryModel | null => {
+  if (!message) return null;
+  return appendLedgerEntry(state, {
     id: message.id,
     type: message.type,
     fromUserId: message.from_user_id,

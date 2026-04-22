@@ -25,14 +25,23 @@ import {
   persistAndBuildView,
   persistState,
 } from "../app-state.js";
-import { removeQueuedPeerMessage } from "./outbox.js";
-import { findConnection, syncUserNameAcrossContacts } from "../connection-helpers.js";
+import {
+  hasProcessedPeerMessage,
+  markProcessedPeerMessage,
+  removeQueuedPeerMessage,
+} from "./outbox.js";
+import { findConnection, getUserConnection, syncUserNameAcrossContacts } from "../connection-helpers.js";
 import {
   createInboundProcessingResult,
-  routeInboundMessage,
+  routeInboundEntry,
   routeOutboundEntry,
 } from "./handlers.js";
-import { mergeSyncedLedgerEntries } from "../ledger.js";
+import { appendLedgerEntryFromMessage, mergeSyncedLedgerEntries } from "../ledger.js";
+import {
+  PEER_MESSAGE_TYPE_RECEIVED,
+  PEER_RECEIPT_RESULT_IGNORED,
+  PEER_RECEIPT_RESULT_PROCESSED,
+} from "./messages.js";
 import { showNotification } from "../ui/notifications.js";
 
 // Everything the realtime client needs to decide who to connect to and what
@@ -243,6 +252,11 @@ export const applyOwnNameFromLedger = async () => {
   await persistAndBuildView(state);
 };
 
+// Ledger-first inbound pipeline. A verified peer message becomes a ledger
+// entry BEFORE any state mutation; the resulting state is then derived from
+// that entry via routeInboundEntry. Replays (sync, startup rehydration) run
+// through the same derivation path, so the UI state is always a function of
+// the ledger — the single source of truth.
 export const applyInboundPeerMessage = async (incomingMessage) => {
   const message = createPeerMessageModel(incomingMessage);
   if (!message.id || !message.from_user_id || !message.type) {
@@ -254,21 +268,57 @@ export const applyInboundPeerMessage = async (incomingMessage) => {
     return createInboundProcessingResult(null);
   }
 
-  const result = await routeInboundMessage(state, message);
+  // Filter: the message isn't addressed to us. Nothing to do and no receipt
+  // semantics to report.
+  if (message.to_user_id && message.to_user_id !== state.user.id) {
+    return createInboundProcessingResult(buildView(state));
+  }
 
-  if (!result.applied && !result.persisted) {
+  // Receipts are transport-layer acks, not ledger events — handled elsewhere.
+  if (message.type === PEER_MESSAGE_TYPE_RECEIVED) {
+    return createInboundProcessingResult(buildView(state));
+  }
+
+  // Dedupe: the sender wants to know we already have this one, and we must
+  // not re-run the state derivation or re-append to the ledger.
+  if (hasProcessedPeerMessage(state, message.id)) {
     return createInboundProcessingResult(
       buildView(state),
-      result.acknowledgeResult
+      PEER_RECEIPT_RESULT_PROCESSED
     );
   }
 
-  if (result.notification) {
-    showNotification(result.notification);
+  // Append the ledger entry first. From this point on, state changes are a
+  // pure function of this entry — routeInboundEntry reads from it.
+  const entry = appendLedgerEntryFromMessage(state, message);
+  if (!entry) {
+    return createInboundProcessingResult(buildView(state));
   }
+
+  const notification = await routeInboundEntry(state, entry);
+
+  if (!notification) {
+    // The entry was well-formed but not applicable to current state (e.g. a
+    // friend_request from someone already accepted). Roll back the ledger
+    // append so the log doesn't accumulate no-ops, and tell the sender we
+    // ignored it.
+    state.ledger.shift();
+    return createInboundProcessingResult(
+      buildView(state),
+      PEER_RECEIPT_RESULT_IGNORED
+    );
+  }
+
+  markProcessedPeerMessage(state, message.id);
+  const userConnection = getUserConnection(state, message.from_user_id);
+  if (userConnection) {
+    userConnection.last_synced_at = new Date().toISOString();
+  }
+
+  showNotification(notification);
 
   return createInboundProcessingResult(
     await persistAndBuildView(state),
-    result.acknowledgeResult
+    PEER_RECEIPT_RESULT_PROCESSED
   );
 };
