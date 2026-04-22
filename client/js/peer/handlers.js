@@ -20,6 +20,7 @@ import {
   ensureUserConnection,
   getDisplayName,
   getUserConnection,
+  removeFriendRelationshipData,
 } from "../connection-helpers.js";
 import { formatCurrency } from "../ui/format.js";
 import {
@@ -447,3 +448,193 @@ export const routeInboundMessage = async (state, message) => {
 };
 
 export { createInboundProcessingResult };
+
+// ---------------------------------------------------------------------------
+// Outbound entry application
+// ---------------------------------------------------------------------------
+// The symmetric counterpart to routeInboundMessage. Applies a ledger entry
+// authored by this user (from_user_id === myId, to_user_id === peerId) to
+// local app state. Called both when a command runs on this device AND when
+// the same entry arrives via self-mesh sync from another device.
+//
+// Returning true means state was mutated; false means the entry was a no-op
+// (already applied or not applicable). Callers own persistence.
+
+const applyOutboundFriendRequest = (state, entry) => {
+  const toId = asTrimmedString(entry.to_user_id);
+  if (!toId) return false;
+  // Create PENDING_OUTGOING only when no connection exists — don't overwrite
+  // an already-accepted or already-pending connection.
+  if (!getUserConnection(state, toId)) {
+    ensureUserConnection(state, toId, toId, {
+      friendshipStatus: FRIENDSHIP_STATUS_PENDING_OUTGOING,
+    });
+    return true;
+  }
+  return false;
+};
+
+const applyOutboundFriendAccept = (state, entry) => {
+  const toId = asTrimmedString(entry.to_user_id);
+  if (!toId) return false;
+  let conn = getUserConnection(state, toId);
+  let changed = false;
+  if (!conn) {
+    // No prior connection on this device — create it as accepted.
+    conn = ensureUserConnection(state, toId, toId, {
+      friendshipStatus: FRIENDSHIP_STATUS_ACCEPTED,
+    });
+    changed = !!conn;
+  } else if (conn.friendship_status !== FRIENDSHIP_STATUS_ACCEPTED) {
+    conn.friendship_status = FRIENDSHIP_STATUS_ACCEPTED;
+    changed = true;
+  }
+  // Restore the trust limit that was agreed to (echoed back in the accept payload).
+  if (conn) {
+    const limit = normalizeCurrencyAmount(entry.payload?.trust_credit_limit_eur, NaN);
+    if (Number.isFinite(limit) && limit >= 0) {
+      conn.trust_credit_limit_eur = limit;
+    }
+  }
+  return changed;
+};
+
+const applyOutboundFriendReject = (state, entry) => {
+  const toId = asTrimmedString(entry.to_user_id);
+  if (!toId) return false;
+  if (!getUserConnection(state, toId)) return false;
+  removeFriendRelationshipData(state, toId);
+  return true;
+};
+
+const applyOutboundTransactionCreated = (state, entry) => {
+  const toId = asTrimmedString(entry.to_user_id);
+  if (!toId) return false;
+  const conn = getUserConnection(state, toId);
+  if (!conn || !isAcceptedFriendshipStatus(conn.friendship_status)) return false;
+
+  // Idempotent: skip if this transaction is already recorded.
+  const txId = asTrimmedString(entry.payload?.transaction_id) || asTrimmedString(entry.id);
+  if (
+    txId &&
+    Array.isArray(conn.recent_transactions) &&
+    conn.recent_transactions.some((tx) => tx.id === txId)
+  ) {
+    return false;
+  }
+
+  const amount = normalizeCurrencyAmount(entry.payload?.amount_eur, NaN);
+  if (!Number.isFinite(amount) || amount <= 0) return false;
+
+  const date = asTrimmedString(entry.payload?.date) || new Date().toISOString().slice(0, 10);
+  const note = asTrimmedString(entry.payload?.note) || "IOU sent";
+
+  if (!Array.isArray(conn.recent_transactions)) conn.recent_transactions = [];
+  conn.debt_eur = (conn.debt_eur || 0) - amount;
+  conn.recent_transactions.unshift(
+    createTransactionModel({ id: txId || createId("tx"), date, amount_eur: -amount, note })
+  );
+  return true;
+};
+
+const applyOutboundPaymentRequest = (state, entry) => {
+  const toId = asTrimmedString(entry.to_user_id);
+  if (!toId) return false;
+  const conn = getUserConnection(state, toId);
+  if (!conn || !isAcceptedFriendshipStatus(conn.friendship_status)) return false;
+  // Don't overwrite — a later payment_request_response may have cleared it.
+  if (conn.pending_payment_request) return false;
+
+  const amount = normalizeCurrencyAmount(entry.payload?.amount_eur, NaN);
+  if (!Number.isFinite(amount) || amount <= 0) return false;
+
+  conn.pending_payment_request = {
+    id: asTrimmedString(entry.payload?.request_id) || asTrimmedString(entry.id),
+    amount_eur: amount,
+    note: asTrimmedString(entry.payload?.note) || "",
+    is_incoming: false,
+    created_at: entry.originated_at || entry.timestamp || new Date().toISOString(),
+  };
+  return true;
+};
+
+const applyOutboundPaymentRequestResponse = (state, entry) => {
+  const toId = asTrimmedString(entry.to_user_id);
+  if (!toId) return false;
+  const conn = getUserConnection(state, toId);
+  if (!conn || conn.pending_payment_request === null) return false;
+  conn.pending_payment_request = null;
+  return true;
+};
+
+const applyOutboundCreditLimitSuggestion = (state, entry) => {
+  const toId = asTrimmedString(entry.to_user_id);
+  if (!toId) return false;
+  const conn = getUserConnection(state, toId);
+  if (!conn || !isPeerEligibleFriendshipStatus(conn.friendship_status)) return false;
+
+  const suggestedLimit = normalizeCurrencyAmount(entry.payload?.credit_limit_eur, NaN);
+  if (!Number.isFinite(suggestedLimit) || suggestedLimit < 0) return false;
+
+  const existingLimit = conn.trust_credit_limit_eur || 0;
+
+  // Acceptance echo: the outbound value matches a currently-incoming pending
+  // suggestion, meaning we accepted the peer's proposal on another device.
+  if (
+    conn.pending_credit_limit_is_incoming === true &&
+    conn.pending_credit_limit_eur === suggestedLimit
+  ) {
+    conn.trust_credit_limit_eur = suggestedLimit;
+    conn.pending_credit_limit_eur = null;
+    conn.pending_credit_limit_is_incoming = null;
+    return true;
+  }
+
+  if (existingLimit > 0 && suggestedLimit < existingLimit) {
+    // Lowering: apply immediately; peer auto-applies on receive.
+    conn.trust_credit_limit_eur = suggestedLimit;
+    conn.pending_credit_limit_eur = null;
+    conn.pending_credit_limit_is_incoming = null;
+  } else if (suggestedLimit === existingLimit) {
+    // Sending back current value = cancel or rejection echo; clear pending.
+    conn.pending_credit_limit_eur = null;
+    conn.pending_credit_limit_is_incoming = null;
+  } else {
+    // New or higher limit: wait for peer to agree.
+    conn.pending_credit_limit_eur = suggestedLimit;
+    conn.pending_credit_limit_is_incoming = false;
+  }
+  return true;
+};
+
+/**
+ * Apply an outbound ledger entry (authored by this user, sent to a peer) to
+ * local app state. The mutation is identical whether the entry was just
+ * created by a local command or arrived via self-mesh sync from another
+ * device. Returns true if state was mutated.
+ */
+export const routeOutboundEntry = (state, entry) => {
+  if (!entry || !state.user?.id) return false;
+  if (entry.from_user_id !== state.user.id) return false;
+  const toId = asTrimmedString(entry.to_user_id);
+  if (!toId || toId === state.user.id) return false;
+
+  switch (entry.type) {
+    case PEER_MESSAGE_TYPE_FRIEND_REQUEST:
+      return applyOutboundFriendRequest(state, entry);
+    case PEER_MESSAGE_TYPE_FRIEND_ACCEPT:
+      return applyOutboundFriendAccept(state, entry);
+    case PEER_MESSAGE_TYPE_FRIEND_REJECT:
+      return applyOutboundFriendReject(state, entry);
+    case PEER_MESSAGE_TYPE_TRANSACTION_CREATED:
+      return applyOutboundTransactionCreated(state, entry);
+    case PEER_MESSAGE_TYPE_PAYMENT_REQUEST:
+      return applyOutboundPaymentRequest(state, entry);
+    case PEER_MESSAGE_TYPE_PAYMENT_REQUEST_RESPONSE:
+      return applyOutboundPaymentRequestResponse(state, entry);
+    case PEER_MESSAGE_TYPE_TRUST_LIMIT_SUGGESTION:
+      return applyOutboundCreditLimitSuggestion(state, entry);
+    default:
+      return false;
+  }
+};

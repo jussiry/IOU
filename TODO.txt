@@ -30,3 +30,24 @@ Scratch book
 
 Security questions
 - what happens if malicious server sends "peer_connect" message for two peers to connect, that are not acutally friends?
+
+
+
+
+
+
+
+Could You Simplify?
+You could fall back to relay-only for important state and accept eventual consistency:
+
+Ledger entries always go to relays (authoritative history)
+Real-time balance updates via WebRTC if peer is online
+If WebRTC fails or doesn't come back after 30s, fall back to relay sync
+Then WebRTC becomes optional (a performance optimization), not critical. Failures wouldn't break the app, just make it slower.
+
+That would let you:
+
+*Rip out most of the wake-from-suspend logic*
+Accept that reconnects take 10-20s
+Not care about "stale green state" because relay sync is the real source of truth
+The UX would be: "friend appears online (relay + WebRTC) or offline (relay only, 1-2s latency)." Still feels good, no nightmare.

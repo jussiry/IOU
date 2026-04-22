@@ -3,12 +3,11 @@ IOU transaction command. Records that the user has taken on debt toward a
 friend (a "sent IOU"), updates the running debt balance, and propagates the
 transaction to the peer so both sides agree on the balance.
 
-Only `createTransaction` lives here for now — receiving a transaction is
-handled inbound by `peer/handlers.js`.
+State is mutated via routeOutboundEntry so the same logic runs whether the
+transaction was created on this device or received via self-mesh sync.
 */
 
 import {
-  createTransactionModel,
   normalizeCurrencyAmount,
 } from "../models/data-model.js";
 import { PEER_MESSAGE_TYPE_TRANSACTION_CREATED } from "../peer/messages.js";
@@ -22,6 +21,7 @@ import {
 import { queuePeerMessage } from "../peer/outbox.js";
 import { getDisplayName, getUserConnection } from "../connection-helpers.js";
 import { appendLedgerEntryFromMessage } from "../ledger.js";
+import { routeOutboundEntry } from "../peer/handlers.js";
 
 export const createTransaction = async ({ friendId, amount, message }) => {
   const normalizedFriendId = asTrimmedString(friendId);
@@ -41,22 +41,13 @@ export const createTransaction = async ({ friendId, amount, message }) => {
     return loadData();
   }
 
+  userConnection.person_name = displayName;
+
   const trimmedMessage = asTrimmedString(message);
   const timestamp = new Date();
   const date = timestamp.toISOString().slice(0, 10);
   const transactionId = createId("tx");
   const note = trimmedMessage.length ? trimmedMessage : "IOU sent";
-
-  userConnection.person_name = displayName;
-  userConnection.debt_eur = (userConnection.debt_eur || 0) - normalizedAmount;
-  userConnection.recent_transactions.unshift(
-    createTransactionModel({
-      id: transactionId,
-      date,
-      amount_eur: -normalizedAmount,
-      note,
-    })
-  );
 
   const txMsg = await queuePeerMessage(state, {
     toUserId: normalizedFriendId,
@@ -70,6 +61,7 @@ export const createTransaction = async ({ friendId, amount, message }) => {
     },
   });
   appendLedgerEntryFromMessage(state, txMsg);
+  routeOutboundEntry(state, txMsg);
 
   return persistAndBuildView(state);
 };

@@ -6,7 +6,8 @@ suggestion, and dismissing the "they lowered it" notification.
 The asymmetry between raising and lowering is load-bearing: lowering takes
 effect immediately (you can always reduce your own exposure), while raising
 requires the peer's agreement and sits in a pending state until they echo
-it back.
+it back. routeOutboundEntry encodes this logic so both this command path and
+the self-mesh sync path apply the same state transition.
 */
 
 import { normalizeCurrencyAmount } from "../models/data-model.js";
@@ -19,8 +20,9 @@ import {
   persistAndBuildView,
 } from "../app-state.js";
 import { queueTrustLimitSuggestion } from "../peer/outbox.js";
-import { getDisplayName, getUserConnection } from "../connection-helpers.js";
+import { getUserConnection } from "../connection-helpers.js";
 import { appendLedgerEntryFromMessage } from "../ledger.js";
+import { routeOutboundEntry } from "../peer/handlers.js";
 
 export const updateTrustLimit = async (friendId, trustLimit) => {
   const normalizedFriendId = asTrimmedString(friendId);
@@ -34,7 +36,6 @@ export const updateTrustLimit = async (friendId, trustLimit) => {
     return null;
   }
 
-  const displayName = getDisplayName(state, normalizedFriendId);
   const userConnection = getUserConnection(state, normalizedFriendId);
   if (!userConnection) {
     return loadData();
@@ -46,31 +47,14 @@ export const updateTrustLimit = async (friendId, trustLimit) => {
     return buildView(state);
   }
 
-  userConnection.person_name = displayName;
   const existingLimit = userConnection.trust_credit_limit_eur || 0;
-
   if (normalizedTrustLimit === existingLimit) {
     return buildView(state);
   }
 
-  if (existingLimit > 0 && normalizedTrustLimit < existingLimit) {
-    // Lowering existing limit: apply locally immediately, peer auto-applies on receive
-    userConnection.trust_credit_limit_eur = normalizedTrustLimit;
-    userConnection.pending_credit_limit_eur = null;
-    userConnection.pending_credit_limit_is_incoming = null;
-    if (isPeerEligibleFriendshipStatus(userConnection.friendship_status)) {
-      const msg = await queueTrustLimitSuggestion(state, normalizedFriendId, normalizedTrustLimit);
-      appendLedgerEntryFromMessage(state, msg);
-    }
-  } else {
-    // New or higher limit: don't apply locally yet, wait for peer to accept
-    userConnection.pending_credit_limit_eur = normalizedTrustLimit;
-    userConnection.pending_credit_limit_is_incoming = false;
-    if (isPeerEligibleFriendshipStatus(userConnection.friendship_status)) {
-      const msg = await queueTrustLimitSuggestion(state, normalizedFriendId, normalizedTrustLimit);
-      appendLedgerEntryFromMessage(state, msg);
-    }
-  }
+  const msg = await queueTrustLimitSuggestion(state, normalizedFriendId, normalizedTrustLimit);
+  appendLedgerEntryFromMessage(state, msg);
+  routeOutboundEntry(state, msg);
 
   return persistAndBuildView(state);
 };
@@ -93,21 +77,26 @@ export const respondToTrustLimitSuggestion = async (friendId, accepted) => {
 
   const pendingLimit = userConnection.pending_credit_limit_eur;
 
-  // On agree: apply the suggested limit. On disagree: keep current limit (sends it back so peer reverts).
+  // Apply state directly on this device first — the agreed/rejected limit must
+  // be set before the response message is created so the payload is correct.
+  // routeOutboundEntry applied to the same message is a no-op on this device
+  // (it sees the already-applied state) but correctly rehydrates the other device.
+  if (accepted) {
+    userConnection.trust_credit_limit_eur = pendingLimit;
+  }
+  userConnection.pending_credit_limit_eur = null;
+  userConnection.pending_credit_limit_is_incoming = null;
+
+  // On agree: echo the agreed limit so the peer applies it. On disagree: echo
+  // the current (unchanged) limit so the peer reverts their pending state.
   const responseLimit = accepted && Number.isFinite(pendingLimit) && pendingLimit >= 0
     ? pendingLimit
     : userConnection.trust_credit_limit_eur || 0;
 
-  if (accepted) {
-    userConnection.trust_credit_limit_eur = pendingLimit;
-  }
-
-  userConnection.pending_credit_limit_eur = null;
-  userConnection.pending_credit_limit_is_incoming = null;
-
   if (isPeerEligibleFriendshipStatus(userConnection.friendship_status)) {
     const msg = await queueTrustLimitSuggestion(state, normalizedFriendId, responseLimit);
     appendLedgerEntryFromMessage(state, msg);
+    routeOutboundEntry(state, msg);
   }
 
   return persistAndBuildView(state);
@@ -130,12 +119,11 @@ export const cancelTrustLimitSuggestion = async (friendId) => {
   }
 
   const currentLimit = userConnection.trust_credit_limit_eur || 0;
-  userConnection.pending_credit_limit_eur = null;
-  userConnection.pending_credit_limit_is_incoming = null;
 
   if (isPeerEligibleFriendshipStatus(userConnection.friendship_status)) {
     const msg = await queueTrustLimitSuggestion(state, normalizedFriendId, currentLimit);
     appendLedgerEntryFromMessage(state, msg);
+    routeOutboundEntry(state, msg);
   }
 
   return persistAndBuildView(state);

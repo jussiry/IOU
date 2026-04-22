@@ -2,11 +2,11 @@
 Friend lifecycle commands: sending and accepting requests, rejecting them,
 withdrawing outgoing ones.
 
-Each command follows the same shape — load state, validate, mutate the user's
-connection, queue a peer message, mirror it into the ledger, and persist.
-That shape is repeated by design: it's the only way a command mutates state,
-and keeping the boilerplate visible makes each command easy to audit against
-the others.
+Each command follows the same shape — load state, validate, queue a peer
+message, mirror it into the ledger, apply it via routeOutboundEntry, and
+persist. State mutations live exclusively in routeOutboundEntry so that
+the same logic runs whether the action originated on this device or arrived
+via self-mesh sync from another device.
 */
 
 import { normalizeCurrencyAmount } from "../models/data-model.js";
@@ -31,12 +31,12 @@ import {
 import { queuePeerMessage } from "../peer/outbox.js";
 import {
   cancelPendingFriendRequest,
-  ensureUserConnection,
   findConnection,
   getDisplayName,
   getUserConnection,
 } from "../connection-helpers.js";
 import { appendLedgerEntryFromMessage } from "../ledger.js";
+import { routeOutboundEntry } from "../peer/handlers.js";
 
 export const createFriend = async ({ friendId, trustLimit }) => {
   const normalizedFriendId = asTrimmedString(friendId);
@@ -51,22 +51,22 @@ export const createFriend = async ({ friendId, trustLimit }) => {
 
   const existingConnection = findConnection(state.user, normalizedFriendId);
   const existingStatus = existingConnection?.friendship_status || "";
-  const userConnection = ensureUserConnection(
-    state,
-    normalizedFriendId,
-    normalizedFriendId
-  );
-  if (!userConnection) {
-    return loadData();
+
+  if (existingStatus === FRIENDSHIP_STATUS_ACCEPTED) {
+    return persistAndBuildView(state);
   }
 
   const normalizedTrustLimit = normalizeCurrencyAmount(trustLimit, NaN);
-  if (Number.isFinite(normalizedTrustLimit) && normalizedTrustLimit >= 0) {
-    userConnection.trust_credit_limit_eur = normalizedTrustLimit;
-  }
 
   if (existingStatus === FRIENDSHIP_STATUS_PENDING_INCOMING) {
-    userConnection.friendship_status = FRIENDSHIP_STATUS_ACCEPTED;
+    // Cross-request: the peer already sent us a request; auto-accept.
+    // Trust limit must be written on the connection before the accept message
+    // is created so the payload carries the correct agreed value.
+    const userConnection = getUserConnection(state, normalizedFriendId);
+    if (!userConnection) return loadData();
+    if (Number.isFinite(normalizedTrustLimit) && normalizedTrustLimit >= 0) {
+      userConnection.trust_credit_limit_eur = normalizedTrustLimit;
+    }
     const acceptMsg = await queuePeerMessage(state, {
       toUserId: normalizedFriendId,
       type: PEER_MESSAGE_TYPE_FRIEND_ACCEPT,
@@ -76,14 +76,11 @@ export const createFriend = async ({ friendId, trustLimit }) => {
       },
     });
     appendLedgerEntryFromMessage(state, acceptMsg);
+    routeOutboundEntry(state, acceptMsg);
     return persistAndBuildView(state);
   }
 
-  if (existingStatus === FRIENDSHIP_STATUS_ACCEPTED) {
-    return persistAndBuildView(state);
-  }
-
-  userConnection.friendship_status = FRIENDSHIP_STATUS_PENDING_OUTGOING;
+  // New outgoing friend request.
   const requestMsg = await queuePeerMessage(state, {
     toUserId: normalizedFriendId,
     type: PEER_MESSAGE_TYPE_FRIEND_REQUEST,
@@ -96,6 +93,7 @@ export const createFriend = async ({ friendId, trustLimit }) => {
     },
   });
   appendLedgerEntryFromMessage(state, requestMsg);
+  routeOutboundEntry(state, requestMsg);
   return persistAndBuildView(state);
 };
 
@@ -110,7 +108,6 @@ export const acceptFriend = async (friendId) => {
     return null;
   }
 
-  const displayName = getDisplayName(state, normalizedFriendId);
   const userConnection = getUserConnection(state, normalizedFriendId);
   if (!userConnection) {
     return loadData();
@@ -122,8 +119,6 @@ export const acceptFriend = async (friendId) => {
     return buildView(state);
   }
 
-  userConnection.friendship_status = FRIENDSHIP_STATUS_ACCEPTED;
-  userConnection.person_name = displayName;
   const acceptMsg = await queuePeerMessage(state, {
     toUserId: normalizedFriendId,
     type: PEER_MESSAGE_TYPE_FRIEND_ACCEPT,
@@ -133,6 +128,7 @@ export const acceptFriend = async (friendId) => {
     },
   });
   appendLedgerEntryFromMessage(state, acceptMsg);
+  routeOutboundEntry(state, acceptMsg);
 
   return persistAndBuildView(state);
 };

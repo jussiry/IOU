@@ -30,6 +30,7 @@ import { findConnection, syncUserNameAcrossContacts } from "../connection-helper
 import {
   createInboundProcessingResult,
   routeInboundMessage,
+  routeOutboundEntry,
 } from "./handlers.js";
 import { mergeSyncedLedgerEntries } from "../ledger.js";
 import { showNotification } from "../ui/notifications.js";
@@ -87,6 +88,86 @@ export const addLedgerEntries = async (entries) => {
     await persistAndBuildView(state);
   }
   return added;
+};
+
+// Like addLedgerEntries, but also applies outbound entries to user-connection
+// state via routeOutboundEntry. This is the unified pipeline: the same state
+// transition runs whether the entry was created by a local command or received
+// via self-mesh sync from another device.
+//
+// Entries must be pre-sorted chronologically by the caller so causal
+// dependencies (e.g. friend_request before friend_accept) are honoured.
+export const addOutboundLedgerEntries = async (entries) => {
+  if (!Array.isArray(entries) || entries.length === 0) return 0;
+
+  const state = await loadState();
+  if (!hasUser(state)) return 0;
+
+  const added = await mergeSyncedLedgerEntries(state, entries);
+
+  // Apply every entry regardless of whether it was newly added — the
+  // connection record may be missing even if the ledger entry was already
+  // stored (e.g. a previous sync that crashed before persisting contacts).
+  let stateChanged = added;
+  for (const entry of entries) {
+    if (routeOutboundEntry(state, entry)) stateChanged += 1;
+  }
+
+  if (stateChanged > 0) {
+    await persistAndBuildView(state);
+  }
+  return added;
+};
+
+// The localStorage key and version that tracks whether the one-time ledger
+// migration has been run on this device. Bump LEDGER_MIGRATION_VERSION
+// whenever a future change requires a full ledger replay.
+const LEDGER_MIGRATION_KEY = "iou_ledger_migration_v";
+const LEDGER_MIGRATION_VERSION = 1;
+
+// Run the full ledger repair exactly once per device, the first time this
+// version of the app starts. On all subsequent starts the localStorage flag
+// is set and this is a cheap no-op. Bump LEDGER_MIGRATION_VERSION to
+// re-trigger for future migrations.
+export const runLedgerMigrationIfNeeded = async () => {
+  try {
+    const stored = parseInt(localStorage.getItem(LEDGER_MIGRATION_KEY) || "0", 10);
+    if (stored >= LEDGER_MIGRATION_VERSION) return;
+    await repairConnectionsFromLedger();
+    localStorage.setItem(LEDGER_MIGRATION_KEY, String(LEDGER_MIGRATION_VERSION));
+  } catch {
+    // Non-fatal — if localStorage is unavailable the repair still ran; the
+    // flag just won't persist, so it will run again next startup (acceptable).
+  }
+};
+
+// Scans the full persisted ledger for outbound entries and re-applies them
+// via routeOutboundEntry. Normally called only via runLedgerMigrationIfNeeded.
+// Can also be triggered explicitly for corrupted-state recovery.
+export const repairConnectionsFromLedger = async () => {
+  const state = await loadState();
+  if (!hasUser(state)) return;
+
+  const myId = state.user.id;
+  const ledger = Array.isArray(state.ledger) ? state.ledger : [];
+
+  // Sort ascending so causal dependencies are processed first.
+  const outboundEntries = ledger
+    .filter((e) => e.from_user_id === myId && e.to_user_id && e.to_user_id !== myId)
+    .sort((a, b) => {
+      const aTs = a.originated_at || a.timestamp || "";
+      const bTs = b.originated_at || b.timestamp || "";
+      return aTs < bTs ? -1 : aTs > bTs ? 1 : 0;
+    });
+
+  let changed = 0;
+  for (const entry of outboundEntries) {
+    if (routeOutboundEntry(state, entry)) changed += 1;
+  }
+
+  if (changed > 0) {
+    await persistAndBuildView(state);
+  }
 };
 
 export const updateLastSyncedAt = async (peerId) => {

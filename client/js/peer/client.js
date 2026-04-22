@@ -32,10 +32,12 @@ session and never need to be forwarded by the server.
 
 import {
   addLedgerEntries,
+  addOutboundLedgerEntries,
   applyInboundPeerMessage,
   applyOwnNameFromLedger,
   getRealtimeSnapshot,
   markPeerMessageReceived,
+  runLedgerMigrationIfNeeded,
   updateLastSyncedAt,
 } from "./bridge.js";
 import { subscribeToDataChanges } from "../app-state.js";
@@ -224,11 +226,13 @@ const createRealtimeClient = () => {
 
     // Replay chronologically: a later tx_created can only apply after an
     // earlier friend_accept has re-created the connection during recovery.
-    inboundLike.sort((a, b) => {
-      const aTs = a.timestamp || "";
-      const bTs = b.timestamp || "";
+    const byOrigin = (a, b) => {
+      const aTs = a.originated_at || a.timestamp || "";
+      const bTs = b.originated_at || b.timestamp || "";
       return aTs < bTs ? -1 : aTs > bTs ? 1 : 0;
-    });
+    };
+    inboundLike.sort(byOrigin);
+    outboundOnly.sort(byOrigin);
 
     logRealtimeEvent(
       `Received sync_data (${scope}): ${entries.length} entries — ${inboundLike.length} inbound, ${outboundOnly.length} outbound, ${selfAddressed.length} self`
@@ -261,7 +265,7 @@ const createRealtimeClient = () => {
       outboundOnly.forEach((entry) => {
         if (entry?.id) broadcastedLedgerIds.add(entry.id);
       });
-      await addLedgerEntries(outboundOnly);
+      await addOutboundLedgerEntries(outboundOnly);
     }
     if (selfAddressed.length > 0) {
       selfAddressed.forEach((entry) => {
@@ -640,25 +644,22 @@ const createRealtimeClient = () => {
     innerMessage,
     { receiptChannelPeerKey, scope = SCOPE_FRIEND, peerKey, peerUserId } = {}
   ) => {
-    if (innerMessage.type === PEER_MESSAGE_TYPE_RECEIVED) {
-      await handleReceiptMessage(innerMessage);
-      return;
-    }
-
-    if (innerMessage.type === PEER_MESSAGE_TYPE_SYNC_HELLO) {
-      await handleSyncHello(peerKey, innerMessage.payload, {
-        scope,
-        peerUserId: peerUserId || innerMessage.from_user_id,
-      });
-      return;
-    }
-
-    if (innerMessage.type === PEER_MESSAGE_TYPE_SYNC_DATA) {
-      await handleSyncData(peerKey, innerMessage.payload, {
-        scope,
-        peerUserId: peerUserId || innerMessage.from_user_id,
-      });
-      return;
+    switch (innerMessage.type) {
+      case PEER_MESSAGE_TYPE_RECEIVED:
+        await handleReceiptMessage(innerMessage);
+        return;
+      case PEER_MESSAGE_TYPE_SYNC_HELLO:
+        await handleSyncHello(peerKey, innerMessage.payload, {
+          scope,
+          peerUserId: peerUserId || innerMessage.from_user_id,
+        });
+        return;
+      case PEER_MESSAGE_TYPE_SYNC_DATA:
+        await handleSyncData(peerKey, innerMessage.payload, {
+          scope,
+          peerUserId: peerUserId || innerMessage.from_user_id,
+        });
+        return;
     }
 
     const processingResult = await applyInboundPeerMessage(innerMessage);
@@ -680,33 +681,32 @@ const createRealtimeClient = () => {
       return;
     }
 
-    if (message.type === PEER_MESSAGE_TYPE_PING) {
-      logRealtimeEvent(`Ping received (${scope})`);
-      const mesh = scope === SCOPE_SELF ? selfMesh : peerMesh;
-      mesh.sendControlMessage(peerKey, {
-        type: PEER_MESSAGE_TYPE_PONG,
-        timestamp: message.timestamp,
-      });
-      return;
-    }
-
-    if (message.type === PEER_MESSAGE_TYPE_PONG) {
-      const sentAt = message.timestamp;
-      const roundTripMs = sentAt ? Date.now() - sentAt : null;
-      logRealtimeEvent(`Pong received (${scope}, ${roundTripMs}ms RTT)`);
-      const resolve = pendingPings.get(peerKey);
-      if (resolve) {
-        pendingPings.delete(peerKey);
-        resolve(roundTripMs);
+    switch (message.type) {
+      case PEER_MESSAGE_TYPE_PING: {
+        logRealtimeEvent(`Ping received (${scope})`);
+        const mesh = scope === SCOPE_SELF ? selfMesh : peerMesh;
+        mesh.sendControlMessage(peerKey, {
+          type: PEER_MESSAGE_TYPE_PONG,
+          timestamp: message.timestamp,
+        });
+        return;
       }
-      return;
-    }
-
-    if (message.type === PEER_MESSAGE_TYPE_RECEIVED) {
-      // Plaintext receipt over WebRTC — used as the fast path when both peers
-      // have a live data channel. Same handling as a server-delivered receipt.
-      await handleReceiptMessage(message);
-      return;
+      case PEER_MESSAGE_TYPE_PONG: {
+        const sentAt = message.timestamp;
+        const roundTripMs = sentAt ? Date.now() - sentAt : null;
+        logRealtimeEvent(`Pong received (${scope}, ${roundTripMs}ms RTT)`);
+        const resolve = pendingPings.get(peerKey);
+        if (resolve) {
+          pendingPings.delete(peerKey);
+          resolve(roundTripMs);
+        }
+        return;
+      }
+      case PEER_MESSAGE_TYPE_RECEIVED:
+        // Plaintext receipt over WebRTC — used as the fast path when both peers
+        // have a live data channel. Same handling as a server-delivered receipt.
+        await handleReceiptMessage(message);
+        return;
     }
 
     if (!isPeerEnvelope(message)) {
@@ -774,7 +774,10 @@ const createRealtimeClient = () => {
     void syncRealtimeState();
   });
 
-  void syncRealtimeState();
+  // Run the one-time ledger migration (no-op after the first deployment).
+  // Must complete before the initial snapshot so repaired connections are
+  // visible to the signaling layer immediately.
+  void runLedgerMigrationIfNeeded().then(() => syncRealtimeState());
 
   const ping = (nameOrKey) => {
     if (!nameOrKey || !currentSnapshot) {

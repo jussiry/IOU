@@ -6,10 +6,12 @@ When a friend accepts a request, this module also creates the mirroring
 IOU transaction locally — the acceptance is equivalent to the friend
 sending us an IOU, so we materialize that transaction in the same tick so
 balances stay consistent.
+
+State mutations go through routeOutboundEntry so the same logic runs
+whether the action happened on this device or synced from another device.
 */
 
 import {
-  createTransactionModel,
   normalizeCurrencyAmount,
 } from "../models/data-model.js";
 import {
@@ -25,8 +27,9 @@ import {
   persistAndBuildView,
 } from "../app-state.js";
 import { queuePeerMessage } from "../peer/outbox.js";
-import { getDisplayName, getUserConnection } from "../connection-helpers.js";
+import { getUserConnection } from "../connection-helpers.js";
 import { appendLedgerEntryFromMessage } from "../ledger.js";
+import { routeOutboundEntry } from "../peer/handlers.js";
 
 export const requestPayment = async ({ friendId, amount, message }) => {
   const normalizedFriendId = asTrimmedString(friendId);
@@ -48,14 +51,6 @@ export const requestPayment = async ({ friendId, amount, message }) => {
   const trimmedMessage = asTrimmedString(message);
   const requestId = createId("pr");
 
-  userConnection.pending_payment_request = {
-    id: requestId,
-    amount_eur: normalizedAmount,
-    note: trimmedMessage || "",
-    is_incoming: false,
-    created_at: new Date().toISOString(),
-  };
-
   const prMsg = await queuePeerMessage(state, {
     toUserId: normalizedFriendId,
     type: PEER_MESSAGE_TYPE_PAYMENT_REQUEST,
@@ -66,6 +61,7 @@ export const requestPayment = async ({ friendId, amount, message }) => {
     },
   });
   appendLedgerEntryFromMessage(state, prMsg);
+  routeOutboundEntry(state, prMsg);
 
   return persistAndBuildView(state);
 };
@@ -95,8 +91,6 @@ export const respondToPaymentRequest = async (friendId, accepted) => {
   const requestAmount = pendingRequest.amount_eur;
   const requestNote = pendingRequest.note;
 
-  userConnection.pending_payment_request = null;
-
   const responseMsg = await queuePeerMessage(state, {
     toUserId: normalizedFriendId,
     type: PEER_MESSAGE_TYPE_PAYMENT_REQUEST_RESPONSE,
@@ -106,22 +100,12 @@ export const respondToPaymentRequest = async (friendId, accepted) => {
     },
   });
   appendLedgerEntryFromMessage(state, responseMsg);
+  routeOutboundEntry(state, responseMsg);
 
   if (accepted) {
-    // Create the transaction as if the user sent an IOU
     const transactionId = createId("tx");
     const date = new Date().toISOString().slice(0, 10);
     const note = requestNote || "Payment request accepted";
-
-    userConnection.debt_eur = (userConnection.debt_eur || 0) - requestAmount;
-    userConnection.recent_transactions.unshift(
-      createTransactionModel({
-        id: transactionId,
-        date,
-        amount_eur: -requestAmount,
-        note,
-      })
-    );
 
     const txMsg = await queuePeerMessage(state, {
       toUserId: normalizedFriendId,
@@ -135,6 +119,7 @@ export const respondToPaymentRequest = async (friendId, accepted) => {
       },
     });
     appendLedgerEntryFromMessage(state, txMsg);
+    routeOutboundEntry(state, txMsg);
   }
 
   return persistAndBuildView(state);
