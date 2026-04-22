@@ -31,10 +31,10 @@ import {
 import { queuePeerMessage } from "../peer/outbox.js";
 import {
   cancelPendingFriendRequest,
-  findConnection,
+  findFriend,
   getDisplayName,
-  getUserConnection,
-} from "../connection-helpers.js";
+  getFriend,
+} from "../friends-helpers.js";
 import { appendLedgerEntryFromMessage } from "../ledger.js";
 import { routeOutboundEntry } from "../peer/handlers.js";
 
@@ -49,8 +49,8 @@ export const createFriend = async ({ friendId, trustLimit }) => {
     return null;
   }
 
-  const existingConnection = findConnection(state.user, normalizedFriendId);
-  const existingStatus = existingConnection?.friendship_status || "";
+  const existingFriend = findFriend(state.user, normalizedFriendId);
+  const existingStatus = existingFriend?.friendship_status || "";
 
   if (existingStatus === FRIENDSHIP_STATUS_ACCEPTED) {
     return persistAndBuildView(state);
@@ -60,19 +60,19 @@ export const createFriend = async ({ friendId, trustLimit }) => {
 
   if (existingStatus === FRIENDSHIP_STATUS_PENDING_INCOMING) {
     // Cross-request: the peer already sent us a request; auto-accept.
-    // Trust limit must be written on the connection before the accept message
+    // Trust limit must be written on the friend before the accept message
     // is created so the payload carries the correct agreed value.
-    const userConnection = getUserConnection(state, normalizedFriendId);
-    if (!userConnection) return loadData();
+    const friend = getFriend(state, normalizedFriendId);
+    if (!friend) return loadData();
     if (Number.isFinite(normalizedTrustLimit) && normalizedTrustLimit >= 0) {
-      userConnection.trust_credit_limit_eur = normalizedTrustLimit;
+      friend.trust_credit_limit_eur = normalizedTrustLimit;
     }
     const acceptMsg = await queuePeerMessage(state, {
       toUserId: normalizedFriendId,
       type: PEER_MESSAGE_TYPE_FRIEND_ACCEPT,
       payload: {
         accepter_name: state.user.name,
-        trust_credit_limit_eur: userConnection.trust_credit_limit_eur || 0,
+        trust_credit_limit_eur: friend.trust_credit_limit_eur || 0,
       },
     });
     appendLedgerEntryFromMessage(state, acceptMsg);
@@ -108,14 +108,14 @@ export const acceptFriend = async (friendId) => {
     return null;
   }
 
-  const userConnection = getUserConnection(state, normalizedFriendId);
-  if (!userConnection) {
+  const friend = getFriend(state, normalizedFriendId);
+  if (!friend) {
     return loadData();
   }
-  if (isAcceptedFriendshipStatus(userConnection.friendship_status)) {
+  if (isAcceptedFriendshipStatus(friend.friendship_status)) {
     return buildView(state);
   }
-  if (userConnection.friendship_status !== FRIENDSHIP_STATUS_PENDING_INCOMING) {
+  if (friend.friendship_status !== FRIENDSHIP_STATUS_PENDING_INCOMING) {
     return buildView(state);
   }
 
@@ -124,7 +124,7 @@ export const acceptFriend = async (friendId) => {
     type: PEER_MESSAGE_TYPE_FRIEND_ACCEPT,
     payload: {
       accepter_name: state.user.name,
-      trust_credit_limit_eur: userConnection.trust_credit_limit_eur || 0,
+      trust_credit_limit_eur: friend.trust_credit_limit_eur || 0,
     },
   });
   appendLedgerEntryFromMessage(state, acceptMsg);
@@ -145,14 +145,14 @@ export const rejectFriend = async (friendId) => {
   }
 
   const displayName = getDisplayName(state, normalizedFriendId);
-  const userConnection = getUserConnection(state, normalizedFriendId);
-  if (!userConnection) {
+  const friend = getFriend(state, normalizedFriendId);
+  if (!friend) {
     return loadData();
   }
-  if (userConnection.friendship_status === FRIENDSHIP_STATUS_REJECTED) {
+  if (friend.friendship_status === FRIENDSHIP_STATUS_REJECTED) {
     return buildView(state);
   }
-  if (userConnection.friendship_status !== FRIENDSHIP_STATUS_PENDING_INCOMING) {
+  if (friend.friendship_status !== FRIENDSHIP_STATUS_PENDING_INCOMING) {
     return buildView(state);
   }
 
@@ -177,11 +177,11 @@ export const removeFriendRequest = async (friendId) => {
   }
 
   const displayName = getDisplayName(state, normalizedFriendId);
-  const userConnection = getUserConnection(state, normalizedFriendId);
-  if (!userConnection) {
+  const friend = getFriend(state, normalizedFriendId);
+  if (!friend) {
     return loadData();
   }
-  if (userConnection.friendship_status !== FRIENDSHIP_STATUS_PENDING_OUTGOING) {
+  if (friend.friendship_status !== FRIENDSHIP_STATUS_PENDING_OUTGOING) {
     return buildView(state);
   }
 

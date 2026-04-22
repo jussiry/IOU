@@ -74,7 +74,7 @@ const buildAliceState = () => {
       public_key_hex: ALICE.publicKeyHex,
       private_key: ALICE.privateKeyNsec,
       private_key_hex: ALICE.privateKeyHex,
-      connections: [
+      friends: [
         {
           person_id: BOB.publicKeyNpub,
           person_name: BOB.name,
@@ -128,7 +128,7 @@ const buildBobState = () => {
       public_key_hex: BOB.publicKeyHex,
       private_key: BOB.privateKeyNsec,
       private_key_hex: BOB.privateKeyHex,
-      connections: [
+      friends: [
         {
           person_id: ALICE.publicKeyNpub,
           person_name: ALICE.name,
@@ -174,7 +174,7 @@ const buildCarolState = () => {
       public_key_hex: CAROL.publicKeyHex,
       private_key: CAROL.privateKeyNsec,
       private_key_hex: CAROL.privateKeyHex,
-      connections: [
+      friends: [
         {
           person_id: ALICE.publicKeyNpub,
           person_name: ALICE.name,

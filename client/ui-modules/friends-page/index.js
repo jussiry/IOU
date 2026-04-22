@@ -29,41 +29,41 @@ const FRIENDSHIP_SORT_ORDER = {
   [FRIENDSHIP_STATUS_REJECTED]: 3,
 };
 
-const compareFriendNames = (leftConnection, rightConnection) => {
-  const leftName = leftConnection.person_name || leftConnection.person_id || "";
-  const rightName = rightConnection.person_name || rightConnection.person_id || "";
+const compareFriendNames = (leftFriend, rightFriend) => {
+  const leftName = leftFriend.person_name || leftFriend.person_id || "";
+  const rightName = rightFriend.person_name || rightFriend.person_id || "";
   return leftName.localeCompare(rightName);
 };
 
-const getFriendSortWeight = (connection) => {
-  return FRIENDSHIP_SORT_ORDER[connection.friendship_status] ?? 99;
+const getFriendSortWeight = (friend) => {
+  return FRIENDSHIP_SORT_ORDER[friend.friendship_status] ?? 99;
 };
 
-const getPendingTrustLimit = (connection) => {
+const getPendingTrustLimit = (friend) => {
   if (
-    connection.friendship_status === FRIENDSHIP_STATUS_PENDING_INCOMING ||
-    connection.friendship_status === FRIENDSHIP_STATUS_PENDING_OUTGOING
+    friend.friendship_status === FRIENDSHIP_STATUS_PENDING_INCOMING ||
+    friend.friendship_status === FRIENDSHIP_STATUS_PENDING_OUTGOING
   ) {
-    return connection.trust_credit_limit_eur || 0;
+    return friend.trust_credit_limit_eur || 0;
   }
   return 0;
 };
 
-const getFriendRowState = (connection) => {
-  if (isAcceptedFriendshipStatus(connection.friendship_status)) {
-    const debtValue = connection.debt_eur || 0;
+const getFriendRowState = (friend) => {
+  if (isAcceptedFriendshipStatus(friend.friendship_status)) {
+    const debtValue = friend.debt_eur || 0;
     return {
       badge: debtValue >= 0 ? "owes you" : "you owe",
       amountHtml: formatDebtWithLimit(
         debtValue,
-        connection.trust_credit_limit_eur
+        friend.trust_credit_limit_eur
       ),
       amountClassName: debtValue >= 0 ? "pos" : "neg",
     };
   }
 
-  if (connection.friendship_status === FRIENDSHIP_STATUS_PENDING_INCOMING) {
-    const suggestedTrustLimit = getPendingTrustLimit(connection);
+  if (friend.friendship_status === FRIENDSHIP_STATUS_PENDING_INCOMING) {
+    const suggestedTrustLimit = getPendingTrustLimit(friend);
     return {
       badge: "incoming",
       amountHtml:
@@ -74,8 +74,8 @@ const getFriendRowState = (connection) => {
     };
   }
 
-  if (connection.friendship_status === FRIENDSHIP_STATUS_PENDING_OUTGOING) {
-    const suggestedTrustLimit = getPendingTrustLimit(connection);
+  if (friend.friendship_status === FRIENDSHIP_STATUS_PENDING_OUTGOING) {
+    const suggestedTrustLimit = getPendingTrustLimit(friend);
     return {
       badge: "pending",
       amountHtml:
@@ -86,7 +86,7 @@ const getFriendRowState = (connection) => {
     };
   }
 
-  if (connection.friendship_status === FRIENDSHIP_STATUS_REJECTED) {
+  if (friend.friendship_status === FRIENDSHIP_STATUS_REJECTED) {
     return {
       badge: "rejected",
       amountHtml: "",
@@ -228,47 +228,47 @@ export const bindFriends = (root, data) => {
     const cancelInitialSync = scheduleAfterLayout(syncAddFriendButton);
   }
 
-  const sortedConnections = [...data.connections].sort((leftConnection, rightConnection) => {
+  const sortedFriends = [...data.friends].sort((leftFriend, rightFriend) => {
     const sortWeightDifference =
-      getFriendSortWeight(leftConnection) - getFriendSortWeight(rightConnection);
+      getFriendSortWeight(leftFriend) - getFriendSortWeight(rightFriend);
     if (sortWeightDifference !== 0) {
       return sortWeightDifference;
     }
 
     if (
-      isAcceptedFriendshipStatus(leftConnection.friendship_status) &&
-      isAcceptedFriendshipStatus(rightConnection.friendship_status)
+      isAcceptedFriendshipStatus(leftFriend.friendship_status) &&
+      isAcceptedFriendshipStatus(rightFriend.friendship_status)
     ) {
       const debtDifference =
-        Math.abs(rightConnection.debt_eur || 0) - Math.abs(leftConnection.debt_eur || 0);
+        Math.abs(rightFriend.debt_eur || 0) - Math.abs(leftFriend.debt_eur || 0);
       if (debtDifference !== 0) {
         return debtDifference;
       }
     }
 
-    return compareFriendNames(leftConnection, rightConnection);
+    return compareFriendNames(leftFriend, rightFriend);
   });
 
-  sortedConnections.forEach((connection) => {
+  sortedFriends.forEach((friend) => {
     const node = friendTemplate.content.firstElementChild.cloneNode(true);
     const nameEl = node.querySelector('[data-bind="name"]');
     const badgeEl = node.querySelector('[data-bind="badge"]');
     const amountEl = node.querySelector('[data-bind="amount"]');
     const iconEl = node.querySelector('[data-bind="friend-icon"]');
     const actionDotEl = node.querySelector('[data-bind="action-dot"]');
-    const rowState = getFriendRowState(connection);
+    const rowState = getFriendRowState(friend);
     node.addEventListener("click", () => {
-      window.location.hash = `friend/${connection.person_id}`;
+      window.location.hash = `friend/${friend.person_id}`;
     });
-    if (nameEl) nameEl.textContent = connection.person_name || connection.person_id;
+    if (nameEl) nameEl.textContent = friend.person_name || friend.person_id;
     if (iconEl) {
-      const isOnline = connectedPeerIds.has(connection.person_id);
-      const isRelay = !isOnline && serverPresentPeerIds.has(connection.person_id);
+      const isOnline = connectedPeerIds.has(friend.person_id);
+      const isRelay = !isOnline && serverPresentPeerIds.has(friend.person_id);
       iconEl.classList.toggle("friend-icon--online", isOnline);
       iconEl.classList.toggle("friend-icon--relay", isRelay);
     }
     if (actionDotEl) {
-      actionDotEl.hidden = !hasActionableNotification(connection);
+      actionDotEl.hidden = !hasActionableNotification(friend);
     }
     if (badgeEl) badgeEl.textContent = rowState.badge;
     if (amountEl) {

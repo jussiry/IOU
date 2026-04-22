@@ -2,7 +2,7 @@
 Shared state utilities used across the data layer modules.
 
 These small helpers are extracted to avoid circular dependencies between
-app-state.js, peer/outbox.js, connection-helpers.js, and peer/handlers.js.
+app-state.js, peer/outbox.js, friends-helpers.js, and peer/handlers.js.
 Ledger-specific helpers live in `ledger.js`.
 */
 

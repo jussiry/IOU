@@ -10,9 +10,9 @@ export const bindTrust = (root, data, friendId) => {
   const submitEl = root.querySelector('[data-bind="trust-submit"]');
   const submitLabelEl = root.querySelector('[data-bind="trust-submit-label"]');
 
-  const connection = data.connections.find((entry) => entry.person_id === friendId);
-  const friendName = connection?.person_name || "Friend";
-  const trustLimit = connection?.trust_credit_limit_eur ?? 0;
+  const friend = data.friends.find((entry) => entry.person_id === friendId);
+  const friendName = friend?.person_name || "Friend";
+  const trustLimit = friend?.trust_credit_limit_eur ?? 0;
   const hasAgreement = trustLimit > 0;
 
   if (titleEl) {

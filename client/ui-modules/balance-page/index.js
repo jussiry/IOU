@@ -121,16 +121,16 @@ export const bindBalance = (root, data) => {
     data.totals.availableTrust
   );
 
-  const acceptedConnections = data.connections.filter((connection) =>
-    isAcceptedFriendshipStatus(connection.friendship_status)
+  const acceptedFriends = data.friends.filter((friend) =>
+    isAcceptedFriendshipStatus(friend.friendship_status)
   );
 
-  const friendsOwe = acceptedConnections
-    .filter((connection) => connection.debt_eur > 0)
+  const friendsOwe = acceptedFriends
+    .filter((friend) => friend.debt_eur > 0)
     .sort((a, b) => b.debt_eur - a.debt_eur);
 
-  const youOwe = acceptedConnections
-    .filter((connection) => connection.debt_eur < 0)
+  const youOwe = acceptedFriends
+    .filter((friend) => friend.debt_eur < 0)
     .sort((a, b) => Math.abs(b.debt_eur) - Math.abs(a.debt_eur));
 
   renderInlineList(root, friendsOwe, {
@@ -146,8 +146,8 @@ export const bindBalance = (root, data) => {
     skipSignClass: true,
   });
 
-  const trustAgreements = acceptedConnections
-    .filter((connection) => (connection.trust_credit_limit_eur || 0) > 0)
+  const trustAgreements = acceptedFriends
+    .filter((friend) => (friend.trust_credit_limit_eur || 0) > 0)
     .sort((a, b) => b.trust_credit_limit_eur - a.trust_credit_limit_eur);
 
   renderInlineList(

@@ -8,9 +8,9 @@ import { hasActionableNotification } from "../utils/friendships.js";
 
 const getActionableCountsByPage = (data) => {
   const counts = {};
-  if (!data?.connections) return counts;
+  if (!data?.friends) return counts;
 
-  const friendsCount = data.connections.filter(hasActionableNotification).length;
+  const friendsCount = data.friends.filter(hasActionableNotification).length;
   if (friendsCount > 0) counts.friends = friendsCount;
 
   return counts;

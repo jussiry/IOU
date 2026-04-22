@@ -65,17 +65,17 @@ export const bindSettings = (root, data, appVersion) => {
   const removeUserButton = root.querySelector('[data-action="remove-user"]');
   if (!removeUserButton) return;
   removeUserButton.addEventListener("click", async () => {
-    const connections = Array.isArray(data?.connections) ? data.connections : [];
-    const unresolvedDebts = connections.filter(
-      (c) => isAcceptedFriendshipStatus(c.friendship_status) && c.debt_eur !== 0
+    const friends = Array.isArray(data?.friends) ? data.friends : [];
+    const unresolvedDebts = friends.filter(
+      (friend) => isAcceptedFriendshipStatus(friend.friendship_status) && friend.debt_eur !== 0
     );
 
     let debtWarning = "";
     if (unresolvedDebts.length > 0) {
-      const lines = unresolvedDebts.map((c) => {
-        const amount = formatCurrency(c.debt_eur);
-        const direction = c.debt_eur > 0 ? `owes you ${amount}` : `you owe ${amount}`;
-        return `• ${c.person_name}: ${direction}`;
+      const lines = unresolvedDebts.map((friend) => {
+        const amount = formatCurrency(friend.debt_eur);
+        const direction = friend.debt_eur > 0 ? `owes you ${amount}` : `you owe ${amount}`;
+        return `• ${friend.person_name}: ${direction}`;
       });
       debtWarning = `\n\nUnresolved debts:\n${lines.join("\n")}\n`;
     }

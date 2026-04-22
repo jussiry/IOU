@@ -61,10 +61,10 @@ export const bindFriendDetail = (root, data, friendId) => {
   const syncTimeEl = root.querySelector('[data-bind="sync-time"]');
   const friendKeyLabelEl = root.querySelector('[data-bind="friend-key-label"]');
 
-  const connection = data.connections.find((entry) => entry.person_id === friendId);
-  const friendName = connection?.person_name || "Friend";
+  const friend = data.friends.find((entry) => entry.person_id === friendId);
+  const friendName = friend?.person_name || "Friend";
   const friendFirstName = friendName.split(/\s+/)[0] || friendName;
-  const friendshipStatus = connection?.friendship_status || FRIENDSHIP_STATUS_ACCEPTED;
+  const friendshipStatus = friend?.friendship_status || FRIENDSHIP_STATUS_ACCEPTED;
   const isOnline = getConnectedPeerIds().includes(friendId);
   const isRelay = !isOnline && getServerPresentPeerIds().includes(friendId);
 
@@ -80,8 +80,8 @@ export const bindFriendDetail = (root, data, friendId) => {
   if (friendKeyLabelEl) friendKeyLabelEl.textContent = `${friendFirstName}'s key`;
 
   if (syncInfoEl && syncTimeEl) {
-    if (connection?.last_synced_at) {
-      const syncDate = new Date(connection.last_synced_at);
+    if (friend?.last_synced_at) {
+      const syncDate = new Date(friend.last_synced_at);
       if (!Number.isNaN(syncDate.getTime())) {
         const now = new Date();
         const diffMs = now - syncDate;
@@ -146,7 +146,7 @@ export const bindFriendDetail = (root, data, friendId) => {
         : "Trust limit";
   }
   if (trustAmountEl) {
-    const trustLimit = connection?.trust_credit_limit_eur ?? 0;
+    const trustLimit = friend?.trust_credit_limit_eur ?? 0;
     trustAmountEl.textContent = formatCurrency(trustLimit);
   }
   if (
@@ -162,7 +162,7 @@ export const bindFriendDetail = (root, data, friendId) => {
     trustButton.classList.add("friend-stat--disabled");
     trustButton.setAttribute("aria-disabled", "true");
   }
-  const debt = connection?.debt_eur || 0;
+  const debt = friend?.debt_eur || 0;
   if (debtLabelEl) {
     if (isAcceptedFriendshipStatus(friendshipStatus)) {
       debtLabelEl.textContent = debt >= 0 ? "owes you" : "you owe";
@@ -208,8 +208,8 @@ export const bindFriendDetail = (root, data, friendId) => {
     });
   }
 
-  const pendingLimit = connection?.pending_credit_limit_eur;
-  const isIncoming = connection?.pending_credit_limit_is_incoming;
+  const pendingLimit = friend?.pending_credit_limit_eur;
+  const isIncoming = friend?.pending_credit_limit_is_incoming;
   const hasPendingSuggestion = Number.isFinite(pendingLimit) && pendingLimit >= 0;
 
   if (suggestionEl && hasPendingSuggestion) {
@@ -262,7 +262,7 @@ export const bindFriendDetail = (root, data, friendId) => {
 
   const nameChangeEl = root.querySelector('[data-section="name-change-notification"]');
   const nameChangeLabelEl = root.querySelector('[data-bind="name-change-label"]');
-  const pendingNameChange = connection?.pending_name_change;
+  const pendingNameChange = friend?.pending_name_change;
   if (nameChangeEl && pendingNameChange) {
     nameChangeEl.hidden = false;
     if (nameChangeLabelEl) {
@@ -278,7 +278,7 @@ export const bindFriendDetail = (root, data, friendId) => {
     });
   }
 
-  const pendingPaymentRequest = connection?.pending_payment_request;
+  const pendingPaymentRequest = friend?.pending_payment_request;
   if (paymentRequestEl && pendingPaymentRequest) {
     paymentRequestEl.hidden = false;
     const amount = pendingPaymentRequest.amount_eur;
@@ -337,8 +337,8 @@ export const bindFriendDetail = (root, data, friendId) => {
     return;
   }
 
-  const transactions = Array.isArray(connection?.recent_transactions)
-    ? connection.recent_transactions
+  const transactions = Array.isArray(friend?.recent_transactions)
+    ? friend.recent_transactions
     : [];
 
   if (!transactions.length) {

@@ -30,7 +30,7 @@ import {
   markProcessedPeerMessage,
   removeQueuedPeerMessage,
 } from "./outbox.js";
-import { findConnection, getUserConnection, syncUserNameAcrossContacts } from "../connection-helpers.js";
+import { findFriend, getFriend, syncUserNameAcrossContacts } from "../friends-helpers.js";
 import {
   createInboundProcessingResult,
   routeInboundEntry,
@@ -53,19 +53,19 @@ export const getRealtimeSnapshot = async () => {
     return null;
   }
 
-  const connections = Array.isArray(state.user.connections) ? state.user.connections : [];
-  const eligibleConnections = connections.filter((connection) => isPeerEligibleFriendshipStatus(connection.friendship_status));
-  const relationshipPeerIds = eligibleConnections
-    .map((connection) => connection.person_id)
+  const friends = Array.isArray(state.user.friends) ? state.user.friends : [];
+  const eligibleFriends = friends.filter((friend) => isPeerEligibleFriendshipStatus(friend.friendship_status));
+  const relationshipPeerIds = eligibleFriends
+    .map((friend) => friend.person_id)
     .filter(Boolean);
   const queuedPeerIds = (Array.isArray(state.outbox) ? state.outbox : [])
     .map((message) => message.to_user_id)
     .filter(Boolean);
 
   const peerNames = {};
-  eligibleConnections.forEach((connection) => {
-    if (connection.person_id && connection.person_name) {
-      peerNames[connection.person_id] = connection.person_name;
+  eligibleFriends.forEach((friend) => {
+    if (friend.person_id && friend.person_name) {
+      peerNames[friend.person_id] = friend.person_name;
     }
   });
 
@@ -186,10 +186,10 @@ export const updateLastSyncedAt = async (peerId) => {
   const state = await loadState();
   if (!hasUser(state)) return;
 
-  const connection = findConnection(state.user, normalizedPeerId);
-  if (!connection) return;
+  const friend = findFriend(state.user, normalizedPeerId);
+  if (!friend) return;
 
-  connection.last_synced_at = new Date().toISOString();
+  friend.last_synced_at = new Date().toISOString();
   await persistState(state);
 };
 
@@ -211,9 +211,9 @@ export const markPeerMessageReceived = async (messageId) => {
 
   const peerId = removedMessage.to_user_id;
   if (peerId) {
-    const connection = findConnection(state.user, peerId);
-    if (connection) {
-      connection.last_synced_at = new Date().toISOString();
+    const friend = findFriend(state.user, peerId);
+    if (friend) {
+      friend.last_synced_at = new Date().toISOString();
     }
   }
 
@@ -310,9 +310,9 @@ export const applyInboundPeerMessage = async (incomingMessage) => {
   }
 
   markProcessedPeerMessage(state, message.id);
-  const userConnection = getUserConnection(state, message.from_user_id);
-  if (userConnection) {
-    userConnection.last_synced_at = new Date().toISOString();
+  const friend = getFriend(state, message.from_user_id);
+  if (friend) {
+    friend.last_synced_at = new Date().toISOString();
   }
 
   showNotification(notification);

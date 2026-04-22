@@ -104,9 +104,9 @@ export const bindLogs = (root, data) => {
 
   const myId = data.you?.id || "";
   const namesById = {};
-  (Array.isArray(data.connections) ? data.connections : []).forEach((conn) => {
-    if (conn.person_id) {
-      namesById[conn.person_id] = conn.person_name || conn.person_id;
+  (Array.isArray(data.friends) ? data.friends : []).forEach((friend) => {
+    if (friend.person_id) {
+      namesById[friend.person_id] = friend.person_name || friend.person_id;
     }
   });
 

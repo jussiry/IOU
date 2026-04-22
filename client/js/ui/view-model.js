@@ -10,42 +10,42 @@ import { isAcceptedFriendshipStatus } from "../utils/friendships.js";
 
 export const buildView = (state) => {
   const user = state.user;
-  const connections = Array.isArray(user.connections) ? user.connections : [];
+  const friends = Array.isArray(user.friends) ? user.friends : [];
 
-  const connectionsWithInbound = connections.map((connection) => {
-    const contact = state.contacts?.[connection.person_id];
+  const friendsWithInbound = friends.map((friend) => {
+    const contact = state.contacts?.[friend.person_id];
 
     return {
-      ...connection,
-      person_name: contact?.name || connection.person_name || connection.person_id,
+      ...friend,
+      person_name: contact?.name || friend.person_name || friend.person_id,
     };
   });
 
-  const acceptedConnections = connectionsWithInbound.filter((connection) =>
-    isAcceptedFriendshipStatus(connection.friendship_status)
+  const acceptedFriends = friendsWithInbound.filter((friend) =>
+    isAcceptedFriendshipStatus(friend.friendship_status)
   );
 
-  const trustAgreements = acceptedConnections.reduce((sum, connection) => {
-    return sum + (connection.trust_credit_limit_eur || 0);
+  const trustAgreements = acceptedFriends.reduce((sum, friend) => {
+    return sum + (friend.trust_credit_limit_eur || 0);
   }, 0);
 
-  const friendsOweTotal = acceptedConnections.reduce((sum, connection) => {
-    return sum + Math.max(connection.debt_eur || 0, 0);
+  const friendsOweTotal = acceptedFriends.reduce((sum, friend) => {
+    return sum + Math.max(friend.debt_eur || 0, 0);
   }, 0);
-  const youOweTotal = acceptedConnections.reduce((sum, connection) => {
-    return sum + Math.max(-(connection.debt_eur || 0), 0);
+  const youOweTotal = acceptedFriends.reduce((sum, friend) => {
+    return sum + Math.max(-(friend.debt_eur || 0), 0);
   }, 0);
   const netBalance = friendsOweTotal - youOweTotal;
 
-  const availableTrust = acceptedConnections.reduce((sum, connection) => {
-    const trustLimit = connection.trust_credit_limit_eur || 0;
-    const debt = connection.debt_eur || 0;
+  const availableTrust = acceptedFriends.reduce((sum, friend) => {
+    const trustLimit = friend.trust_credit_limit_eur || 0;
+    const debt = friend.debt_eur || 0;
     return sum + Math.max(trustLimit + debt, 0);
   }, 0);
 
   return {
     you: createPublicPersonModel(user),
-    connections: connectionsWithInbound,
+    connections: friendsWithInbound,
     totals: {
       netBalance,
       friendsOweTotal,

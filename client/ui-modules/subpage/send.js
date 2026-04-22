@@ -8,13 +8,13 @@ import { isAcceptedFriendshipStatus } from "../../js/utils/friendships.js";
 import { loadVendorScript } from "../../js/utils/vendor-loader.js";
 import { parseIouUri } from "../../js/utils/qr-uri.js";
 
-const renderEmptyState = (contentEl, allConnections) => {
+const renderEmptyState = (contentEl, allFriends) => {
   if (!contentEl) {
     return;
   }
 
-  const hasAnyConnections = Array.isArray(allConnections) && allConnections.length > 0;
-  contentEl.innerHTML = hasAnyConnections
+  const hasAnyFriends = Array.isArray(allFriends) && allFriends.length > 0;
+  contentEl.innerHTML = hasAnyFriends
     ? `
       <div class="send-empty-state empty">
         No accepted friends yet. Complete a pending friendship or <a class="send-empty-link" href="#add-friend">add a new friend</a>
@@ -48,16 +48,16 @@ export const bindSend = (root, data, friendId) => {
     messageEl.addEventListener("input", autoGrow);
   }
 
-  const allConnections = Array.isArray(data?.connections) ? data.connections : [];
-  const acceptedConnections = allConnections
-    .filter((connection) => isAcceptedFriendshipStatus(connection.friendship_status))
-    .sort((leftConnection, rightConnection) => {
-      const leftName = leftConnection.person_name || leftConnection.person_id || "";
-      const rightName = rightConnection.person_name || rightConnection.person_id || "";
+  const allFriends = Array.isArray(data?.friends) ? data.friends : [];
+  const acceptedFriends = allFriends
+    .filter((friend) => isAcceptedFriendshipStatus(friend.friendship_status))
+    .sort((leftFriend, rightFriend) => {
+      const leftName = leftFriend.person_name || leftFriend.person_id || "";
+      const rightName = rightFriend.person_name || rightFriend.person_id || "";
       return leftName.localeCompare(rightName);
     });
-  if (!acceptedConnections.length) {
-    renderEmptyState(contentEl, allConnections);
+  if (!acceptedFriends.length) {
+    renderEmptyState(contentEl, allFriends);
     return {
       submitEl: null,
       getPayload: () => ({
@@ -82,39 +82,39 @@ export const bindSend = (root, data, friendId) => {
 
   if (selectEl) {
     selectEl.innerHTML = "";
-    acceptedConnections.forEach((connection) => {
+    acceptedFriends.forEach((friend) => {
       const option = document.createElement("option");
-      option.value = connection.person_id;
-      option.textContent = connection.person_name || connection.person_id;
+      option.value = friend.person_id;
+      option.textContent = friend.person_name || friend.person_id;
       selectEl.appendChild(option);
     });
 
     const initialSelection =
-      acceptedConnections.find((connection) => connection.person_id === friendId) ||
-      acceptedConnections[0] ||
+      acceptedFriends.find((friend) => friend.person_id === friendId) ||
+      acceptedFriends[0] ||
       null;
     if (initialSelection) {
       selectEl.value = initialSelection.person_id;
     }
 
     const selectAlternate = (currentId) => {
-      const candidates = acceptedConnections.filter(
-        (connection) => connection.person_id !== currentId
+      const candidates = acceptedFriends.filter(
+        (friend) => friend.person_id !== currentId
       );
       if (!candidates.length) return null;
       const pick = candidates[Math.floor(Math.random() * candidates.length)];
       return pick?.person_name || pick?.person_id || null;
     };
 
-    const selected = acceptedConnections.find(
-      (connection) => connection.person_id === selectEl.value
+    const selected = acceptedFriends.find(
+      (friend) => friend.person_id === selectEl.value
     );
     const selectedName = selected?.person_name || selected?.person_id;
     updateExplainer(selectedName, selectAlternate(selectEl.value));
 
     selectEl.addEventListener("change", () => {
-      const current = acceptedConnections.find(
-        (connection) => connection.person_id === selectEl.value
+      const current = acceptedFriends.find(
+        (friend) => friend.person_id === selectEl.value
       );
       const name = current?.person_name || current?.person_id;
       updateExplainer(name, selectAlternate(selectEl.value));
@@ -156,8 +156,8 @@ export const bindSend = (root, data, friendId) => {
     }
 
     // Check if the scanned key is an accepted friend
-    const matchedFriend = acceptedConnections.find(
-      (c) => c.person_id === parsed.key
+    const matchedFriend = acceptedFriends.find(
+      (friend) => friend.person_id === parsed.key
     );
 
     if (matchedFriend) {
@@ -226,7 +226,7 @@ export const bindSend = (root, data, friendId) => {
   return {
     submitEl,
     getPayload: () => {
-      const selectedId = selectEl?.value || acceptedConnections[0]?.person_id || "";
+      const selectedId = selectEl?.value || acceptedFriends[0]?.person_id || "";
       const amount = amountEl ? parseFloat(amountEl.value) : NaN;
       const message = messageEl ? messageEl.value : "";
       return {

@@ -44,19 +44,19 @@ const bindRequestFriend = (root, data) => {
     messageEl.addEventListener("input", autoGrow);
   }
 
-  const allConnections = Array.isArray(data?.connections) ? data.connections : [];
-  const acceptedConnections = allConnections
-    .filter((connection) => isAcceptedFriendshipStatus(connection.friendship_status))
+  const allFriends = Array.isArray(data?.friends) ? data.friends : [];
+  const acceptedFriends = allFriends
+    .filter((friend) => isAcceptedFriendshipStatus(friend.friendship_status))
     .sort((a, b) => {
       const aName = a.person_name || a.person_id || "";
       const bName = b.person_name || b.person_id || "";
       return aName.localeCompare(bName);
     });
 
-  if (!acceptedConnections.length) {
+  if (!acceptedFriends.length) {
     const panel = root.querySelector('[data-panel="request-friend"]');
     if (panel) {
-      const hasAny = allConnections.length > 0;
+      const hasAny = allFriends.length > 0;
       panel.innerHTML = hasAny
         ? `<div class="send-empty-state empty">
             No accepted friends yet. Complete a pending friendship or <a class="send-empty-link" href="#add-friend">add a new friend</a>
@@ -72,10 +72,10 @@ const bindRequestFriend = (root, data) => {
 
   if (selectEl) {
     selectEl.innerHTML = "";
-    acceptedConnections.forEach((connection) => {
+    acceptedFriends.forEach((friend) => {
       const option = document.createElement("option");
-      option.value = connection.person_id;
-      option.textContent = connection.person_name || connection.person_id;
+      option.value = friend.person_id;
+      option.textContent = friend.person_name || friend.person_id;
       selectEl.appendChild(option);
     });
   }
@@ -83,7 +83,7 @@ const bindRequestFriend = (root, data) => {
   return {
     submitEl,
     getPayload: () => {
-      const selectedId = selectEl?.value || acceptedConnections[0]?.person_id || "";
+      const selectedId = selectEl?.value || acceptedFriends[0]?.person_id || "";
       const amount = amountEl ? parseFloat(amountEl.value) : NaN;
       const message = messageEl ? messageEl.value : "";
       return { friendId: selectedId, amount, message };

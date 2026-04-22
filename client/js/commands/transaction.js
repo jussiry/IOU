@@ -19,7 +19,7 @@ import {
   persistAndBuildView,
 } from "../app-state.js";
 import { queuePeerMessage } from "../peer/outbox.js";
-import { getDisplayName, getUserConnection } from "../connection-helpers.js";
+import { getDisplayName, getFriend } from "../friends-helpers.js";
 import { appendLedgerEntryFromMessage } from "../ledger.js";
 import { routeOutboundEntry } from "../peer/handlers.js";
 
@@ -36,12 +36,12 @@ export const createTransaction = async ({ friendId, amount, message }) => {
   }
 
   const displayName = getDisplayName(state, normalizedFriendId);
-  const userConnection = getUserConnection(state, normalizedFriendId);
-  if (!userConnection || !isAcceptedFriendshipStatus(userConnection.friendship_status)) {
+  const friend = getFriend(state, normalizedFriendId);
+  if (!friend || !isAcceptedFriendshipStatus(friend.friendship_status)) {
     return loadData();
   }
 
-  userConnection.person_name = displayName;
+  friend.person_name = displayName;
 
   const trimmedMessage = asTrimmedString(message);
   const timestamp = new Date();

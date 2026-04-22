@@ -18,9 +18,9 @@ import {
 import { queuePeerMessage } from "../peer/outbox.js";
 import { appendLedgerEntryFromMessage } from "../ledger.js";
 import {
-  getUserConnection,
+  getFriend,
   syncUserNameAcrossContacts,
-} from "../connection-helpers.js";
+} from "../friends-helpers.js";
 
 export const updateUserName = async (name) => {
   const trimmedName = asTrimmedString(name);
@@ -36,13 +36,13 @@ export const updateUserName = async (name) => {
   state.user.name = trimmedName;
   syncUserNameAcrossContacts(state);
 
-  const connections = Array.isArray(state.user.connections) ? state.user.connections : [];
-  const eligibleConnections = connections.filter((connection) =>
-    isPeerEligibleFriendshipStatus(connection.friendship_status)
+  const friends = Array.isArray(state.user.friends) ? state.user.friends : [];
+  const eligibleFriends = friends.filter((friend) =>
+    isPeerEligibleFriendshipStatus(friend.friendship_status)
   );
-  for (const connection of eligibleConnections) {
+  for (const friend of eligibleFriends) {
     const message = await queuePeerMessage(state, {
-      toUserId: connection.person_id,
+      toUserId: friend.person_id,
       type: PEER_MESSAGE_TYPE_NAME_CHANGED,
       payload: { name: trimmedName },
     });
@@ -65,11 +65,11 @@ export const dismissNameChangeNotification = async (friendId) => {
     return null;
   }
 
-  const userConnection = getUserConnection(state, normalizedFriendId);
-  if (!userConnection) {
+  const friend = getFriend(state, normalizedFriendId);
+  if (!friend) {
     return loadData();
   }
 
-  userConnection.pending_name_change = null;
+  friend.pending_name_change = null;
   return persistAndBuildView(state);
 };

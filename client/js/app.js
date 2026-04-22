@@ -264,7 +264,7 @@ const loadPage = async (route) => {
         },
       });
     } else if (route.type === "friend") {
-      const friend = data.connections.find((entry) => entry.person_id === route.friendId);
+      const friend = data.friends.find((entry) => entry.person_id === route.friendId);
       if (!friend) {
         window.location.hash = "friends";
         return;
@@ -330,7 +330,7 @@ const loadPage = async (route) => {
             return;
           }
           if (payload.amount >= 100) {
-            const friend = data?.connections?.find((c) => c.person_id === payload.friendId);
+            const friend = data?.friends?.find((c) => c.person_id === payload.friendId);
             const friendName = friend?.person_name || payload.friendId;
             const confirmed = await showConfirmModal({
               title: `Send €${payload.amount} to ${friendName}`,

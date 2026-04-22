@@ -40,7 +40,7 @@ export interface PendingNameChange {
 /** `true` = incoming proposal, `false` = outgoing, `"lowered"` = auto-applied lower limit. */
 export type PendingCreditLimitDirection = boolean | "lowered" | null;
 
-export interface ConnectionModel {
+export interface FriendModel {
   person_id: string;
   person_name: string;
   friendship_status: string;
@@ -54,6 +54,9 @@ export interface ConnectionModel {
   pending_name_change: PendingNameChange | null;
 }
 
+/** Backwards compatibility alias for FriendModel */
+export type ConnectionModel = FriendModel;
+
 export interface PersonModel {
   id: string;
   name: string;
@@ -63,7 +66,9 @@ export interface PersonModel {
   private_key: string;
   /** Always `""` when produced by `createPublicPersonModel`. */
   private_key_hex: string;
-  connections: ConnectionModel[];
+  friends: FriendModel[];
+  /** @deprecated Use friends instead */
+  connections?: FriendModel[];
 }
 
 export interface LedgerEntryModel {
@@ -146,17 +151,17 @@ const normalizeStringList = (values: any): string[] => {
   return Array.from(normalizedValues);
 };
 
-const normalizeConnectionList = (connections: any): ConnectionModel[] => {
-  if (!Array.isArray(connections)) return [];
+const normalizeFriendList = (friends: any): FriendModel[] => {
+  if (!Array.isArray(friends)) return [];
 
-  const normalizedConnections = new Map<string, ConnectionModel>();
-  connections.forEach((connection) => {
-    const normalizedConnection = createConnectionModel(connection);
-    if (!normalizedConnection.person_id) return;
-    normalizedConnections.set(normalizedConnection.person_id, normalizedConnection);
+  const normalizedFriends = new Map<string, FriendModel>();
+  friends.forEach((friend) => {
+    const normalizedFriend = createFriendModel(friend);
+    if (!normalizedFriend.person_id) return;
+    normalizedFriends.set(normalizedFriend.person_id, normalizedFriend);
   });
 
-  return Array.from(normalizedConnections.values());
+  return Array.from(normalizedFriends.values());
 };
 
 // ---------------------------------------------------------------------------
@@ -172,7 +177,7 @@ export const createTransactionModel = (input: any = {}): TransactionModel => {
   };
 };
 
-export const createConnectionModel = (input: any = {}): ConnectionModel => {
+export const createFriendModel = (input: any = {}): FriendModel => {
   const transactions: TransactionModel[] = Array.isArray(input.recent_transactions)
     ? input.recent_transactions.map((transaction: any) => createTransactionModel(transaction))
     : [];
@@ -221,6 +226,9 @@ export const createConnectionModel = (input: any = {}): ConnectionModel => {
   };
 };
 
+/** Backwards compatibility alias for createFriendModel */
+export const createConnectionModel = createFriendModel;
+
 export interface CreatePersonModelOptions {
   includePrivateKeys?: boolean;
 }
@@ -234,7 +242,7 @@ export const createPersonModel = (
   const normalizedId = asTrimmedStringOrDefault(input.id);
   const normalizedPublicKey = asTrimmedStringOrDefault(input.public_key);
   const personId = normalizedPublicKey || normalizedId;
-  const connections = normalizeConnectionList(input.connections);
+  const friends = normalizeFriendList(input.friends || input.connections);
 
   return {
     id: personId,
@@ -243,7 +251,7 @@ export const createPersonModel = (
     public_key_hex: asTrimmedStringOrDefault(input.public_key_hex),
     private_key: includePrivateKeys ? asTrimmedStringOrDefault(input.private_key) : "",
     private_key_hex: includePrivateKeys ? asTrimmedStringOrDefault(input.private_key_hex) : "",
-    connections,
+    friends,
   };
 };
 

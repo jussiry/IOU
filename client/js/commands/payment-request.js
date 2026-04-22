@@ -27,7 +27,7 @@ import {
   persistAndBuildView,
 } from "../app-state.js";
 import { queuePeerMessage } from "../peer/outbox.js";
-import { getUserConnection } from "../connection-helpers.js";
+import { getFriend } from "../friends-helpers.js";
 import { appendLedgerEntryFromMessage } from "../ledger.js";
 import { routeOutboundEntry } from "../peer/handlers.js";
 
@@ -43,8 +43,8 @@ export const requestPayment = async ({ friendId, amount, message }) => {
     return null;
   }
 
-  const userConnection = getUserConnection(state, normalizedFriendId);
-  if (!userConnection || !isAcceptedFriendshipStatus(userConnection.friendship_status)) {
+  const friend = getFriend(state, normalizedFriendId);
+  if (!friend || !isAcceptedFriendshipStatus(friend.friendship_status)) {
     return loadData();
   }
 
@@ -77,12 +77,12 @@ export const respondToPaymentRequest = async (friendId, accepted) => {
     return null;
   }
 
-  const userConnection = getUserConnection(state, normalizedFriendId);
-  if (!userConnection || !isAcceptedFriendshipStatus(userConnection.friendship_status)) {
+  const friend = getFriend(state, normalizedFriendId);
+  if (!friend || !isAcceptedFriendshipStatus(friend.friendship_status)) {
     return loadData();
   }
 
-  const pendingRequest = userConnection.pending_payment_request;
+  const pendingRequest = friend.pending_payment_request;
   if (!pendingRequest || !pendingRequest.is_incoming) {
     return loadData();
   }
@@ -136,11 +136,11 @@ export const dismissPaymentRequest = async (friendId) => {
     return null;
   }
 
-  const userConnection = getUserConnection(state, normalizedFriendId);
-  if (!userConnection) {
+  const friend = getFriend(state, normalizedFriendId);
+  if (!friend) {
     return loadData();
   }
 
-  userConnection.pending_payment_request = null;
+  friend.pending_payment_request = null;
   return persistAndBuildView(state);
 };

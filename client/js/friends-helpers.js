@@ -1,13 +1,13 @@
 /*
-Manages the bidirectional connection and contact graph.
+Manages the bidirectional friendship and contact graph.
 
-Provides helpers to find, create, and update friend connections on both the
+Provides helpers to find, create, and update friend relationships on both the
 user and their contacts. Also handles friend request cancellation and
 relationship cleanup.
 */
 
 import {
-  createConnectionModel,
+  createFriendModel,
   createPublicPersonModel,
 } from "./models/data-model.js";
 import {
@@ -33,8 +33,8 @@ export const ensureContacts = (state) => {
   }
 };
 
-export const findConnection = (person, friendId) => {
-  if (!Array.isArray(person?.connections)) {
+export const findFriend = (person, friendId) => {
+  if (!Array.isArray(person?.friends)) {
     return null;
   }
 
@@ -44,32 +44,32 @@ export const findConnection = (person, friendId) => {
   }
 
   return (
-    person.connections.find((entry) => entry.person_id === normalizedFriendId) || null
+    person.friends.find((entry) => entry.person_id === normalizedFriendId) || null
   );
 };
 
-export const getUserConnection = (state, friendId) => {
+export const getFriend = (state, friendId) => {
   if (!hasUser(state)) {
     return null;
   }
 
-  return findConnection(state.user, friendId);
+  return findFriend(state.user, friendId);
 };
 
-export const ensureConnection = (person, friendId, friendName, options = {}) => {
+const ensureFriendInternal = (person, friendId, friendName, options = {}) => {
   const normalizedFriendId = asTrimmedString(friendId);
   const normalizedFriendName = asTrimmedString(friendName);
   if (!normalizedFriendId) {
     return null;
   }
 
-  if (!Array.isArray(person.connections)) {
-    person.connections = [];
+  if (!Array.isArray(person.friends)) {
+    person.friends = [];
   }
 
-  let connection = findConnection(person, normalizedFriendId);
-  if (!connection) {
-    connection = createConnectionModel({
+  let friend = findFriend(person, normalizedFriendId);
+  if (!friend) {
+    friend = createFriendModel({
       person_id: normalizedFriendId,
       person_name: normalizedFriendName || normalizedFriendId,
       friendship_status: options.friendshipStatus || FRIENDSHIP_STATUS_ACCEPTED,
@@ -77,19 +77,19 @@ export const ensureConnection = (person, friendId, friendName, options = {}) => 
       trust_credit_limit_eur: 0,
       recent_transactions: [],
     });
-    person.connections.push(connection);
+    person.friends.push(friend);
   }
 
-  connection.person_name =
-    normalizedFriendName || connection.person_name || normalizedFriendId;
-  if (!Array.isArray(connection.recent_transactions)) {
-    connection.recent_transactions = [];
+  friend.person_name =
+    normalizedFriendName || friend.person_name || normalizedFriendId;
+  if (!Array.isArray(friend.recent_transactions)) {
+    friend.recent_transactions = [];
   }
   if (options.friendshipStatus) {
-    connection.friendship_status = options.friendshipStatus;
+    friend.friendship_status = options.friendshipStatus;
   }
 
-  return connection;
+  return friend;
 };
 
 export const ensureContact = (state, contactId, contactName) => {
@@ -118,7 +118,7 @@ export const ensureContact = (state, contactId, contactName) => {
   return contact;
 };
 
-export const ensureUserConnection = (state, friendId, friendName, options = {}) => {
+export const ensureFriend = (state, friendId, friendName, options = {}) => {
   if (!hasUser(state)) {
     return null;
   }
@@ -129,7 +129,7 @@ export const ensureUserConnection = (state, friendId, friendName, options = {}) 
   }
 
   ensureContact(state, normalizedFriendId, friendName);
-  return ensureConnection(state.user, normalizedFriendId, friendName, options);
+  return ensureFriendInternal(state.user, normalizedFriendId, friendName, options);
 };
 
 export const ensureContactBackLink = (state, contactId, contactName) => {
@@ -142,28 +142,28 @@ export const ensureContactBackLink = (state, contactId, contactName) => {
     return null;
   }
 
-  return ensureConnection(contact, state.user.id, state.user.name);
+  return ensureFriendInternal(contact, state.user.id, state.user.name);
 };
 
 export const syncUserNameAcrossContacts = (state) => {
   if (!hasUser(state)) return;
 
   Object.values(state.contacts || {}).forEach((contact) => {
-    const userConnection = Array.isArray(contact.connections)
-      ? contact.connections.find((entry) => entry.person_id === state.user.id)
+    const friend = Array.isArray(contact.friends)
+      ? contact.friends.find((entry) => entry.person_id === state.user.id)
       : null;
-    if (!userConnection) return;
-    userConnection.person_name = state.user.name;
+    if (!friend) return;
+    friend.person_name = state.user.name;
   });
 };
 
 export const getDisplayName = (state, friendId) => {
   const normalizedFriendId = asTrimmedString(friendId);
-  const userConnection = getUserConnection(state, normalizedFriendId);
+  const friend = getFriend(state, normalizedFriendId);
   const contact = state.contacts?.[normalizedFriendId];
   return (
     contact?.name ||
-    userConnection?.person_name ||
+    friend?.person_name ||
     normalizedFriendId
   );
 };
@@ -174,8 +174,8 @@ export const removeFriendRelationshipData = (state, friendId) => {
     return;
   }
 
-  state.user.connections = Array.isArray(state.user.connections)
-    ? state.user.connections.filter((connection) => connection.person_id !== normalizedFriendId)
+  state.user.friends = Array.isArray(state.user.friends)
+    ? state.user.friends.filter((friend) => friend.person_id !== normalizedFriendId)
     : [];
   ensureContacts(state);
   delete state.contacts[normalizedFriendId];
@@ -195,19 +195,19 @@ export const cancelPendingFriendRequest = async (
 ) => {
   const normalizedFriendId = asTrimmedString(friendId);
   const normalizedDisplayName = asTrimmedString(displayName) || normalizedFriendId;
-  const userConnection = getUserConnection(state, normalizedFriendId);
-  if (!userConnection) {
+  const friend = getFriend(state, normalizedFriendId);
+  if (!friend) {
     return false;
   }
   if (
-    userConnection.friendship_status !== FRIENDSHIP_STATUS_PENDING_INCOMING &&
-    userConnection.friendship_status !== FRIENDSHIP_STATUS_PENDING_OUTGOING
+    friend.friendship_status !== FRIENDSHIP_STATUS_PENDING_INCOMING &&
+    friend.friendship_status !== FRIENDSHIP_STATUS_PENDING_OUTGOING
   ) {
     return false;
   }
 
   const hasUnsentOutgoingRequest =
-    userConnection.friendship_status === FRIENDSHIP_STATUS_PENDING_OUTGOING &&
+    friend.friendship_status === FRIENDSHIP_STATUS_PENDING_OUTGOING &&
     hasQueuedPeerMessage(state, {
       toUserId: normalizedFriendId,
       type: PEER_MESSAGE_TYPE_FRIEND_REQUEST,
