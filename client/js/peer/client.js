@@ -509,7 +509,7 @@ const createRealtimeClient = () => {
       if (queued) {
         envelopesSentToServer.add(message.id);
         logRealtimeEvent(
-          `Queued envelope on server → ${message.to_user_id?.slice(0, 10)}…`
+          `Queued peer envelope on server → ${message.to_user_id?.slice(0, 10)}…`
         );
       }
     }
@@ -634,7 +634,7 @@ const createRealtimeClient = () => {
         privateKeyHex: currentSnapshot.userPrivateKeyHex,
       });
       const queued = signalingClient.queuePeerEnvelopeOnServer(envelope);
-      logRealtimeEvent(queued ? "Queued receipt on server" : "Receipt queue rejected by server");
+      logRealtimeEvent(queued ? "Queued peer receipt on server" : "Peer receipt queue rejected by server");
     } catch (error) {
       logRealtimeEvent(`Failed to wrap receipt for server: ${String(error?.message || error)}`);
     }
@@ -752,7 +752,7 @@ const createRealtimeClient = () => {
     }
 
     logRealtimeEvent(
-      `Envelope received from server (from ${envelope.from_user_id?.slice(0, 10)}…)`
+      `Peer envelope received from server (from ${envelope.from_user_id?.slice(0, 10)}…)`
     );
 
     const innerMessage = await unwrapEnvelopeOrLog(envelope, envelope.from_user_id);

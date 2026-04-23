@@ -423,10 +423,10 @@ const createPeerMesh = (
       return;
     }
 
-    // ICE candidates fire frequently during negotiation; the individual
-    // candidate payload isn't useful in normal debugging, so we log only
-    // the fact that one arrived.
-    logPeerEvent(`ICE candidate from ${shortKey(peer.peerKey)}`);
+    // ICE candidates fire frequently during negotiation; log the candidate
+    // type (host, srflx, relay) so tests can verify TURN relay usage.
+    const candidateStr = candidate.candidate || "";
+    logPeerEvent(`ICE candidate from ${shortKey(peer.peerKey)}: ${candidateStr}`);
     if (!peer.connection.remoteDescription) {
       peer.pendingCandidates.push(candidate);
       return;
