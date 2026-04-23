@@ -340,6 +340,11 @@ export const bindFriendDetail = (root, data, friendId) => {
   const transactions = Array.isArray(friend?.recent_transactions)
     ? friend.recent_transactions
     : [];
+  const lastViewedTransactionIds = new Set(
+    Array.isArray(friend?.last_viewed_transaction_ids)
+      ? friend.last_viewed_transaction_ids
+      : []
+  );
 
   if (!transactions.length) {
     bodyEl.innerHTML = `<div class="empty">No transactions yet.</div>`;
@@ -351,6 +356,9 @@ export const bindFriendDetail = (root, data, friendId) => {
     const dateEl = txNode.querySelector('[data-bind="date"]');
     const amountTxEl = txNode.querySelector('[data-bind="amount"]');
     const noteEl = txNode.querySelector('[data-bind="note"]');
+    const isNewTransaction = tx?.id && !lastViewedTransactionIds.has(tx.id);
+
+    txNode.classList.toggle("tx-item--new", Boolean(isNewTransaction));
     if (dateEl) dateEl.textContent = formatDate(tx.date);
     if (amountTxEl) amountTxEl.textContent = formatSigned(tx.amount_eur);
     if (noteEl) noteEl.textContent = tx.note;

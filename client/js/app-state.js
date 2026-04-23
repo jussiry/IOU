@@ -110,6 +110,34 @@ export const loadData = async () => {
   return buildView(state);
 };
 
+export const markFriendTransactionsViewed = async (friendId, transactionIds = []) => {
+  const state = await loadState();
+  const friend = state.user?.friends?.find((entry) => entry?.person_id === friendId);
+  if (!friend) {
+    return false;
+  }
+  const normalizedTransactionIds = Array.from(
+    new Set(
+      (Array.isArray(transactionIds) ? transactionIds : [])
+        .map((value) => asTrimmedString(value))
+        .filter(Boolean)
+    )
+  );
+  const currentTransactionIds = Array.isArray(friend.last_viewed_transaction_ids)
+    ? friend.last_viewed_transaction_ids
+    : [];
+  const didChange =
+    currentTransactionIds.length !== normalizedTransactionIds.length ||
+    currentTransactionIds.some((value, index) => value !== normalizedTransactionIds[index]);
+
+  if (!didChange) {
+    return false;
+  }
+  friend.last_viewed_transaction_ids = normalizedTransactionIds;
+  await persistState(state);
+  return true;
+};
+
 export const createUser = async (name, { existingNsec, ncryptsec, passphrase } = {}) => {
   const trimmedName = asTrimmedString(name);
 

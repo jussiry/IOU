@@ -19,6 +19,11 @@
   color: var(--ink);
 }
 
+.tx-list li.tx-item--new {
+  background: rgba(229, 166, 50, 0.44);
+  box-shadow: inset 0 0 0 1px rgba(168, 106, 16, 0.18);
+}
+
 .tx-list li strong {
   font-size: 12px;
 }

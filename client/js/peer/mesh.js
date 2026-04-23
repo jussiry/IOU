@@ -426,7 +426,8 @@ const createPeerMesh = (
     // ICE candidates fire frequently during negotiation; log the candidate
     // type (host, srflx, relay) so tests can verify TURN relay usage.
     const candidateStr = candidate.candidate || "";
-    logPeerEvent(`ICE candidate from ${shortKey(peer.peerKey)}: ${candidateStr}`);
+    const type = candidateStr.match(/typ\s+\w+/)?.[0]
+    logPeerEvent(`ICE candidate from ${shortKey(peer.peerKey)} ${type}`);
     if (!peer.connection.remoteDescription) {
       peer.pendingCandidates.push(candidate);
       return;

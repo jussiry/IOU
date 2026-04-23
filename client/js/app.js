@@ -9,6 +9,7 @@ import {
   ensureVersion,
   hasUserData,
   loadData,
+  markFriendTransactionsViewed,
   subscribeToDataChanges,
 } from "./app-state.js";
 import { createFriend } from "./commands/friendship.js";
@@ -246,6 +247,7 @@ const loadPage = async (route) => {
       fetchTemplate(target),
       isWelcome ? Promise.resolve(null) : loadData(),
     ]);
+    let friendTransactionIdsToMark = null;
     if (sequence !== navigationSequence) return;
     if (!isWelcome && !data) {
       window.location.hash = "welcome";
@@ -269,6 +271,11 @@ const loadPage = async (route) => {
         window.location.hash = "friends";
         return;
       }
+      friendTransactionIdsToMark = Array.isArray(friend.recent_transactions)
+        ? friend.recent_transactions
+            .map((transaction) => transaction?.id)
+            .filter(Boolean)
+        : [];
       const [friendHtml, trustExplainerHtml] = await Promise.all([
         fetchTemplate(templatePaths.friend),
         fetchTemplate(templatePaths.trustExplainer),
@@ -415,6 +422,9 @@ const loadPage = async (route) => {
     currentRoute = route;
     if (route.type === "page") {
       lastMainPage = route.page;
+    }
+    if (route.type === "friend" && friendTransactionIdsToMark) {
+      void markFriendTransactionsViewed(route.friendId, friendTransactionIdsToMark);
     }
   } catch (error) {
     if (sequence !== navigationSequence) return;

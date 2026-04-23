@@ -49,6 +49,7 @@ export interface FriendModel {
   pending_credit_limit_eur: number | null;
   pending_credit_limit_is_incoming: PendingCreditLimitDirection;
   recent_transactions: TransactionModel[];
+  last_viewed_transaction_ids: string[];
   last_synced_at: string;
   pending_payment_request: PaymentRequestModel | null;
   pending_name_change: PendingNameChange | null;
@@ -181,6 +182,7 @@ export const createFriendModel = (input: any = {}): FriendModel => {
   const transactions: TransactionModel[] = Array.isArray(input.recent_transactions)
     ? input.recent_transactions.map((transaction: any) => createTransactionModel(transaction))
     : [];
+  const lastViewedTransactionIds = normalizeStringList(input.last_viewed_transaction_ids);
 
   const pendingCreditLimitIsIncoming: PendingCreditLimitDirection =
     input.pending_credit_limit_is_incoming === true
@@ -206,6 +208,7 @@ export const createFriendModel = (input: any = {}): FriendModel => {
         : null,
     pending_credit_limit_is_incoming: pendingCreditLimitIsIncoming,
     recent_transactions: transactions,
+    last_viewed_transaction_ids: lastViewedTransactionIds,
     last_synced_at: asTrimmedStringOrDefault(input.last_synced_at),
     pending_payment_request:
       input.pending_payment_request && typeof input.pending_payment_request === "object"
