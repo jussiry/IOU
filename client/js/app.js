@@ -341,7 +341,7 @@ const loadPage = async (route) => {
             const friendName = friend?.person_name || payload.friendId;
             const confirmed = await showConfirmModal({
               title: `Send €${payload.amount} to ${friendName}`,
-              body: "IOU app is in early development. For now it is recommended to use it only for small transactions, are you sure you want to continue?",
+              body: "The IOU app is in early development. For now, it is recommended to use it only for small transactions. Are you sure you want to continue?",
               confirmLabel: "Send",
               variant: "success",
               holdMs: 750,

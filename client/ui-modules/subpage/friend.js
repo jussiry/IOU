@@ -29,6 +29,7 @@ import {
 import { formatCurrency, formatDate, formatSigned } from "../../js/ui/format.js";
 import { initInfiniteList } from "../../js/ui/infinite-list.js";
 import { getConnectedPeerIds, getServerPresentPeerIds } from "../../js/peer/status.js";
+import { showConfirmModal } from "../components/confirm-modal.js";
 
 export const bindFriendDetail = (root, data, friendId) => {
   const titleEl = root.querySelector('[data-bind="page-title"]');
@@ -60,13 +61,24 @@ export const bindFriendDetail = (root, data, friendId) => {
   const syncInfoEl = root.querySelector('[data-section="sync-info"]');
   const syncTimeEl = root.querySelector('[data-bind="sync-time"]');
   const friendKeyLabelEl = root.querySelector('[data-bind="friend-key-label"]');
+  const friendDangerButton = root.querySelector('[data-action="friend-danger-action"]');
+  const friendDangerLabelEl = root.querySelector('[data-bind="friend-danger-label"]');
 
   const friend = data.friends.find((entry) => entry.person_id === friendId);
   const friendName = friend?.person_name || "Friend";
   const friendFirstName = friendName.split(/\s+/)[0] || friendName;
   const friendshipStatus = friend?.friendship_status || FRIENDSHIP_STATUS_ACCEPTED;
+  const debt = friend?.debt_eur || 0;
   const isOnline = getConnectedPeerIds().includes(friendId);
   const isRelay = !isOnline && getServerPresentPeerIds().includes(friendId);
+  const friendDangerActionLabel =
+    debt > 0 ? "Absolve debt" : debt < 0 ? "Default on debt" : "Deactivate friend";
+  const friendDangerBody =
+    debt > 0
+      ? `Forgive ${friendName}'s debt of **€${Math.abs(debt).toFixed(2)}** to you. With this action, you also deactivate your friend connection, stopping any activity between you two.\n\nIf you want to cancel the debt without deactivating the connection, you can do this by sending them an IOU of €${Math.abs(debt).toFixed(2)}.\n\nAfter deactivation, if both of you agree, the friend connection and this debt can be reactivated later.`
+      : debt < 0
+      ? `Defaulting on debt can have **serious consequences**. It is strongly recommended to talk about this with ${friendName} before taking this step. You currently owe **${Math.abs(debt).toFixed(2)} €** to ${friendName}.\n\nIn practice this action stops any activity with ${friendName} and removes this debt from balances. If both of you agree, the friend connection and this debt can be reactivated later.`
+      : `With this action, you deactivate your friend connection to ${friendName}, stopping any activity between you two. The transaction history will remain visible on this page.\n\nThe friend connection can be reactivated later if both of you agree to do so.`;
 
   if (titleEl) {
     titleEl.textContent = friendName;
@@ -78,6 +90,17 @@ export const bindFriendDetail = (root, data, friendId) => {
   }
 
   if (friendKeyLabelEl) friendKeyLabelEl.textContent = `${friendFirstName}'s key`;
+  if (friendDangerLabelEl) friendDangerLabelEl.textContent = friendDangerActionLabel;
+  if (friendDangerButton) {
+    friendDangerButton.addEventListener("click", async () => {
+      await showConfirmModal({
+        title: friendDangerActionLabel,
+        body: friendDangerBody,
+        confirmLabel: friendDangerActionLabel,
+        confirmButtonLabel: friendDangerActionLabel,
+      });
+    });
+  }
 
   if (syncInfoEl && syncTimeEl) {
     if (friend?.last_synced_at) {
@@ -162,7 +185,6 @@ export const bindFriendDetail = (root, data, friendId) => {
     trustButton.classList.add("friend-stat--disabled");
     trustButton.setAttribute("aria-disabled", "true");
   }
-  const debt = friend?.debt_eur || 0;
   if (debtLabelEl) {
     if (isAcceptedFriendshipStatus(friendshipStatus)) {
       debtLabelEl.textContent = debt >= 0 ? "owes you" : "you owe";

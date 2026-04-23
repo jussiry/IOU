@@ -15,6 +15,8 @@ Usage:
 The modal mounts to document.body, traps the focus on the cancel button by default, closes on Esc / backdrop click (treated as cancel), and resolves with a boolean indicating confirmation.
 */
 
+import { formatMarkdownish } from "../../js/utils/markdownish.js";
+
 const DEFAULT_HOLD_MS = 1500;
 
 const createElement = (tag, className, attrs = {}) => {
@@ -31,6 +33,7 @@ export const showConfirmModal = ({
   title,
   body,
   confirmLabel = "Confirm",
+  confirmButtonLabel = null,
   cancelLabel = "Cancel",
   holdMs = DEFAULT_HOLD_MS,
   // 'danger' (default, red) | 'success' (green)
@@ -54,7 +57,7 @@ export const showConfirmModal = ({
 
     if (body) {
       const bodyEl = createElement("div", "confirm-modal-body");
-      bodyEl.textContent = body;
+      bodyEl.innerHTML = formatMarkdownish(body);
       dialog.appendChild(bodyEl);
     }
 
@@ -68,7 +71,7 @@ export const showConfirmModal = ({
     const confirmBtn = createElement("button", confirmBtnClass, { type: "button" });
     const confirmFill = createElement("span", "confirm-modal-confirm-fill", { "aria-hidden": "true" });
     const confirmLabelEl = createElement("span", "confirm-modal-confirm-label");
-    confirmLabelEl.textContent = `Hold to ${confirmLabel.toLowerCase()}`;
+    confirmLabelEl.textContent = confirmButtonLabel || `Hold to ${confirmLabel.toLowerCase()}`;
     confirmBtn.appendChild(confirmFill);
     confirmBtn.appendChild(confirmLabelEl);
 

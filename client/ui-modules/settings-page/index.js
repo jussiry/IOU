@@ -69,6 +69,7 @@ export const bindSettings = (root, data, appVersion) => {
     const unresolvedDebts = friends.filter(
       (friend) => isAcceptedFriendshipStatus(friend.friendship_status) && friend.debt_eur !== 0
     );
+    const negativeDebts = unresolvedDebts.filter((friend) => friend.debt_eur < 0);
 
     let debtWarning = "";
     if (unresolvedDebts.length > 0) {
@@ -78,9 +79,16 @@ export const bindSettings = (root, data, appVersion) => {
         return `• ${friend.person_name}: ${direction}`;
       });
       debtWarning = `\n\nUnresolved debts:\n${lines.join("\n")}\n`;
+      if (negativeDebts.length > 0) {
+        const totalOwed = negativeDebts.reduce(
+          (sum, friend) => sum + Math.abs(friend.debt_eur || 0),
+          0
+        );
+        debtWarning += `\nIf you have not transferred your user to another device, you are in practice defaulting on debt totalling **${formatCurrency(totalOwed)}**. This can have serious consequences.\n`;
+      }
     }
 
-    const body = `This is a SERIOUS step. This will permanently remove all local data. Unless you have transferred your user to another device, you will NOT be able to retrieve your user.${debtWarning}\nDo you still want to remove your user?`;
+    const body = `This is a **serious** step. This will permanently remove all local data. Unless you have transferred your user to another device, you will not be able to retrieve your user.${debtWarning}\nDo you still want to remove your user data?`;
     const isConfirmed = await showConfirmModal({
       title: "Remove user data",
       body,

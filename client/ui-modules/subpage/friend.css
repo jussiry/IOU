@@ -243,3 +243,8 @@
   word-break: break-all;
   line-height: 1.5;
 }
+
+.friend-danger-button {
+  margin: 14px 20px 0;
+  width: calc(100% - 40px);
+}
