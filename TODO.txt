@@ -1,5 +1,7 @@
 
 
+
+FEATURES
 Add inactivate friend button.
 - defaulting / debt forgiveness
 - explain possible concequences
@@ -11,43 +13,29 @@ Inactive frient
   * as long as either retains inactive state, reactivation can be suggested
 
 
-- add e2e test case for multiple devices online (fanning messages)
+BUGS:
+- with multiple devices, only one of them shows friends online status correctly - webrtc connection to only one of them?
+  * add e2e test case for multiple devices online
+    * test to see online status (current bug)
+    * fanning messages to devices
+- getting name passed to second device still bugs.. (brave user with incognito firefox)
 
+CHECK
 - test deleting user and make sure indexdb is fully removed
-- getting name when cloning user still bugs.. (brave user with incognito firefox)
 
-
+SMALL
 - on a friend page highlight latest transaction(s) since the page was last visited
 
 
-Joskus myöhemmin:
+
+
+MAJOR
 - Currencies sivu
   * listaa kaikki itse käytetyt ja kaverien käyttämät valuutat
   * Sama ticker voi olla eri valuutoilla, mutta ei samaa selostusta valuutasta
   * listaa suosituimmuus järjestyksessä, joten ei haittaa vaikka joku "spämmää"
 
-Scratch book
-
-Security questions
-- what happens if malicious server sends "peer_connect" message for two peers to connect, that are not acutally friends?
 
 
+Scratch book:
 
-
-
-
-
-Could You Simplify?
-You could fall back to relay-only for important state and accept eventual consistency:
-
-Ledger entries always go to relays (authoritative history)
-Real-time balance updates via WebRTC if peer is online
-If WebRTC fails or doesn't come back after 30s, fall back to relay sync
-Then WebRTC becomes optional (a performance optimization), not critical. Failures wouldn't break the app, just make it slower.
-
-That would let you:
-
-*Rip out most of the wake-from-suspend logic*
-Accept that reconnects take 10-20s
-Not care about "stale green state" because relay sync is the real source of truth
-The UX would be: "friend appears online (relay + WebRTC) or offline (relay only, 1-2s latency)." Still feels good, no nightmare.
