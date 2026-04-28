@@ -36,6 +36,9 @@ MAJOR
   * listaa suosituimmuus järjestyksessä, joten ei haittaa vaikka joku "spämmää"
 
 
+- Tracking of unique favours (NFT's)
+  * e.g. Bob gave me his powerdrill - no need to define value in euros. It's either to remind to give that exact powerdrill back later, or something of same value.
+
 
 Scratch book:
 
