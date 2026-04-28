@@ -12,8 +12,18 @@ const { createSignalingServer } = require("./signaling/websocket-server");
 
 const HOST = process.env.HOST || "0.0.0.0";
 const PORT = Number(process.env.PORT) || 3000;
-const CLIENT_ROOT = path.resolve(__dirname, "..", "app");
-const INDEX_FILE = path.join(CLIENT_ROOT, "index.html");
+
+const CLIENT_ROOTS = {
+  web: path.resolve(__dirname, "..", "web"),
+  app: path.resolve(__dirname, "..", "app"),
+};
+
+const getClientRoot = (hostname) => {
+  const host = (hostname || "").split(":")[0].toLowerCase();
+  return host === "tally.earth" || host === "www.tally.earth"
+    ? CLIENT_ROOTS.web
+    : CLIENT_ROOTS.app;
+};
 
 const MIME_TYPES = new Map([
   [".css", "text/css; charset=utf-8"],
@@ -38,19 +48,19 @@ const isInsideRoot = (rootPath, targetPath) => {
   return relativePath === "" || (!relativePath.startsWith("..") && !path.isAbsolute(relativePath));
 };
 
-const tryResolvePath = (requestPath) => {
+const tryResolvePath = (clientRoot, requestPath) => {
   try {
     const decodedPath = decodeURIComponent(requestPath);
-    const resolvedPath = path.resolve(CLIENT_ROOT, `.${decodedPath}`);
-    return isInsideRoot(CLIENT_ROOT, resolvedPath) ? resolvedPath : null;
+    const resolvedPath = path.resolve(clientRoot, `.${decodedPath}`);
+    return isInsideRoot(clientRoot, resolvedPath) ? resolvedPath : null;
   } catch {
     return null;
   }
 };
 
-const resolveFilePath = async (requestPath) => {
+const resolveFilePath = async (clientRoot, requestPath) => {
   const normalizedRequestPath = requestPath === "/" ? "/index.html" : requestPath;
-  const initialPath = tryResolvePath(normalizedRequestPath);
+  const initialPath = tryResolvePath(clientRoot, normalizedRequestPath);
   if (!initialPath) return null;
 
   try {
@@ -66,7 +76,7 @@ const resolveFilePath = async (requestPath) => {
     }
   } catch {
     if (!path.extname(normalizedRequestPath)) {
-      return INDEX_FILE;
+      return path.join(clientRoot, "index.html");
     }
     return null;
   }
@@ -114,6 +124,7 @@ const sendFile = async (request, response, filePath) => {
 const server = http.createServer(async (request, response) => {
   const method = request.method || "GET";
   const requestUrl = new URL(request.url || "/", `http://${request.headers.host || "localhost"}`);
+  const clientRoot = getClientRoot(request.headers.host);
 
   if (!["GET", "HEAD"].includes(method)) {
     response.setHeader("Allow", "GET, HEAD");
@@ -121,7 +132,7 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
-  const filePath = await resolveFilePath(requestUrl.pathname);
+  const filePath = await resolveFilePath(clientRoot, requestUrl.pathname);
   if (!filePath) {
     sendText(response, 404, "Not found.");
     return;
