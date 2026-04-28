@@ -16,6 +16,7 @@ const CLIENT_ROOT = path.resolve(__dirname, "..", "app");
 const INDEX_FILE = path.join(CLIENT_ROOT, "index.html");
 const WEB_ROOT = path.resolve(__dirname, "..", "web");
 const WEB_PREFIX = "/web";
+const WEB_DOMAINS = new Set(["tally.app", "www.tally.app"]);
 
 const MIME_TYPES = new Map([
   [".css", "text/css; charset=utf-8"],
@@ -114,14 +115,17 @@ const sendFile = async (request, response, filePath) => {
 };
 
 const resolveWebFilePath = async (requestPath) => {
-  const subPath = requestPath === WEB_PREFIX || requestPath === WEB_PREFIX + "/"
-    ? "/index.html"
-    : requestPath.slice(WEB_PREFIX.length);
+  const normalizedPath = requestPath === "/" || requestPath === "" ? "/index.html" : requestPath;
   try {
-    const decoded = decodeURIComponent(subPath);
+    const decoded = decodeURIComponent(normalizedPath);
     const resolved = path.resolve(WEB_ROOT, `.${decoded}`);
     if (!isInsideRoot(WEB_ROOT, resolved)) return null;
     const stats = await fsp.stat(resolved);
+    if (stats.isDirectory()) {
+      const indexPath = path.join(resolved, "index.html");
+      const indexStats = await fsp.stat(indexPath);
+      return indexStats.isFile() ? indexPath : null;
+    }
     return stats.isFile() ? resolved : null;
   } catch {
     return null;
@@ -138,9 +142,16 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
-  // Serve landing page from /web/ prefix
-  if (requestUrl.pathname === WEB_PREFIX || requestUrl.pathname.startsWith(WEB_PREFIX + "/")) {
-    const webFilePath = await resolveWebFilePath(requestUrl.pathname);
+  // Serve landing page for tally.app domain or /web/ path prefix
+  const hostname = (request.headers.host || "").split(":")[0].toLowerCase();
+  const isWebDomain = WEB_DOMAINS.has(hostname);
+  const isWebPrefix = requestUrl.pathname === WEB_PREFIX || requestUrl.pathname.startsWith(WEB_PREFIX + "/");
+
+  if (isWebDomain || isWebPrefix) {
+    const webPath = isWebPrefix
+      ? requestUrl.pathname.slice(WEB_PREFIX.length) || "/"
+      : requestUrl.pathname;
+    const webFilePath = await resolveWebFilePath(webPath);
     if (!webFilePath) {
       sendText(response, 404, "Not found.");
       return;
