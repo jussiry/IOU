@@ -14,6 +14,8 @@ const HOST = process.env.HOST || "0.0.0.0";
 const PORT = Number(process.env.PORT) || 3000;
 const CLIENT_ROOT = path.resolve(__dirname, "..", "app");
 const INDEX_FILE = path.join(CLIENT_ROOT, "index.html");
+const WEB_ROOT = path.resolve(__dirname, "..", "web");
+const WEB_PREFIX = "/web";
 
 const MIME_TYPES = new Map([
   [".css", "text/css; charset=utf-8"],
@@ -111,6 +113,21 @@ const sendFile = async (request, response, filePath) => {
   }
 };
 
+const resolveWebFilePath = async (requestPath) => {
+  const subPath = requestPath === WEB_PREFIX || requestPath === WEB_PREFIX + "/"
+    ? "/index.html"
+    : requestPath.slice(WEB_PREFIX.length);
+  try {
+    const decoded = decodeURIComponent(subPath);
+    const resolved = path.resolve(WEB_ROOT, `.${decoded}`);
+    if (!isInsideRoot(WEB_ROOT, resolved)) return null;
+    const stats = await fsp.stat(resolved);
+    return stats.isFile() ? resolved : null;
+  } catch {
+    return null;
+  }
+};
+
 const server = http.createServer(async (request, response) => {
   const method = request.method || "GET";
   const requestUrl = new URL(request.url || "/", `http://${request.headers.host || "localhost"}`);
@@ -118,6 +135,17 @@ const server = http.createServer(async (request, response) => {
   if (!["GET", "HEAD"].includes(method)) {
     response.setHeader("Allow", "GET, HEAD");
     sendText(response, 405, "Method not allowed.");
+    return;
+  }
+
+  // Serve landing page from /web/ prefix
+  if (requestUrl.pathname === WEB_PREFIX || requestUrl.pathname.startsWith(WEB_PREFIX + "/")) {
+    const webFilePath = await resolveWebFilePath(requestUrl.pathname);
+    if (!webFilePath) {
+      sendText(response, 404, "Not found.");
+      return;
+    }
+    await sendFile(request, response, webFilePath);
     return;
   }
 

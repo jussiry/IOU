@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tally — Return Money to Its Roots</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&display=swap" rel="stylesheet">
+
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      background: oklch(96% 0.014 100);
+      color: oklch(16% 0.022 150);
+      font-family: 'DM Sans', system-ui, sans-serif;
+      font-size: 17px;
+      line-height: 1.65;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+    /* Grain */
+    body::after {
+      content: '';
+      position: fixed; inset: 0; pointer-events: none; z-index: 9999;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.78' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='0.042'/%3E%3C/svg%3E");
+    }
+    #root { min-height: 100vh; }
+
+    @keyframes sway {
+      0%,100% { transform: rotate(-1.5deg); }
+      50%      { transform: rotate(1.5deg); }
+    }
+    @keyframes fadeUp {
+      from { opacity:0; transform:translateY(24px); }
+      to   { opacity:1; transform:translateY(0); }
+    }
+    .fade-up { animation: fadeUp 0.9s ease both; }
+    .fade-up-2 { animation: fadeUp 0.9s 0.15s ease both; }
+    .fade-up-3 { animation: fadeUp 0.9s 0.3s ease both; }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel">
+
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "palette": "light",
+  "accentHue": 120,
+  "showMutualCredit": true,
+  "showFeatures": true,
+  "ctaLabel": "Try Tally",
+  "branchDepth": 5,
+  "repelForce": 40,
+  "lineLength": 42,
+  "nodeSize": 3
+}/*EDITMODE-END*/;
+
+// ─── Physics tree illustration ─────────────────────────────────────────────
+const RootsIllustration = ({ color, faint, branchDepth = 3, repelForce = 160, bgColor = 'white', lineLength = 36, nodeSize = 5 }) => {
+  const NODE_R  = nodeSize;
+  const LINE_L  = lineLength;
+  const SPREAD  = 40 * Math.PI / 180;
+  const SPRING_K = 0.055;
+  const DAMPING  = 0.78;
+
+  const buildTree = React.useCallback((depth) => {
+    const nodes = [{ x: 0, y: 0, vx: 0, vy: 0, fx: 0, fy: 0, fixed: true }];
+    const edges = [];
+    const addBranch = (parentIdx, angle, d) => {
+      if (d === 0) return;
+      const p = nodes[parentIdx];
+      const idx = nodes.length;
+      nodes.push({
+        x: p.x + LINE_L * Math.cos(angle),
+        y: p.y + LINE_L * Math.sin(angle),
+        vx: (Math.random() - 0.5) * 0.5,
+        vy: (Math.random() - 0.5) * 0.5,
+        fx: 0, fy: 0, fixed: false
+      });
+      edges.push([parentIdx, idx]);
+      if (d > 1) {
+        addBranch(idx, angle - SPREAD, d - 1);
+        addBranch(idx, angle + SPREAD, d - 1);
+      }
+    };
+    addBranch(0, -Math.PI / 2, depth);
+    addBranch(0,  Math.PI / 2, depth);
+
+    // Pre-settle: run physics synchronously for 500 iterations
+    const step = (rep) => {
+      const n = nodes.length;
+      for (let i = 0; i < n; i++) { nodes[i].fx = 0; nodes[i].fy = 0; }
+      for (let i = 0; i < n; i++) {
+        if (nodes[i].fixed) continue;
+        for (let j = 0; j < n; j++) {
+          if (i === j) continue;
+          const dx = nodes[i].x - nodes[j].x;
+          const dy = nodes[i].y - nodes[j].y;
+          const d2 = Math.max(dx*dx + dy*dy, 4);
+          const d  = Math.sqrt(d2);
+          const f  = rep / d2;
+          nodes[i].fx += f * dx / d;
+          nodes[i].fy += f * dy / d;
+        }
+      }
+      for (const [a, b] of edges) {
+        const dx = nodes[b].x - nodes[a].x;
+        const dy = nodes[b].y - nodes[a].y;
+        const d  = Math.sqrt(dx*dx + dy*dy) || 0.01;
+        const f  = SPRING_K * (d - LINE_L);
+        const fx = f * dx / d, fy = f * dy / d;
+        if (!nodes[a].fixed) { nodes[a].fx += fx; nodes[a].fy += fy; }
+        if (!nodes[b].fixed) { nodes[b].fx -= fx; nodes[b].fy -= fy; }
+      }
+      for (let i = 0; i < n; i++) {
+        if (nodes[i].fixed) continue;
+        nodes[i].vx = (nodes[i].vx + nodes[i].fx) * DAMPING;
+        nodes[i].vy = (nodes[i].vy + nodes[i].fy) * DAMPING;
+        nodes[i].x += nodes[i].vx;
+        nodes[i].y += nodes[i].vy;
+      }
+    };
+    for (let i = 0; i < 500; i++) step(repelForce);
+
+    return { nodes, edges };
+  }, [branchDepth, repelForce, lineLength]);
+
+  const treeRef   = React.useRef(null);
+  const rafRef    = React.useRef(null);
+  const repelRef  = React.useRef(repelForce);
+  const [, setTick] = React.useState(0);
+
+  // Rebuild tree when depth changes
+  React.useEffect(() => {
+    treeRef.current = buildTree(branchDepth);
+    setTick(t => t + 1);
+  }, [branchDepth, buildTree]);
+
+  // Keep repel ref fresh without restarting loop
+  React.useEffect(() => { repelRef.current = repelForce; }, [repelForce]);
+
+  // Animation loop — wind + gentle continuous physics
+  React.useEffect(() => {
+    let t = 0;
+    const tick = () => {
+      const tree = treeRef.current;
+      if (!tree) { rafRef.current = requestAnimationFrame(tick); return; }
+      const { nodes, edges } = tree;
+      const n = nodes.length;
+      const repel = repelRef.current;
+      t += 0.012;
+
+      for (let i = 0; i < n; i++) { nodes[i].fx = 0; nodes[i].fy = 0; }
+
+      // Wind — stronger on upper nodes (branches), weaker on lower (roots)
+      for (let i = 0; i < n; i++) {
+        if (nodes[i].fixed) continue;
+        const y = nodes[i].y;
+        let windStrength;
+        if (y < 0) {
+          // Upper tree — full strength
+          windStrength = Math.max(0, -y) / 200 * 0.18;
+        } else {
+          // Roots — 1/3 strength, inverted phase for subtle counter-sway
+          windStrength = Math.max(0, y) / 200 * 0.06;
+        }
+        nodes[i].fx += Math.sin(t + i * 0.3) * windStrength;
+      }
+
+      // Repulsion
+      for (let i = 0; i < n; i++) {
+        if (nodes[i].fixed) continue;
+        for (let j = 0; j < n; j++) {
+          if (i === j) continue;
+          const dx = nodes[i].x - nodes[j].x;
+          const dy = nodes[i].y - nodes[j].y;
+          const d2 = Math.max(dx*dx + dy*dy, 4);
+          const d  = Math.sqrt(d2);
+          const f  = repel / d2;
+          nodes[i].fx += f * dx / d;
+          nodes[i].fy += f * dy / d;
+        }
+      }
+
+      // Springs
+      for (const [a, b] of edges) {
+        const dx = nodes[b].x - nodes[a].x;
+        const dy = nodes[b].y - nodes[a].y;
+        const d  = Math.sqrt(dx*dx + dy*dy) || 0.01;
+        const f  = SPRING_K * (d - LINE_L);
+        const fx = f * dx / d, fy = f * dy / d;
+        if (!nodes[a].fixed) { nodes[a].fx += fx; nodes[a].fy += fy; }
+        if (!nodes[b].fixed) { nodes[b].fx -= fx; nodes[b].fy -= fy; }
+      }
+
+      // Integrate
+      for (let i = 0; i < n; i++) {
+        if (nodes[i].fixed) continue;
+        nodes[i].vx = (nodes[i].vx + nodes[i].fx) * DAMPING;
+        nodes[i].vy = (nodes[i].vy + nodes[i].fy) * DAMPING;
+        nodes[i].x += nodes[i].vx;
+        nodes[i].y += nodes[i].vy;
+      }
+
+      setTick(tk => tk + 1);
+      rafRef.current = requestAnimationFrame(tick);
+    };
+    rafRef.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, []);
+
+  const tree = treeRef.current;
+  if (!tree) return null;
+  const { nodes, edges } = tree;
+
+  // Compute depth of each node (BFS from center)
+  const depth = new Array(nodes.length).fill(0);
+  const adj = {};
+  for (const [a, b] of edges) {
+    adj[a] = adj[a] || []; adj[a].push(b);
+    adj[b] = adj[b] || []; adj[b].push(a);
+  }
+  const visited = new Set([0]);
+  const queue = [0];
+  while (queue.length) {
+    const cur = queue.shift();
+    for (const nb of (adj[cur] || [])) {
+      if (!visited.has(nb)) {
+        visited.add(nb);
+        depth[nb] = depth[cur] + 1;
+        queue.push(nb);
+      }
+    }
+  }
+  const maxDepth = Math.max(...depth);
+
+  // Taper: thick at center, thin at tips
+  const edgeWidth = (a, b) => {
+    const d = Math.max(depth[a], depth[b]);
+    const t = maxDepth > 0 ? d / maxDepth : 0;
+    return Math.max(0.6, 3.2 * (1 - t * 0.8));
+  };
+
+  const pad = NODE_R + 10;
+
+  return (
+    <svg viewBox="-280 -280 560 560"
+      style={{ width: '100%', maxWidth: 460, display: 'block' }}>
+      {edges.map(([a, b], i) => (
+        <line key={i}
+          x1={nodes[a].x} y1={nodes[a].y}
+          x2={nodes[b].x} y2={nodes[b].y}
+          stroke={color} strokeWidth={edgeWidth(a, b)} strokeLinecap="round" opacity="0.72" />
+      ))}
+      {nodes.map((n, i) => (
+        <circle key={i} cx={n.x} cy={n.y} r={NODE_R}
+          fill={i === 0 ? color : bgColor}
+          stroke={color} strokeWidth="1.8" />
+      ))}
+    </svg>
+  );
+};
+
+
+
+// ─── SVG: Tally mark ──────────────────────────────────────────────────────
+const TallyMark = ({ count=5, color='currentColor', size=40 }) => {
+  const gap = size / 6;
+  return (
+    <svg width={size*0.9} height={size} viewBox={`0 0 ${size*0.9} ${size}`}
+      fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round">
+      {Array.from({length: count}).map((_,i) => i === 4
+        ? <line key={i} x1={0} y1={size*0.2} x2={size*0.9} y2={size*0.8}/>
+        : <line key={i} x1={i*gap+gap*0.5} y1={size*0.12} x2={i*gap+gap*0.5} y2={size*0.88}/>
+      )}
+    </svg>
+  );
+};
+
+// ─── SVG: Credit circle diagram ───────────────────────────────────────────
+const CreditCircle = ({ green, amber }) => {
+  // Three nodes in a triangle
+  const nodes = [
+    { angle: -90, label: 'Alice',   balance: '−2', color: amber },
+    { angle:  30, label: 'Bob',     balance: '+1', color: green },
+    { angle: 150, label: 'Charlie', balance: '+1', color: green },
+  ];
+  const R = 110, cx = 200, cy = 185;
+  const pt = (a) => [
+    cx + R * Math.cos(a * Math.PI / 180),
+    cy + R * Math.sin(a * Math.PI / 180),
+  ];
+
+  // Arrows: Alice→Bob (3), Bob→Charlie (2), Charlie→Alice (1)
+  const arrows = [
+    { from: 0, to: 1, count: 3, color: amber },
+    { from: 1, to: 2, count: 2, color: green },
+    { from: 2, to: 0, count: 1, color: 'oklch(55% 0.08 200)' },
+  ];
+
+  return (
+    <svg viewBox="0 0 400 370" style={{ width:'100%', maxWidth:340, display:'block' }}>
+      <defs>
+        {arrows.map((a, i) => (
+          <marker key={i} id={`arr${i}`} markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto">
+            <path d="M0,0 L0,7 L7,3.5 Z" fill={a.color} opacity="0.9"/>
+          </marker>
+        ))}
+      </defs>
+
+      {/* Arrows between nodes */}
+      {arrows.map((a, i) => {
+        const [x1, y1] = pt(nodes[a.from].angle);
+        const [x2, y2] = pt(nodes[a.to].angle);
+        // Shorten line to not overlap circles
+        const nr = 36;
+        const dx = x2 - x1, dy = y2 - y1;
+        const len = Math.sqrt(dx*dx + dy*dy);
+        const sx = x1 + dx/len * nr, sy = y1 + dy/len * nr;
+        const ex = x2 - dx/len * (nr + 6), ey = y2 - dy/len * (nr + 6);
+        return (
+          <g key={i}>
+            <line x1={sx} y1={sy} x2={ex} y2={ey}
+              stroke={a.color} strokeWidth="2" opacity="0.85"
+              markerEnd={`url(#arr${i})`}/>
+            {/* Tally count badge */}
+            <rect x={(sx+ex)/2 - 10} y={(sy+ey)/2 - 10} width="20" height="20" rx="10"
+              fill="white" stroke={a.color} strokeWidth="1.2"/>
+            <text x={(sx+ex)/2} y={(sy+ey)/2 + 4.5} textAnchor="middle"
+              fontFamily="'DM Sans',sans-serif" fontSize="11" fontWeight="600" fill={a.color}>
+              {a.count}
+            </text>
+          </g>
+        );
+      })}
+
+      {/* Nodes */}
+      {nodes.map((n, i) => {
+        const [x, y] = pt(n.angle);
+        return (
+          <g key={i}>
+            <circle cx={x} cy={y} r={34} fill="white" stroke={n.color} strokeWidth="2"/>
+            <text x={x} y={y - 5} textAnchor="middle"
+              fontFamily="'DM Sans',sans-serif" fontSize="13" fontWeight="500"
+              fill="oklch(18% 0.022 150)">{n.label}</text>
+            <text x={x} y={y + 13} textAnchor="middle"
+              fontFamily="'DM Sans',sans-serif" fontSize="12" fontWeight="600"
+              fill={n.color}>{n.balance}</text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+};
+
+// ─── Step ─────────────────────────────────────────────────────────────────
+const Step = ({ n, title, body, green, rule }) => (
+  <div style={{ display:'flex', gap:20, padding:'28px 0', borderBottom:`1px solid ${rule}` }}>
+    <div style={{
+      width:44, height:44, borderRadius:'50%', flexShrink:0,
+      border:`2px solid ${green}`, display:'flex', alignItems:'center', justifyContent:'center',
+      fontFamily:"'DM Serif Display',serif", fontSize:18, color:green, fontWeight:600
+    }}>{n}</div>
+    <div>
+      <div style={{ fontFamily:"'DM Serif Display',serif", fontSize:20, fontWeight:600, marginBottom:6 }}>{title}</div>
+      <div style={{ color:'oklch(38% 0.018 145)', lineHeight:1.65 }}>{body}</div>
+    </div>
+  </div>
+);
+
+// ─── Feature ──────────────────────────────────────────────────────────────
+const Feature = ({ icon, text, green }) => (
+  <div style={{
+    display:'flex', alignItems:'center', gap:12,
+    padding:'12px 20px',
+    background:'oklch(99% 0.008 100)',
+    border:'1px solid oklch(88% 0.018 148)',
+    borderRadius:999, fontSize:15,
+    color:'oklch(24% 0.02 148)'
+  }}>
+    <span style={{ color:green, fontSize:17 }}>{icon}</span>{text}
+  </div>
+);
+
+// ─── Concept Card ─────────────────────────────────────────────────────────
+const ConceptCard = ({ title, body, accent, bg }) => (
+  <div style={{
+    padding:'32px 28px', background:bg,
+    border:`1px solid ${accent}33`, borderRadius:16,
+    borderTop:`3px solid ${accent}`
+  }}>
+    <div style={{ fontFamily:"'DM Serif Display',serif", fontSize:20, fontWeight:600, marginBottom:10 }}>{title}</div>
+    <div style={{ color:'oklch(38% 0.018 145)', lineHeight:1.7, fontSize:16 }}>{body}</div>
+  </div>
+);
+
+// ─── SVG: Chained trust — Alice ↔ Bob ↔ Charlie ─────────────────────────
+const ChainDiagram = ({ green, amber, inkMid, bgCard, rule }) => {
+  const nodes = [
+    { x: 90,  label: 'Alice',   sub: '−10 €', subColor: amber },
+    { x: 280, label: 'Bob',     sub: 'neutral',  subColor: 'oklch(55% 0.01 150)' },
+    { x: 470, label: 'Charlie', sub: '+10 €', subColor: green },
+  ];
+
+  return (
+    <svg viewBox="0 0 560 290" style={{ width:'100%', maxWidth:520, display:'block' }}>
+
+      {/* Trust connection lines */}
+      <line x1="130" y1="90" x2="242" y2="90" stroke={green} strokeWidth="1.5" strokeDasharray="5 4" opacity="0.4"/>
+      <line x1="318" y1="90" x2="430" y2="90" stroke={green} strokeWidth="1.5" strokeDasharray="5 4" opacity="0.4"/>
+
+      {/* Trust labels */}
+      <text x="186" y="68" textAnchor="middle" fontFamily="'DM Sans',sans-serif"
+        fontSize="13" fill={green} opacity="0.65">trusts</text>
+      <text x="374" y="68" textAnchor="middle" fontFamily="'DM Sans',sans-serif"
+        fontSize="13" fill={green} opacity="0.65">trusts</text>
+
+      {/* Arrows */}
+      <path d="M134,104 C168,124 208,124 238,104"
+        stroke={amber} strokeWidth="2.2" fill="none" opacity="0.85"
+        markerEnd="url(#arr-a)"/>
+      <path d="M322,104 C356,124 396,124 426,104"
+        stroke={green} strokeWidth="2.2" fill="none" opacity="0.85"
+        markerEnd="url(#arr-b)"/>
+
+      <defs>
+        <marker id="arr-a" markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto">
+          <path d="M0,0 L0,7 L7,3.5 Z" fill={amber} opacity="0.85"/>
+        </marker>
+        <marker id="arr-b" markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto">
+          <path d="M0,0 L0,7 L7,3.5 Z" fill={green} opacity="0.85"/>
+        </marker>
+      </defs>
+
+      {/* Badges */}
+      <rect x="158" y="118" width="56" height="22" rx="11"
+        fill="white" stroke={amber} strokeWidth="1.2" opacity="0.95"/>
+      <text x="186" y="133" textAnchor="middle" fontFamily="'DM Sans',sans-serif"
+        fontSize="12" fontWeight="600" fill={amber}>10 €</text>
+
+      <rect x="346" y="118" width="56" height="22" rx="11"
+        fill="white" stroke={green} strokeWidth="1.2" opacity="0.95"/>
+      <text x="374" y="133" textAnchor="middle" fontFamily="'DM Sans',sans-serif"
+        fontSize="12" fontWeight="600" fill={green}>10 €</text>
+
+      {/* Node circles */}
+      {nodes.map((n, i) => (
+        <g key={i}>
+          <circle cx={n.x} cy={90} r={38}
+            fill="white" stroke={i===1 ? green : 'oklch(84% 0.016 100)'}
+            strokeWidth={i===1 ? 2 : 1.5}/>
+          <text x={n.x} y={86} textAnchor="middle"
+            fontFamily="'DM Sans',sans-serif" fontSize="14" fontWeight="500"
+            fill="oklch(18% 0.022 150)">{n.label}</text>
+          <text x={n.x} y={104} textAnchor="middle"
+            fontFamily="'DM Sans',sans-serif" fontSize="12" fontWeight="600"
+            fill={n.subColor}>{n.sub}</text>
+        </g>
+      ))}
+
+      {/* Result caption */}
+      <text x="280" y="198" textAnchor="middle" fontFamily="'DM Serif Display',serif"
+        fontSize="20" fill="oklch(18% 0.022 150)" fontStyle="italic">
+        Alice paid Charlie — through Bob.
+      </text>
+      <text x="280" y="226" textAnchor="middle" fontFamily="'DM Sans',sans-serif"
+        fontSize="15" fill={inkMid} opacity="0.75">
+        Alice and Charlie can transact without having to trust each other.
+      </text>
+    </svg>
+  );
+};
+
+// ─── App ──────────────────────────────────────────────────────────────────
+function App() {
+  const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
+
+  const isDark  = tweaks.palette === 'dark';
+  const hue     = tweaks.accentHue;
+  const green   = `oklch(48% 0.14 ${hue})`;
+  const greenLt = `oklch(56% 0.11 ${hue})`;
+  const amber   = `oklch(56% 0.13 72)`;
+
+  const bg      = isDark ? `oklch(14% 0.018 ${hue})` : `oklch(96% 0.012 ${hue})`;
+  const bgCard  = isDark ? `oklch(20% 0.018 ${hue})` : `oklch(98.8% 0.006 ${hue})`;
+  const bgStripe= isDark ? `oklch(17% 0.018 ${hue})` : `oklch(93.5% 0.016 ${hue})`;
+  const ink     = isDark ? 'oklch(92% 0.01 100)'  : 'oklch(16% 0.022 150)';
+  const inkMid  = isDark ? 'oklch(68% 0.01 100)'  : 'oklch(38% 0.018 148)';
+  const rule    = isDark ? 'oklch(28% 0.018 148)'  : 'oklch(84% 0.016 100)';
+  const faintLine = isDark ? 'oklch(35% 0.015 148)' : 'oklch(78% 0.018 148)';
+
+  return (
+    <div style={{ background:bg, color:ink, minHeight:'100vh', transition:'background 0.4s, color 0.4s' }}>
+
+      {/* ── NAV ── */}
+      <nav style={{
+        position:'sticky', top:0, zIndex:100,
+        display:'flex', alignItems:'center', justifyContent:'space-between',
+        padding:'0 clamp(24px,5vw,80px)', height:64,
+        background: isDark ? `oklch(14% 0.018 145 / 0.93)` : `oklch(96% 0.014 100 / 0.93)`,
+        backdropFilter:'blur(14px)',
+        borderBottom:`1px solid ${rule}`,
+        transition:'background 0.4s',
+      }}>
+        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+          <TallyMark count={5} color={green} size={26}/>
+          <span style={{ fontFamily:"'DM Serif Display',serif", fontSize:21, fontWeight: 400, letterSpacing:'-0.01em' }}>
+            tally<span style={{ color:green }}>.earth</span>
+          </span>
+        </div>
+        <div style={{ display:'flex', gap:28, alignItems:'center' }}>
+          {['How it works','#how','Why Tally','#why','Mutual credit','#mutual'].flatMap((_,i,a) =>
+            i % 2 === 0
+              ? [<a key={a[i]} href={a[i+1]} style={{ color:inkMid, textDecoration:'none', fontSize:15, transition:'color 0.2s' }}
+                  onMouseEnter={e=>e.target.style.color=green}
+                  onMouseLeave={e=>e.target.style.color=inkMid}>{a[i]}</a>]
+              : []
+          )}
+          <a href="https://iou-ui.up.railway.app/" target="_blank" rel="noopener"
+            style={{ background:green, color:'white', padding:'8px 22px', borderRadius:999, textDecoration:'none', fontSize:15, fontWeight:500, transition:'opacity 0.2s' }}
+            onMouseEnter={e=>e.currentTarget.style.opacity='0.82'}
+            onMouseLeave={e=>e.currentTarget.style.opacity='1'}>{tweaks.ctaLabel}</a>
+        </div>
+      </nav>
+
+      {/* ── HERO ── */}
+      <section style={{
+        minHeight:'90vh', display:'grid',
+        gridTemplateColumns:'1fr 1fr',
+        alignItems:'center',
+        gap:60,
+        padding:'clamp(60px,10vh,120px) clamp(24px,7vw,120px)',
+        position:'relative', overflow:'hidden',
+      }}>
+        {/* left */}
+        <div className="fade-up">
+          <div style={{
+            display:'inline-flex', alignItems:'center', gap:8,
+            padding:'6px 14px', borderRadius:999,
+            border:`1px solid ${greenLt}`, color:greenLt,
+            fontSize:13, fontWeight:500, marginBottom:36, letterSpacing:'0.04em'
+          }}>
+            <span style={{ width:7, height:7, borderRadius:'50%', background:greenLt, display:'inline-block' }}/>
+            early access · peer-to-peer · be your own bank
+          </div>
+
+          <h1 style={{
+            fontFamily:"'DM Serif Display',serif",
+            fontSize:'clamp(44px,5.5vw,76px)',
+            lineHeight:1.1, fontWeight: 400, letterSpacing:'-0.02em',
+            marginBottom:12, textWrap:'pretty'
+          }}>
+            Tally
+          </h1>
+          <h2 style={{
+            fontFamily:"'DM Serif Display',serif",
+            fontSize:'clamp(22px,3vw,38px)',
+            lineHeight:1.25, fontWeight:400, fontStyle:'italic',
+            color:green, marginBottom:32, textWrap:'pretty'
+          }}>
+            Return money to its roots.
+          </h2>
+
+          <p style={{ fontSize:'clamp(17px,1.8vw,20px)', color:inkMid, maxWidth:480, lineHeight:1.7, marginBottom:44, textWrap:'pretty' }}>
+            A peer-to-peer app for tracking favours and trading within your community — no banks, no interest, no middlemen. Rooted in thousands of years of reciprocal exchange.
+          </p>
+
+          <div style={{ display:'flex', gap:16, flexWrap:'wrap', alignItems:'center' }}>
+            <a href="https://iou-ui.up.railway.app/" target="_blank" rel="noopener"
+              style={{
+                display:'inline-block', background:green, color:'white',
+                padding:'14px 34px', borderRadius:999, textDecoration:'none',
+                fontSize:17, fontWeight:500, boxShadow:`0 4px 28px ${green}44`,
+                transition:'transform 0.2s, box-shadow 0.2s'
+              }}
+              onMouseEnter={e=>{e.currentTarget.style.transform='translateY(-2px)';e.currentTarget.style.boxShadow=`0 10px 36px ${green}55`;}}
+              onMouseLeave={e=>{e.currentTarget.style.transform='translateY(0)';e.currentTarget.style.boxShadow=`0 4px 28px ${green}44`;}}>
+              {tweaks.ctaLabel} →
+            </a>
+            <a href="#how" style={{ color:inkMid, textDecoration:'none', fontSize:16, borderBottom:`1px solid ${rule}`, paddingBottom:2 }}>
+              See how it works
+            </a>
+          </div>
+        </div>
+
+        {/* right — roots illustration */}
+        <div className="fade-up-2" style={{ display:'flex', justifyContent:'center', alignItems:'center' }}>
+          <RootsIllustration color={green} faint={faintLine} branchDepth={tweaks.branchDepth} repelForce={tweaks.repelForce} bgColor={bg} lineLength={tweaks.lineLength} nodeSize={tweaks.nodeSize}/>
+        </div>
+
+        {/* scroll cue */}
+        <div style={{
+          position:'absolute', bottom:36, left:'50%', transform:'translateX(-50%)',
+          display:'flex', flexDirection:'column', alignItems:'center', gap:6,
+          color:inkMid, fontSize:11, opacity:0.4, letterSpacing:'0.1em'
+        }}>
+          <div style={{ width:1, height:36, background:inkMid }}/>scroll
+        </div>
+      </section>
+
+      {/* ── HOW IT WORKS ── */}
+      <section id="how" style={{
+        padding:'clamp(80px,12vh,140px) clamp(24px,7vw,120px)',
+        background: bgCard,
+        borderTop:`1px solid ${rule}`,
+      }}>
+        <div style={{ maxWidth:1080, margin:'0 auto', display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(300px,1fr))', gap:72, alignItems:'center' }}>
+          <div>
+            <div style={{ color:green, fontSize:12, fontWeight:500, letterSpacing:'0.12em', marginBottom:16 }}>HOW IT WORKS</div>
+            <h2 style={{ fontFamily:"'DM Serif Display',serif", fontSize:'clamp(30px,3.5vw,46px)', fontWeight: 400, lineHeight:1.2, marginBottom:36, textWrap:'pretty' }}>
+              Like a tally stick —<br/><em style={{ color:green, fontStyle:'italic' }}>split between two.</em>
+            </h2>
+            <Step n="1" title="Connect with people you trust" green={green} rule={rule}
+              body="Add friends by scanning their QR code or by sharing your identity key."/>
+            <Step n="2" title="Record a favour" green={green} rule={rule}
+              body="Did someone cover your coffee? Buy groceries for a neighbour? Log a tally. It's kept on your phone, not on any server."/>
+            <Step n="3" title="Let it flow through the community" green={green} rule={rule}
+              body={<>Your favours can travel through <a href="#chain" style={{ color:green, textDecoration:'none', borderBottom:`1px solid ${green}55`, paddingBottom:1, fontWeight:600 }}>chains of trust</a> to someone you don't even know. When loops form, they cancel automatically. The whole network stays in balance.</>}/>
+          </div>
+          <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:24 }}>
+            <CreditCircle green={green} amber={amber}/>
+            <p style={{ color:inkMid, fontSize:14, textAlign:'center', maxWidth:300, lineHeight:1.6 }}>
+              Every favour logged has a matching entry somewhere in the network — always balanced, always honest.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* ── CHAINED TRUST ── */}
+      <section id="chain" style={{
+        padding:'clamp(80px,12vh,140px) clamp(24px,7vw,120px)',
+        background: bgStripe,
+        borderTop:`1px solid ${rule}`,
+      }}>
+        <div style={{ maxWidth:1080, margin:'0 auto', display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(300px,1fr))', gap:72, alignItems:'center' }}>
+
+          {/* Illustration */}
+          <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:20 }}>
+            <ChainDiagram green={green} amber={amber} inkMid={inkMid} bgCard={bgCard} rule={rule}/>
+          </div>
+
+          {/* Text */}
+          <div>
+            <div style={{ color:green, fontSize:12, fontWeight:500, letterSpacing:'0.12em', marginBottom:16 }}>CHAINED TRUST</div>
+            <h2 style={{ fontFamily:"'DM Serif Display',serif", fontSize:'clamp(28px,3.5vw,44px)', lineHeight:1.2, marginBottom:20, textWrap:'pretty' }}>
+              Reach anyone through<br/><em style={{ color:green, fontStyle:'italic' }}>a chain of friends.</em>
+            </h2>
+            <p style={{ color:inkMid, lineHeight:1.75, marginBottom:20, textWrap:'pretty' }}>
+              Alice and Bob trust each other. Bob and Charlie trust each other. Alice needs to pay Charlie — but they've never met.
+            </p>
+            <p style={{ color:inkMid, lineHeight:1.75, marginBottom:20, textWrap:'pretty' }}>
+              Tally routes the favour through Bob: Alice records a tally with Bob, Bob records one of equal value with Charlie. Charlie is paid. Bob's balance stays neutral. Alice and Charlie can transact without having to trust each other.
+            </p>
+            <p style={{ color:inkMid, lineHeight:1.75, textWrap:'pretty' }}>
+              Chains can be as long as needed — the more trust connections in your community, the further a favour can travel.
+            </p>
+          </div>
+
+        </div>
+      </section>
+      {tweaks.showMutualCredit && (
+        <section id="mutual" style={{
+          background:bgCard, borderTop:`1px solid ${rule}`, borderBottom:`1px solid ${rule}`,
+          padding:'clamp(80px,12vh,140px) clamp(24px,7vw,120px)',
+          transition:'background 0.4s',
+        }}>
+          <div style={{ maxWidth:1080, margin:'0 auto' }}>
+            <div style={{ color:green, fontSize:12, fontWeight:500, letterSpacing:'0.12em', marginBottom:16 }}>THE CONCEPT</div>
+            <h2 style={{ fontFamily:"'DM Serif Display',serif", fontSize:'clamp(28px,3.5vw,44px)', fontWeight: 400, lineHeight:1.2, marginBottom:16, textWrap:'pretty', maxWidth:640 }}>
+              Mutual favour — as old as community itself.
+            </h2>
+            <p style={{ color:inkMid, maxWidth:560, marginBottom:56, lineHeight:1.75, textWrap:'pretty' }}>
+              Before coins and central banks, communities made trade based on trust and shared records. In the digital age we can extend this local trust to global communities.
+            </p>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(240px,1fr))', gap:20 }}>
+              <ConceptCard accent={green} bg={bgStripe}
+                title="Choose your currency"
+                body="The value of favours can be recorded in any currency you and your friends choose: euros, work hours, meals. Only imagination is the limit."/>
+              <ConceptCard accent={green} bg={bgStripe}
+                title="Secure and private"
+                body="Tallies are secured with modern cryptography, so no one besides the people making an exchange can see them."/>
+              <ConceptCard accent={amber} bg={bgStripe}
+                title="Open source and decentralised"
+                body="Tally is not just an app, it's a protocol that anyone can build on. The local nature of tallies makes it truly decentralised, while also allowing it to scale without any bottlenecks."/>
+              <ConceptCard accent={amber} bg={bgStripe}
+                title="Circular cancellation"
+                body="If A owes B and B owes C and C owes A, Tally cancels the loop automatically. Debts dissolve; the community moves on."/>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ── WHY TALLY ── */}
+      <section id="why" style={{
+        padding:'clamp(80px,12vh,140px) clamp(24px,7vw,120px)',
+        background: bgStripe,
+        borderTop:`1px solid ${rule}`,
+        borderBottom:`1px solid ${rule}`,
+      }}>
+        <div style={{ maxWidth:820, margin:'0 auto' }}>
+          <div style={{ color:green, fontSize:12, fontWeight:500, letterSpacing:'0.12em', marginBottom:16 }}>THE ROOTS</div>
+          <h2 style={{ fontFamily:"'DM Serif Display',serif", fontSize:'clamp(28px,3.5vw,44px)', fontWeight: 400, lineHeight:1.25, marginBottom:40, textWrap:'pretty' }}>
+            Money was never meant to be this complicated.
+          </h2>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))', gap:40, marginBottom:52 }}>
+            <p style={{ color:inkMid, lineHeight:1.8, textWrap:'pretty' }}>
+              Whether Hawala, Quipu or Tally Sticks, using records of good deeds as money is long and ancient. When you root money in the community it stays honest, and can't support wars or other destructive aims.
+            </p>
+            <p style={{ color:inkMid, lineHeight:1.8, textWrap:'pretty' }}>
+              Tally.earth returns this idea to the digital age — and takes it further. By chaining tallies, local trust can extend to global trade. No central monetary system. No manipulation of the money supply. No corruption.
+            </p>
+          </div>
+          <blockquote style={{
+            padding:'32px 40px',
+            borderLeft:`3px solid ${green}`,
+            background:bgCard, borderRadius:'0 12px 12px 0',
+          }}>
+            <p style={{
+              fontFamily:"'DM Serif Display',serif",
+              fontSize:'clamp(20px,2.2vw,26px)', fontStyle:'italic',
+              lineHeight:1.5, color:ink, marginBottom:14
+            }}>
+              "Money, in its essence, is just bookkeeping that tracks good deeds that should be paid back."
+            </p>
+            <div style={{ color:inkMid, fontSize:14 }}>— Tally manifesto</div>
+          </blockquote>
+        </div>
+      </section>
+
+      {/* ── FEATURES ── */}
+      {tweaks.showFeatures && (
+        <section style={{ padding:'clamp(80px,12vh,130px) clamp(24px,7vw,120px)', background: bgCard, borderTop:`1px solid ${rule}`, borderBottom:`1px solid ${rule}` }}>
+          <div style={{ maxWidth:860, margin:'0 auto' }}>
+            <div style={{ color:green, fontSize:12, fontWeight:500, letterSpacing:'0.12em', marginBottom:16 }}>FEATURES</div>
+            <h2 style={{ fontFamily:"'DM Serif Display',serif", fontSize:'clamp(26px,3vw,40px)', fontWeight: 400, lineHeight:1.25, marginBottom:44 }}>
+              Honest tools for tracking favours.
+            </h2>
+            <div style={{ display:'flex', flexWrap:'wrap', gap:12 }}>
+              {[
+                ['◎','No sign-up or revealing data'],
+                ['⟳','Automatic loop cancellation'],
+                ['◈','QR code friend-adding'],
+                ['◐','Works offline on mobile'],
+                ['⊹','Trust limits you set yourself'],
+                ['⌁','Nostr-compatible identity'],
+                ['◫','Full local transaction history'],
+                ['◭','Open source'],
+                ['◬','Peer-to-peer, data stays on device'],
+              ].map(([icon,text]) => <Feature key={text} icon={icon} text={text} green={green}/>)}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ── CTA ── */}
+      <section style={{
+        padding:'clamp(100px,14vh,160px) clamp(24px,7vw,120px)',
+        display:'flex', flexDirection:'column', alignItems:'center', textAlign:'center',
+        background: isDark ? `oklch(12% 0.022 ${hue})` : `oklch(22% 0.05 ${hue})`,
+        color: 'oklch(96% 0.01 100)',
+      }}>
+        <div style={{ marginBottom:44, opacity:0.18 }}>
+          <RootsIllustration color={ink} faint={ink} branchDepth={tweaks.branchDepth} repelForce={tweaks.repelForce} bgColor={isDark ? 'oklch(12% 0.022 148)' : 'oklch(22% 0.05 148)'} lineLength={tweaks.lineLength} nodeSize={tweaks.nodeSize}/>
+        </div>
+        <h2 style={{
+          fontFamily:"'DM Serif Display',serif",
+          fontSize:'clamp(32px,5vw,62px)', fontWeight: 400, lineHeight:1.15,
+          maxWidth:580, marginBottom:20, textWrap:'pretty', marginTop:-160,
+          position:'relative', zIndex:2
+        }}>
+          Plant your first<br/><em style={{ color:green, fontStyle:'italic' }}>root of trust.</em>
+        </h2>
+        <p style={{ color:'oklch(80% 0.04 100)', fontSize:18, maxWidth:420, marginBottom:44, lineHeight:1.65, textWrap:'pretty', position:'relative', zIndex:2 }}>
+          Tally is in early access. Open it in your browser — no install, no sign-up, just you and the people whose favours you trust.
+        </p>
+        <a href="https://iou-ui.up.railway.app/" target="_blank" rel="noopener"
+          style={{
+            display:'inline-block', background:green, color:'white',
+            padding:'16px 42px', borderRadius:999, textDecoration:'none',
+            fontSize:18, fontWeight:500,
+            boxShadow:`0 4px 32px ${green}44`,
+            transition:'transform 0.2s, box-shadow 0.2s',
+            position:'relative', zIndex:2
+          }}
+          onMouseEnter={e=>{e.currentTarget.style.transform='translateY(-2px)';e.currentTarget.style.boxShadow=`0 10px 40px ${green}55`;}}
+          onMouseLeave={e=>{e.currentTarget.style.transform='translateY(0)';e.currentTarget.style.boxShadow=`0 4px 32px ${green}44`;}}>
+          {tweaks.ctaLabel} →
+        </a>
+        <p style={{ color:'oklch(72% 0.04 100)', fontSize:13, marginTop:20, position:'relative', zIndex:2 }}>
+          Early access · open source · your data stays on your device
+        </p>
+      </section>
+
+      {/* ── FOOTER ── */}
+      <footer style={{
+        borderTop:`1px solid ${rule}`,
+        padding:`28px clamp(24px,7vw,120px)`,
+        display:'flex', justifyContent:'space-between', alignItems:'center',
+        flexWrap:'wrap', gap:16, color:inkMid, fontSize:14,
+      }}>
+        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+          <TallyMark count={5} color={green} size={20}/>
+          <span style={{ fontFamily:"'DM Serif Display',serif", fontWeight:600, color:ink }}>tally.earth</span>
+        </div>
+        <div style={{ display:'flex', gap:24 }}>
+          <a href="https://github.com/jussiry/IOU" target="_blank" rel="noopener" style={{ color:inkMid, textDecoration:'none' }}>GitHub</a>
+          <a href="https://iou-ui.up.railway.app/" target="_blank" rel="noopener" style={{ color:inkMid, textDecoration:'none' }}>App</a>
+        </div>
+        <div style={{ opacity:0.55 }}>© 2026 Tally. Community money, honestly.</div>
+      </footer>
+
+      {/* ── TWEAKS ── */}
+      <TweaksPanel>
+        <TweakSection label="Tree illustration"/>
+        <TweakSlider label="Branch depth" value={tweaks.branchDepth} min={1} max={8} step={1}
+          onChange={v => setTweak('branchDepth', v)}/>
+        <TweakSlider label="Line length" value={tweaks.lineLength} min={1} max={80} step={1}
+          onChange={v => setTweak('lineLength', v)}/>
+        <TweakSlider label="Node size" value={tweaks.nodeSize} min={2} max={14} step={1}
+          onChange={v => setTweak('nodeSize', v)}/>
+        <TweakSlider label="Repel force" value={tweaks.repelForce} min={30} max={400} step={10}
+          onChange={v => setTweak('repelForce', v)}/>
+        <TweakSection label="Appearance"/>
+        <TweakRadio label="Theme"
+          value={tweaks.palette}
+          options={[{value:'light',label:'Light'},{value:'dark',label:'Dark'}]}
+          onChange={v => setTweak('palette', v)}/>
+        <TweakSlider label="Accent hue" value={tweaks.accentHue}
+          min={80} max={220} step={5}
+          onChange={v => setTweak('accentHue', v)}/>
+        <TweakSection label="Sections"/>
+        <TweakToggle label="Mutual credit section"
+          value={tweaks.showMutualCredit}
+          onChange={v => setTweak('showMutualCredit', v)}/>
+        <TweakToggle label="Features section"
+          value={tweaks.showFeatures}
+          onChange={v => setTweak('showFeatures', v)}/>
+        <TweakSection label="Copy"/>
+        <TweakText label="CTA button label"
+          value={tweaks.ctaLabel}
+          onChange={v => setTweak('ctaLabel', v)}/>
+      </TweaksPanel>
+
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
