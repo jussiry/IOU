@@ -16,7 +16,7 @@ const CLIENT_ROOT = path.resolve(__dirname, "..", "app");
 const INDEX_FILE = path.join(CLIENT_ROOT, "index.html");
 const WEB_ROOT = path.resolve(__dirname, "..", "web");
 const WEB_PREFIX = "/web";
-const WEB_DOMAINS = new Set(["tally.app", "www.tally.app"]);
+const WEB_DOMAINS = new Set(["tally.earth", "www.tally.earth"]);
 
 const MIME_TYPES = new Map([
   [".css", "text/css; charset=utf-8"],
@@ -142,7 +142,7 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
-  // Serve landing page for tally.app domain or /web/ path prefix
+  // Serve landing page for tally.earth domain or /web/ path prefix
   const hostname = (request.headers.host || "").split(":")[0].toLowerCase();
   const isWebDomain = WEB_DOMAINS.has(hostname);
   const isWebPrefix = requestUrl.pathname === WEB_PREFIX || requestUrl.pathname.startsWith(WEB_PREFIX + "/");
