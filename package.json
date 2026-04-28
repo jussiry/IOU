@@ -4,8 +4,8 @@
   "scripts": {
     "build": "node scripts/build-client.cjs",
     "build:watch": "node scripts/build-client.cjs --watch",
-    "dev": "concurrently --kill-others-on-fail --names build,server --prefix-colors blue,green \"npm:build:watch\" \"nodemon --watch relay-server --ext js,cjs,json relay-server/server.js\"",
-    "start": "npm run build && node relay-server/server.js",
+    "dev": "concurrently --kill-others-on-fail --names build,server --prefix-colors blue,green \"npm:build:watch\" \"nodemon --watch server --ext js,cjs,json server/server.js\"",
+    "start": "npm run build && node server/server.js",
     "typecheck": "tsc --noEmit",
     "test:e2e:two-client": "node tests/two-client-e2e/run.cjs",
     "test:e2e:friend-request-online": "node tests/two-client-e2e/run.cjs --scenario friend-request-online",
