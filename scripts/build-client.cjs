@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /*
 Client build pipeline — esbuild per-file transpile of every .ts / .js under
-`client/js/**` and `client/ui-modules/**` into `client/dist/`, preserving the
+`app/js/**` and `app/ui-modules/**` into `app/dist/`, preserving the
 source directory layout.
 
 Why per-file (bundle: false):
@@ -10,7 +10,7 @@ Why per-file (bundle: false):
     file moves from .js to .ts.
   - Lazy-loaded modules (dev seeds, vendor loaders) keep working because each
     source file still maps 1:1 to an output file the browser can fetch.
-  - Vendor files (client/js/vendor/*.js) pass through untouched — esbuild
+  - Vendor files (app/js/vendor/*.js) pass through untouched — esbuild
     emits them as-is since they contain no TS syntax.
 
 Watch mode (--watch) is incremental: esbuild only reprocesses files whose
@@ -23,7 +23,7 @@ const fs = require("fs");
 const esbuild = require("esbuild");
 
 const ROOT = path.resolve(__dirname, "..");
-const CLIENT_DIR = path.join(ROOT, "client");
+const CLIENT_DIR = path.join(ROOT, "app");
 const OUT_DIR = path.join(CLIENT_DIR, "dist");
 
 const WATCH = process.argv.includes("--watch");
@@ -91,7 +91,7 @@ const run = async () => {
     if (result.errors && result.errors.length > 0) {
       process.exit(1);
     }
-    console.log(`[build-client] built ${options.entryPoints.length} files → client/dist`);
+    console.log(`[build-client] built ${options.entryPoints.length} files → app/dist`);
   }
 };
 

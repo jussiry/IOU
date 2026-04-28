@@ -12,7 +12,7 @@ const { createSignalingServer } = require("./signaling/websocket-server");
 
 const HOST = process.env.HOST || "0.0.0.0";
 const PORT = Number(process.env.PORT) || 3000;
-const CLIENT_ROOT = path.resolve(__dirname, "..", "client");
+const CLIENT_ROOT = path.resolve(__dirname, "..", "app");
 const INDEX_FILE = path.join(CLIENT_ROOT, "index.html");
 
 const MIME_TYPES = new Map([

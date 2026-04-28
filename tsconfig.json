@@ -14,6 +14,6 @@
     "allowImportingTsExtensions": false,
     "verbatimModuleSyntax": false
   },
-  "include": ["client/**/*.ts", "client/**/*.js"],
-  "exclude": ["client/dist", "node_modules"]
+  "include": ["app/**/*.ts", "app/**/*.js"],
+  "exclude": ["app/dist", "node_modules"]
 }

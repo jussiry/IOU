@@ -9,7 +9,7 @@ repo_root="$(git rev-parse --show-toplevel)"
 cd "$repo_root"
 
 next_version="$(bash scripts/bump-version.sh)"
-git add client/data/version.json
+git add app/data/version.json
 
 echo "Version bumped to ${next_version}."
 exit 0

@@ -13,7 +13,7 @@
     {
       "name": "Production Server",
       "runtimeExecutable": "/Users/jussi/.nvm/versions/node/v24.14.0/bin/node",
-      "runtimeArgs": ["backend/server.js"],
+      "runtimeArgs": ["relay-server/server.js"],
       "port": 3000
     }
   ]

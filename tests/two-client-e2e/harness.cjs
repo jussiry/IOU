@@ -70,7 +70,7 @@ const createTwoClientHarness = ({
   waitMs = DEFAULT_WAIT_MS,
 } = {}) => {
   const repoRoot = path.resolve(__dirname, "..", "..");
-  const serverEntry = path.join(repoRoot, "backend", "server.js");
+  const serverEntry = path.join(repoRoot, "relay-server", "server.js");
   const baseUrl = `http://${host}:${port}`;
 
   let browser = null;
