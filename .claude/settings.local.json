@@ -49,7 +49,11 @@
       "Read(//tmp/**)",
       "Read(//private/tmp/**)",
       "Read(//Users/jussi/.claude/**)",
-      "Read(//Users/jussi/.claude/projects/**)"
+      "Read(//Users/jussi/.claude/projects/**)",
+      "Bash(GIT_TRACE=1 git commit --dry-run -m \"test\")",
+      "Bash(gunzip)",
+      "Bash(cp /tmp/tally-design/tally-earth/project/index.html /Users/jussi/code/IOU/web/index.html)",
+      "Bash(cp /tmp/tally-design/tally-earth/project/tweaks-panel.jsx /Users/jussi/code/IOU/web/tweaks-panel.jsx)"
     ]
   }
 }

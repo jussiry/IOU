@@ -8,7 +8,7 @@ export const initIouActions = (root, friendId) => {
   const sendButton = root.querySelector('[data-action="send"]');
   if (sendButton) {
     sendButton.addEventListener("click", () => {
-      const target = friendId ? `send/${friendId}` : "send";
+      const target = friendId ? `record/${friendId}` : "record";
       window.location.hash = target;
     });
   }

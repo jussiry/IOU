@@ -137,11 +137,11 @@ export const bindFriendDetail = (root, data, friendId) => {
   if (headerRight) {
     if (friendshipStatus === FRIENDSHIP_STATUS_ACCEPTED) {
       headerRight.innerHTML = `
-        <button class="friend-send surface-box" type="button" data-action="send" aria-label="Send IOU">
+        <button class="friend-send surface-box" type="button" data-action="send" aria-label="Record tally">
           <svg class="friend-send-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
             <use href="#icon-send" />
           </svg>
-          <span class="friend-send-label">Send</span>
+          <span class="friend-send-label">Record</span>
         </button>
       `;
     } else if (friendshipStatus === FRIENDSHIP_STATUS_REJECTED) {

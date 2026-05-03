@@ -1,7 +1,9 @@
 /*
-This module binds the send-IOU subpage form. It populates selectable friends, updates explanatory copy, and returns a payload reader for submit handling.
+This module binds the record-tally subpage form. It populates selectable friends, updates explanatory copy, and returns a payload reader for submit handling.
 
 Only accepted friendships can be used for transactions, so the binder also owns the empty states shown when the user has no friends yet or only pending friendships.
+
+The submit button label updates dynamically to "Send €[amount]" as the user types an amount, making clear that recording a tally is equivalent in effect to sending that value.
 */
 
 import { isAcceptedFriendshipStatus } from "../../js/utils/friendships.js";
@@ -29,7 +31,13 @@ const renderEmptyState = (contentEl, allFriends) => {
     `;
 };
 
-export const bindSend = (root, data, friendId) => {
+const formatSubmitLabel = (amount) => {
+  const parsed = parseFloat(amount);
+  if (!amount || !Number.isFinite(parsed) || parsed <= 0) return "Send €";
+  return `Send €${parsed % 1 === 0 ? parsed : parsed.toFixed(2)}`;
+};
+
+export const bindRecord = (root, data, friendId) => {
   const titleEl = root.querySelector('[data-bind="page-title"]');
   const contentEl = root.querySelector(".send-content");
   const selectEl = root.querySelector('[data-bind="send-to"]');
@@ -38,7 +46,19 @@ export const bindSend = (root, data, friendId) => {
   const messageEl = root.querySelector('[data-bind="send-message"]');
   const submitEl = root.querySelector('[data-bind="send-submit"]');
 
-  if (titleEl) titleEl.textContent = "Send IOU";
+  if (titleEl) titleEl.textContent = "Record a tally";
+
+  // Dynamic submit button label
+  const submitLabelEl = submitEl?.querySelector(".primary-button-label");
+  const updateSubmitLabel = () => {
+    const label = formatSubmitLabel(amountEl?.value);
+    if (submitLabelEl) submitLabelEl.textContent = label;
+  };
+
+  if (amountEl) {
+    amountEl.addEventListener("input", updateSubmitLabel);
+    updateSubmitLabel();
+  }
 
   if (messageEl) {
     const autoGrow = () => {
@@ -75,8 +95,8 @@ export const bindSend = (root, data, friendId) => {
     const friendName = name ? getFirstName(name) : "your friend";
     const otherName = alternate ? getFirstName(alternate) : "another friend";
     explainerEl.innerHTML = `
-      <p>When sending IOU's (I Owe You) you are <strong>making a promise</strong> of giving something of that value back some time later.</p>
-      <p>This transaction can be redeemed by your friend sending their IOU's back to you. IOU's can also be redeemed in circular cancellation: <strong>you</strong> owe <strong>${friendName}</strong> who owes <strong>${otherName}</strong> who owes <strong>you</strong>. Circular cancellations are made automatically by the system.</p>
+      <p>Recording a tally means <strong>you owe</strong> this amount — it's a promise to give back that value later, the same effect as sending euros, just recorded in your mutual trust.</p>
+      <p>Tallies can be settled when your friend records one back to you. They can also cancel out in a circle: <strong>you</strong> owe <strong>${friendName}</strong> who owes <strong>${otherName}</strong> who owes <strong>you</strong>. The system resolves these automatically.</p>
     `;
   };
 
@@ -163,7 +183,10 @@ export const bindSend = (root, data, friendId) => {
     if (matchedFriend) {
       // Fill form fields
       if (selectEl) selectEl.value = matchedFriend.person_id;
-      if (parsed.amount && amountEl) amountEl.value = parsed.amount;
+      if (parsed.amount && amountEl) {
+        amountEl.value = parsed.amount;
+        amountEl.dispatchEvent(new Event("input", { bubbles: true }));
+      }
       if (parsed.note && messageEl) {
         messageEl.value = parsed.note;
         messageEl.dispatchEvent(new Event("input", { bubbles: true }));

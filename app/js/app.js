@@ -25,7 +25,7 @@ import { bindFriendDetail } from "../ui-modules/subpage/friend.js";
 import { bindAddFriend } from "../ui-modules/subpage/add-friend.js";
 import { initIouActions } from "../ui-modules/components/iou-actions.js";
 import { showConfirmModal } from "../ui-modules/components/confirm-modal.js";
-import { bindSend } from "../ui-modules/subpage/send.js";
+import { bindRecord } from "../ui-modules/subpage/record.js";
 import { bindRequest } from "../ui-modules/subpage/request.js";
 import { bindTrust } from "../ui-modules/subpage/trust.js";
 import { bindTransfer } from "../ui-modules/subpage/transfer.js";
@@ -59,7 +59,7 @@ const templatePaths = {
   subpage: "ui-modules/subpage/index.html",
   friend: "ui-modules/subpage/friend.html",
   addFriend: "ui-modules/subpage/add-friend.html",
-  send: "ui-modules/subpage/send.html",
+  record: "ui-modules/subpage/record.html",
   request: "ui-modules/subpage/request.html",
   trust: "ui-modules/subpage/trust.html",
   transfer: "ui-modules/subpage/transfer.html",
@@ -192,9 +192,9 @@ const parseRoute = () => {
   if (hash === "add-friend") {
     return createSubpageRoute("add-friend");
   }
-  if (hash.startsWith("send")) {
+  if (hash.startsWith("record")) {
     const parts = hash.split("/");
-    return createSubpageRoute("send", parts[1] || null);
+    return createSubpageRoute("record", parts[1] || null);
   }
   if (hash === "request") {
     return createSubpageRoute("request");
@@ -324,15 +324,15 @@ const loadPage = async (route) => {
           navigateTo(`friend/${payload.friendId}`);
         });
       }
-    } else if (route.type === "send") {
-      const sendHtml = await fetchTemplate(templatePaths.send);
-      renderSubpageContent(pageView, sendHtml);
-      const sendHandlers = bindSend(pageView, data, route.friendId);
-      document.title = "IOU — Send";
+    } else if (route.type === "record") {
+      const recordHtml = await fetchTemplate(templatePaths.record);
+      renderSubpageContent(pageView, recordHtml);
+      const recordHandlers = bindRecord(pageView, data, route.friendId);
+      document.title = "IOU — Record a tally";
       setFallbackBackNavigation(pageView);
-      if (sendHandlers?.submitEl) {
-        sendHandlers.submitEl.addEventListener("click", async () => {
-          const payload = sendHandlers.getPayload();
+      if (recordHandlers?.submitEl) {
+        recordHandlers.submitEl.addEventListener("click", async () => {
+          const payload = recordHandlers.getPayload();
           if (!payload.friendId || !Number.isFinite(payload.amount) || payload.amount <= 0) {
             return;
           }
