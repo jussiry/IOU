@@ -512,8 +512,9 @@ function initPhysicsTree(container, { color, bgColor, branchDepth = 5, repelForc
 
   const nodes = [{ x: 0, y: 0, vx: 0, vy: 0, fx: 0, fy: 0, fixed: true }];
   const edges = [];
+  const nodeBranch = [-1]; // -1 = root; 0 = upper branch, 1 = lower branch
 
-  function addBranch(parentIdx, angle, d) {
+  function addBranch(parentIdx, angle, d, branch) {
     if (d === 0) return;
     const p = nodes[parentIdx];
     const idx = nodes.length;
@@ -524,15 +525,16 @@ function initPhysicsTree(container, { color, bgColor, branchDepth = 5, repelForc
       vy: (Math.random() - 0.5) * 0.5,
       fx: 0, fy: 0, fixed: false
     });
+    nodeBranch.push(branch);
     edges.push([parentIdx, idx]);
     if (d > 1) {
-      addBranch(idx, angle - SPREAD, d - 1);
-      addBranch(idx, angle + SPREAD, d - 1);
+      addBranch(idx, angle - SPREAD, d - 1, branch);
+      addBranch(idx, angle + SPREAD, d - 1, branch);
     }
   }
 
-  addBranch(0, -Math.PI / 2, branchDepth);
-  addBranch(0,  Math.PI / 2, branchDepth);
+  addBranch(0, -Math.PI / 2, branchDepth, 0); // upper branch
+  addBranch(0,  Math.PI / 2, branchDepth, 1); // lower branch
 
   function physicsStep(rep) {
     const n = nodes.length;
@@ -565,6 +567,18 @@ function initPhysicsTree(container, { color, bgColor, branchDepth = 5, repelForc
 
   for (let i = 0; i < 500; i++) physicsStep(repelForce);
 
+  // Identify leaf nodes (never a parent in any edge).
+  // addBranch always recurses left (angle-SPREAD) before right (angle+SPREAD),
+  // so leaves are created in DFS perimeter order:
+  //   upper branch → left-to-right,  lower branch → right-to-left.
+  // Concatenating them gives a clean clockwise ring with no cross-connections.
+  const isParent = new Set(edges.map(([a]) => a));
+  const leafIndices = nodes.map((_, i) => i).filter(i => i !== 0 && !isParent.has(i));
+  const upperLeaves = leafIndices.filter(i => nodeBranch[i] === 0);
+  const lowerLeaves = leafIndices.filter(i => nodeBranch[i] === 1);
+  const leafRing = [...upperLeaves, ...lowerLeaves];
+  const leafEdges = leafRing.map((idx, i) => [idx, leafRing[(i + 1) % leafRing.length]]);
+
   // BFS depth for stroke tapering
   const depth = new Array(nodes.length).fill(0);
   const adj = {};
@@ -584,6 +598,12 @@ function initPhysicsTree(container, { color, bgColor, branchDepth = 5, repelForc
 
   const svg = svgEl('svg', { viewBox: '-280 -280 560 560' });
   svg.style.cssText = 'width:100%;max-width:460px;display:block';
+
+  const leafLineEls = leafEdges.map(() => {
+    const el = svgEl('line', { stroke: color, 'stroke-linecap': 'round', opacity: '0.2', 'stroke-width': '0.7' });
+    svg.appendChild(el);
+    return el;
+  });
 
   const lineEls = edges.map(([a, b]) => {
     const t = maxDepth > 0 ? Math.max(depth[a], depth[b]) / maxDepth : 0;
@@ -640,6 +660,11 @@ function initPhysicsTree(container, { color, bgColor, branchDepth = 5, repelForc
       nodes[i].x += nodes[i].vx;
       nodes[i].y += nodes[i].vy;
     }
+
+    leafEdges.forEach(([a, b], i) => {
+      leafLineEls[i].setAttribute('x1', nodes[a].x); leafLineEls[i].setAttribute('y1', nodes[a].y);
+      leafLineEls[i].setAttribute('x2', nodes[b].x); leafLineEls[i].setAttribute('y2', nodes[b].y);
+    });
 
     edges.forEach(([a, b], i) => {
       lineEls[i].setAttribute('x1', nodes[a].x); lineEls[i].setAttribute('y1', nodes[a].y);
