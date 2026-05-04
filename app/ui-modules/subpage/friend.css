@@ -142,7 +142,8 @@
 }
 
 .friend-inline-action--primary {
-  background: var(--accent-soft);
+  background: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
 .friend-status-chip {
