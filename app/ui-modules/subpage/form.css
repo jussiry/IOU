@@ -104,7 +104,7 @@
   border: none;
   border-radius: 14px;
   padding: 12px 14px;
-  background: rgba(244, 184, 96, 0.6);
+  background: oklch(48% 0.14 120 / 0.6);
   color: var(--ink);
   font-weight: 700;
   font-size: 14px;

@@ -38,7 +38,7 @@
 }
 
 .add-friend-copy-button:focus-visible {
-  outline: 3px solid rgba(244, 184, 96, 0.7);
+  outline: 3px solid var(--accent-strong);
   outline-offset: 3px;
 }
 

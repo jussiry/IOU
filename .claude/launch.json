@@ -16,5 +16,11 @@
       "runtimeArgs": ["server/server.js"],
       "port": 3000
     }
+  ,{
+      "name": "Web (landing)",
+      "runtimeExecutable": "/Users/jussi/.nvm/versions/node/v24.14.0/bin/npx",
+      "runtimeArgs": ["serve", "web", "-l", "3001"],
+      "port": 3001
+    }
   ]
 }

@@ -1,7 +1,21 @@
 :root {
   --ink: #1b1b1b;
   --muted: #6b635e;
-  --accent-2: #f4b860;
+  /* Brand accent — matches tally.earth landing page green */
+  --accent: oklch(48% 0.14 120);
+  --accent-deep: oklch(42% 0.13 120);
+  --accent-faint: oklch(48% 0.14 120 / 0.12);
+  --accent-soft: oklch(48% 0.14 120 / 0.35);
+  --accent-glow: oklch(48% 0.14 120 / 0.65);
+  --accent-strong: oklch(48% 0.14 120 / 0.7);
+  --accent-bold: oklch(48% 0.14 120 / 0.85);
+  --accent-2: var(--accent); /* legacy alias */
+  /* Background gradient tint — green-leaning warm */
+  --bg-tint: oklch(92% 0.045 120);
+  /* Notification colors — keep original yellow */
+  --notify: #e5a632;
+  --notify-faint: rgba(229, 166, 50, 0.12);
+  --notify-soft: rgba(229, 166, 50, 0.35);
   --card: #ffffff;
   --danger: #b93b3b;
   --ok: #0f7d4d;
@@ -25,7 +39,7 @@
 
 body {
   margin: 0;
-  background: radial-gradient(120% 120% at 20% -10%, #f4e2c5 0%, #f0ece5 50%, #e4e9e6 100%);
+  background: radial-gradient(120% 120% at 20% -10%, var(--bg-tint) 0%, #f0ece5 50%, #e4e9e6 100%);
   color: var(--ink);
   font-family: "Space Grotesk", "IBM Plex Sans", "Avenir Next", sans-serif;
   overflow-x: hidden;
@@ -92,7 +106,7 @@ header {
   width: 140px;
   height: 140px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(244, 184, 96, 0.65), rgba(244, 184, 96, 0));
+  background: radial-gradient(circle, var(--accent-glow), transparent);
 }
 
 .trust-hero::after {
@@ -199,7 +213,7 @@ nav {
   min-width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: #e5a632;
+  background: var(--notify);
   color: #fff;
   font-size: 10px;
   font-weight: 700;

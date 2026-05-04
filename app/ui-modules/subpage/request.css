@@ -22,7 +22,7 @@
 }
 
 .request-tab--active {
-  background: rgba(244, 184, 96, 0.35);
+  background: var(--accent-soft);
   color: var(--ink);
 }
 

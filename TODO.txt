@@ -1,5 +1,8 @@
 
-
+IOU -> Tally process
+- on recod page add confirm prompt when "send" is pressed.
+  * explains the record that is being made
+  * when over 100€ add extra warning and "hold to confirm"
 
 FEATURES
 Add inactivate friend button.

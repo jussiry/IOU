@@ -31,7 +31,7 @@
 }
 
 .check-toggle.is-active .check-toggle-track {
-  background: rgba(244, 184, 96, 0.85);
+  background: var(--accent-bold);
 }
 
 .check-toggle.is-active .check-toggle-thumb {

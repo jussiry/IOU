@@ -28,7 +28,7 @@
 }
 
 .friends-add-button:focus-visible {
-  outline: 3px solid rgba(244, 184, 96, 0.7);
+  outline: 3px solid var(--accent-strong);
   outline-offset: 4px;
 }
 
@@ -103,7 +103,7 @@ summary::-webkit-details-marker {
   width: 9px;
   height: 9px;
   border-radius: 50%;
-  background: #e5a632;
+  background: var(--accent-deep);
 }
 
 .friend-icon {
@@ -118,7 +118,7 @@ summary::-webkit-details-marker {
 }
 
 .friend-icon--relay {
-  color: #e5a632;
+  color: var(--accent-deep);
 }
 
 .meta h3 {

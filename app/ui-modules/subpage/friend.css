@@ -9,7 +9,7 @@
 }
 
 .online-dot--relay {
-  background: #e5a632;
+  background: var(--notify);
 }
 
 .friend-sync-status {
@@ -142,7 +142,7 @@
 }
 
 .friend-inline-action--primary {
-  background: rgba(244, 184, 96, 0.35);
+  background: var(--accent-soft);
 }
 
 .friend-status-chip {
@@ -181,8 +181,8 @@
   --surface-radius: 18px;
   margin: 10px 20px 0;
   padding: 16px 18px;
-  border: 2px solid rgba(244, 184, 96, 0.5);
-  background: rgba(244, 184, 96, 0.12);
+  border: 2px solid rgba(229, 166, 50, 0.5);
+  background: rgba(229, 166, 50, 0.12);
   display: grid;
   gap: 10px;
   text-align: center;
