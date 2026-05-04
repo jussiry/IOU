@@ -193,7 +193,7 @@
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--muted);
+  color: #555; /*var(--muted)*/
   overflow: hidden;
   text-overflow: ellipsis;
   /*white-space: nowrap;*/

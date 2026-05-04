@@ -5,7 +5,7 @@ request from them, and dismissing a stale request after the fact.
 When a friend accepts a request, this module also creates the mirroring
 IOU transaction locally — the acceptance is equivalent to the friend
 sending us an IOU, so we materialize that transaction in the same tick so
-balances stay consistent.
+tallies stay consistent.
 
 State mutations go through routeOutboundEntry so the same logic runs
 whether the action happened on this device or synced from another device.

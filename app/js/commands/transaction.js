@@ -1,7 +1,7 @@
 /*
 IOU transaction command. Records that the user has taken on debt toward a
-friend (a "sent IOU"), updates the running debt balance, and propagates the
-transaction to the peer so both sides agree on the balance.
+friend (a "sent IOU"), updates the running friend tally, and propagates the
+transaction to the peer so both sides agree on the tally.
 
 State is mutated via routeOutboundEntry so the same logic runs whether the
 transaction was created on this device or received via self-mesh sync.

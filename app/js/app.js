@@ -16,7 +16,7 @@ import { createFriend } from "./commands/friendship.js";
 import { createTransaction } from "./commands/transaction.js";
 import { requestPayment } from "./commands/payment-request.js";
 import { updateTrustLimit } from "./commands/trust-limit.js";
-import { bindBalance, initBalanceToggles } from "../ui-modules/balance-page/index.js";
+import { bindTally, initTallyToggles } from "../ui-modules/tally-page/index.js";
 import { bindFriends } from "../ui-modules/friends-page/index.js";
 import { bindLogs } from "../ui-modules/logs-page/index.js";
 import { bindSettings } from "../ui-modules/settings-page/index.js";
@@ -44,7 +44,7 @@ const appRoot = document.querySelector(".app");
 const navOrder = navButtons.map((button) => button.dataset.page).filter(Boolean);
 
 const pageTitles = {
-  balance: "IOU — Balance",
+  tally: "Tally",
   friends: "IOU — Friends",
   logs: "IOU — Logs",
   settings: "IOU — Settings",
@@ -52,7 +52,7 @@ const pageTitles = {
 
 const templatePaths = {
   welcome: "ui-modules/welcome-page/index.html",
-  balance: "ui-modules/balance-page/index.html",
+  tally: "ui-modules/tally-page/index.html",
   friends: "ui-modules/friends-page/index.html",
   logs: "ui-modules/logs-page/index.html",
   settings: "ui-modules/settings-page/index.html",
@@ -69,13 +69,13 @@ const templatePaths = {
 };
 
 const pageBinders = {
-  balance: bindBalance,
+  tally: bindTally,
   friends: bindFriends,
   logs: bindLogs,
   settings: bindSettings,
 };
 
-let lastMainPage = "balance";
+let lastMainPage = "tally";
 let currentRoute = null;
 let navigationSequence = 0;
 const templateCache = new Map();
@@ -124,7 +124,7 @@ const setRouteUiState = (route) => {
   }
 
   appRoot?.classList.remove("is-subpage");
-  document.title = pageTitles[route.page] || pageTitles.balance;
+  document.title = pageTitles[route.page] || pageTitles.tally;
   setActiveNav(navButtons, route.page);
 };
 
@@ -136,7 +136,7 @@ const setFallbackBackNavigation = (pageView) => {
     if (window.history.length > 1) {
       window.history.back();
     } else {
-      window.location.hash = lastMainPage || "balance";
+      window.location.hash = lastMainPage || "tally";
     }
   });
 };
@@ -181,7 +181,7 @@ const createPageView = (html) => {
 
 const parseRoute = () => {
   const hash = window.location.hash.replace("#", "");
-  if (!hash) return { type: "page", page: "balance" };
+  if (!hash) return { type: "page", page: "tally" };
   if (hash === "welcome") {
     return { type: "welcome" };
   }
@@ -206,7 +206,7 @@ const parseRoute = () => {
   if (hash === "transfer") {
     return createSubpageRoute("transfer");
   }
-  return pageTitles[hash] ? { type: "page", page: hash } : { type: "page", page: "balance" };
+  return pageTitles[hash] ? { type: "page", page: hash } : { type: "page", page: "tally" };
 };
 
 const resolveRouteForUserState = async (route) => {
@@ -221,7 +221,7 @@ const resolveRouteForUserState = async (route) => {
   }
 
   if (route.type === "welcome") {
-    window.location.hash = "balance";
+    window.location.hash = "tally";
     return null;
   }
 
@@ -262,7 +262,7 @@ const loadPage = async (route) => {
       bindWelcome(pageView, {
         onCreateUser: async (name, options) => {
           await createUser(name, options);
-          window.location.hash = "balance";
+          window.location.hash = "tally";
         },
       });
     } else if (route.type === "friend") {
@@ -399,7 +399,7 @@ const loadPage = async (route) => {
         });
       }
     } else {
-      if (route.page === "balance") {
+      if (route.page === "tally") {
         const actionsSlot = pageView.querySelector('[data-slot="iou-actions"]');
         if (actionsSlot) {
           const actionsHtml = await fetchTemplate(templatePaths.iouActions);
@@ -414,7 +414,7 @@ const loadPage = async (route) => {
     }
 
     if (!isWelcome) {
-      initBalanceToggles(pageView);
+      initTallyToggles(pageView);
     }
     await swapPage(contentRoot, pageView, { direction });
     if (sequence !== navigationSequence) return;
@@ -459,7 +459,7 @@ const loadActiveRoute = async () => {
 };
 
 window.addEventListener("hashchange", () => {
-  const hash = window.location.hash.replace("#", "") || "balance";
+  const hash = window.location.hash.replace("#", "") || "tally";
   const existingIndex = hashHistory.lastIndexOf(hash);
   if (existingIndex !== -1 && existingIndex < hashHistory.length - 1) {
     hashHistory.length = existingIndex + 1;
@@ -470,7 +470,7 @@ window.addEventListener("hashchange", () => {
 });
 
 const initApp = async () => {
-  hashHistory.push(window.location.hash.replace("#", "") || "balance");
+  hashHistory.push(window.location.hash.replace("#", "") || "tally");
   await applyDevSeedIfRequested();
   await ensureIconSprite();
   appVersion = await getAppVersion();

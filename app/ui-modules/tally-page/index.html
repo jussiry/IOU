@@ -1,8 +1,8 @@
-<div class="balance-actions" data-slot="iou-actions"></div>
+<div class="tally-actions" data-slot="iou-actions"></div>
 
-<div class="balance-hero" aria-label="Total balance">
-  <div class="hero-label">Current balance</div>
-  <div class="hero-amount"><span class="hero-number" data-bind="net-balance"></span></div>
+<div class="content-card" aria-label="Total tally">
+  <div class="hero-label">Total tally</div>
+  <div class="hero-amount"><span class="hero-number" data-bind="total-tally"></span></div>
   <div class="hero-sub">
     <button class="pill toggle" type="button" aria-expanded="false">
       <div class="pill-row">
@@ -40,7 +40,7 @@
     </button>
   </div>
 </div>
-<div class="balance-hero trust-hero" aria-label="Trust agreements">
+<div class="content-card trust-hero" aria-label="Trust agreements">
   <div class="hero-label">Trust agreements</div>
   <div class="hero-amount"><span class="hero-number" data-bind="available-trust"></span> <span>theoretical limit when sending IOU's to someone you don't know</span></div>
   <div class="hero-sub">

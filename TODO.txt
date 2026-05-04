@@ -4,6 +4,9 @@ IOU -> Tally process
   * explains the record that is being made
   * when over 100€ add extra warning and "hold to confirm"
 
+Create a migration process (checks app version and runs migrations when app version change matches) to change IOU -> record, anything else that needs changing?
+  * make search for IOU
+
 FEATURES
 Add inactivate friend button.
 - defaulting / debt forgiveness

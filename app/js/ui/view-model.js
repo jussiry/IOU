@@ -35,7 +35,7 @@ export const buildView = (state) => {
   const youOweTotal = acceptedFriends.reduce((sum, friend) => {
     return sum + Math.max(-(friend.debt_eur || 0), 0);
   }, 0);
-  const netBalance = friendsOweTotal - youOweTotal;
+  const totalTally = friendsOweTotal - youOweTotal;
 
   const availableTrust = acceptedFriends.reduce((sum, friend) => {
     const trustLimit = friend.trust_credit_limit_eur || 0;
@@ -47,7 +47,7 @@ export const buildView = (state) => {
     you: createPublicPersonModel(user),
     friends: friendsWithInbound,
     totals: {
-      netBalance,
+      totalTally,
       friendsOweTotal,
       youOweTotal,
       trustAgreements,

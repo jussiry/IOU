@@ -89,7 +89,7 @@ header {
   color: var(--muted);
 }
 
-.balance-hero {
+.content-card {
   margin: 16px 20px 0;
   background: var(--card);
   border-radius: 28px;
@@ -99,7 +99,7 @@ header {
   overflow: hidden;
 }
 
-.balance-hero::after {
+.content-card::after {
   content: "";
   position: absolute;
   right: -40px;

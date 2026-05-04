@@ -1,7 +1,7 @@
 /*
-This module binds the balance page UI. It renders totals, populates list sections for debts and trust agreements, and controls expandable detail pills.
+This module binds the tally page UI. It renders totals, populates list sections for debts and trust agreements, and controls expandable detail pills.
 
-It keeps all balance-page specific rendering logic local to this module so the app shell can treat the page as a simple binder callback.
+It keeps all tally-page specific rendering logic local to this module so the app shell can treat the page as a simple binder callback.
 */
 
 import { formatCurrency, formatNet, formatSigned } from "../../js/ui/format.js";
@@ -39,7 +39,7 @@ const openPanel = (button, panel) => {
   panel.addEventListener("transitionend", onEnd);
 };
 
-export const initBalanceToggles = (root) => {
+export const initTallyToggles = (root) => {
   const groups = Array.from(root.querySelectorAll(".hero-sub"));
   groups.forEach((group) => {
     const toggleButtons = Array.from(group.querySelectorAll(".pill.toggle"));
@@ -100,9 +100,9 @@ const renderInlineList = (root, list, templateSelector, options = {}) => {
   });
 };
 
-export const bindBalance = (root, data) => {
-  root.querySelector('[data-bind="net-balance"]').textContent = formatNet(
-    data.totals.netBalance
+export const bindTally = (root, data) => {
+  root.querySelector('[data-bind="total-tally"]').textContent = formatNet(
+    data.totals.totalTally
   );
   root.querySelector('[data-bind="friends-owe-total"]').textContent = formatSigned(
     data.totals.friendsOweTotal
