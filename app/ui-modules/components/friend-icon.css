@@ -1,0 +1,14 @@
+.friend-icon {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  color: var(--muted);
+}
+
+.friend-icon--online {
+  color: #27a857;
+}
+
+.friend-icon--relay {
+  color: var(--notify);
+}

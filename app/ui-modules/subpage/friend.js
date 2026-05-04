@@ -27,6 +27,7 @@ import {
   isAcceptedFriendshipStatus,
 } from "../../js/utils/friendships.js";
 import { formatCurrency, formatDate, formatSigned } from "../../js/ui/format.js";
+import { createFriendIcon, setFriendIconStatus } from "../components/friend-icon.js";
 import { initInfiniteList } from "../../js/ui/infinite-list.js";
 import { getConnectedPeerIds, getServerPresentPeerIds } from "../../js/peer/status.js";
 import { showConfirmModal } from "../components/confirm-modal.js";
@@ -83,9 +84,9 @@ export const bindFriendDetail = (root, data, friendId) => {
   if (titleEl) {
     titleEl.textContent = friendName;
     if (isOnline || isRelay) {
-      const dot = document.createElement("span");
-      dot.className = isRelay ? "online-dot online-dot--relay" : "online-dot";
-      titleEl.prepend(dot);
+      const icon = createFriendIcon();
+      setFriendIconStatus(icon, isOnline, isRelay);
+      titleEl.append(icon);
     }
   }
 

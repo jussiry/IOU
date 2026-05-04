@@ -86,6 +86,8 @@ summary::-webkit-details-marker {
 }
 
 .meta {
+  display: flex;
+  align-items: center;
   min-width: 0;
   overflow: hidden;
 }
@@ -94,6 +96,7 @@ summary::-webkit-details-marker {
   display: flex;
   align-items: center;
   gap: 8px;
+  margin-right: 5px;
   min-width: 0;
   overflow: hidden;
 }
@@ -103,23 +106,10 @@ summary::-webkit-details-marker {
   width: 9px;
   height: 9px;
   border-radius: 50%;
-  background: var(--accent-deep);
+  background: var(--accent-light);
 }
 
-.friend-icon {
-  flex: 0 0 auto;
-  width: 18px;
-  height: 18px;
-  color: var(--muted);
-}
-
-.friend-icon--online {
-  color: #27a857;
-}
-
-.friend-icon--relay {
-  color: var(--accent-deep);
-}
+/* .friend-icon colours live in components/friend-icon.css */
 
 .meta h3 {
   flex: 1;

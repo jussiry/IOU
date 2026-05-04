@@ -6,6 +6,7 @@ It also owns the add-friend button behavior and keeps accepted, pending, and rej
 
 import { formatCurrency, formatSigned } from "../../js/ui/format.js";
 import { getConnectedPeerIds, getServerPresentPeerIds } from "../../js/peer/status.js";
+import { setFriendIconStatus } from "../components/friend-icon.js";
 import {
   FRIENDSHIP_STATUS_ACCEPTED,
   FRIENDSHIP_STATUS_PENDING_INCOMING,
@@ -264,8 +265,7 @@ export const bindFriends = (root, data) => {
     if (iconEl) {
       const isOnline = connectedPeerIds.has(friend.person_id);
       const isRelay = !isOnline && serverPresentPeerIds.has(friend.person_id);
-      iconEl.classList.toggle("friend-icon--online", isOnline);
-      iconEl.classList.toggle("friend-icon--relay", isRelay);
+      setFriendIconStatus(iconEl, isOnline, isRelay);
     }
     if (actionDotEl) {
       actionDotEl.hidden = !hasActionableNotification(friend);

@@ -1,15 +1,8 @@
-.online-dot {
-  display: inline-block;
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: #27a857;
-  margin-right: 6px;
-  flex-shrink: 0;
-}
-
-.online-dot--relay {
-  background: var(--notify);
+.subpage-title .friend-icon {
+  width: 22px;
+  height: 22px;
+  margin-left: 2px;
+  margin-bottom: 5px;
 }
 
 .friend-sync-status {
@@ -136,14 +129,14 @@
   display: inline-flex;
   align-items: center;
   font-weight: 700;
-  color: var(--ink);
+  color: #666;
   cursor: pointer;
   background: #fff;
 }
 
 .friend-inline-action--primary {
-  background: #fff;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  background: var(--accent-glow);
+  color: #fff;
 }
 
 .friend-status-chip {

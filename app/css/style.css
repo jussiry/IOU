@@ -9,6 +9,7 @@
   --accent-glow: oklch(48% 0.14 120 / 0.65);
   --accent-strong: oklch(48% 0.14 120 / 0.7);
   --accent-bold: oklch(48% 0.14 120 / 0.85);
+  --accent-light: rgb(128, 157, 0);
   --accent-2: var(--accent); /* legacy alias */
   /* Background gradient tint — green-leaning warm */
   --bg-tint: oklch(92% 0.045 120);
@@ -213,7 +214,7 @@ nav {
   min-width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: var(--notify);
+  background: var(--accent-light);
   color: #fff;
   font-size: 10px;
   font-weight: 700;
@@ -229,7 +230,7 @@ nav {
 }
 
 .nav-item.active .nav-icon {
-  color: var(--accent-2);
+  color: var(--accent-light);
 }
 
 @media (min-width: 600px) {
