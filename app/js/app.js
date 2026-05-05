@@ -23,7 +23,7 @@ import { bindSettings } from "../ui-modules/settings-page/index.js";
 import { bindWelcome } from "../ui-modules/welcome-page/index.js";
 import { bindFriendDetail } from "../ui-modules/subpage/friend.js";
 import { bindAddFriend } from "../ui-modules/subpage/add-friend.js";
-import { initIouActions } from "../ui-modules/components/iou-actions.js";
+import { initTallyActions } from "../ui-modules/components/tally-actions.js";
 import { showConfirmModal } from "../ui-modules/components/confirm-modal.js";
 import { bindRecord } from "../ui-modules/subpage/record.js";
 import { bindRequest } from "../ui-modules/subpage/request.js";
@@ -65,7 +65,7 @@ const templatePaths = {
   transfer: "ui-modules/subpage/transfer.html",
   trustLimitField: "ui-modules/subpage/trust-limit-field.html",
   trustExplainer: "ui-modules/subpage/trust-explainer.html",
-  iouActions: "ui-modules/components/iou-actions.html",
+  tallyActions: "ui-modules/components/tally-actions.html",
 };
 
 const pageBinders = {
@@ -289,7 +289,7 @@ const loadPage = async (route) => {
       } else {
         document.title = "IOU — Friend";
       }
-      initIouActions(pageView, route.friendId);
+      initTallyActions(pageView, route.friendId);
       setFallbackBackNavigation(pageView);
     } else if (route.type === "add-friend") {
       const [addFriendHtml, trustLimitFieldHtml, trustExplainerHtml] = await Promise.all([
@@ -400,11 +400,11 @@ const loadPage = async (route) => {
       }
     } else {
       if (route.page === "tally") {
-        const actionsSlot = pageView.querySelector('[data-slot="iou-actions"]');
+        const actionsSlot = pageView.querySelector('[data-slot="tally-actions"]');
         if (actionsSlot) {
-          const actionsHtml = await fetchTemplate(templatePaths.iouActions);
+          const actionsHtml = await fetchTemplate(templatePaths.tallyActions);
           actionsSlot.innerHTML = actionsHtml;
-          initIouActions(pageView, null);
+          initTallyActions(pageView, null);
         }
       }
       const binder = pageBinders[route.page];

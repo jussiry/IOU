@@ -4,7 +4,7 @@
   margin-top: 12px;
 }
 
-.tally-actions .iou-actions {
+[data-slot="tally-actions"] .tally-actions {
   margin: 18px 20px 10px;
 }
 
