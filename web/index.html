@@ -239,6 +239,46 @@
     }
     .feature-icon { color: var(--green); font-size: 17px; }
 
+    /* ── LEARN ── */
+    .learn {
+      padding: clamp(80px,12vh,140px) clamp(24px,7vw,120px);
+      background: var(--bg-card); border-top: 1px solid var(--rule);
+    }
+    .learn-inner {
+      max-width: 1080px; margin: 0 auto;
+      display: grid; grid-template-columns: repeat(auto-fit,minmax(300px,1fr));
+      gap: 72px; align-items: center;
+    }
+    .learn-h2 {
+      font-family: 'DM Serif Display', serif;
+      font-size: clamp(28px,3.5vw,44px); font-weight: 400; line-height: 1.2; margin-bottom: 24px;
+    }
+    .learn-h2 em { color: var(--green); font-style: italic; }
+    .learn-body { color: var(--ink-mid); line-height: 1.75; margin-bottom: 32px; max-width: 460px; }
+    .learn-ctas { display: flex; gap: 18px; flex-wrap: wrap; align-items: center; }
+    .learn-meta { color: var(--ink-mid); font-size: 14px; opacity: 0.75; }
+    .learn-stick-wrap {
+      display: flex; flex-direction: column; align-items: center; gap: 18px;
+      user-select: none;
+    }
+    .learn-stick-hint {
+      font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase;
+      color: var(--ink-mid); opacity: 0.55;
+    }
+    #learn-stick { width: 100%; max-width: 360px; cursor: pointer; }
+    #learn-stick .stick-body { fill: oklch(82% 0.04 80); stroke: oklch(48% 0.05 80); stroke-width: 1.2; }
+    #learn-stick .stick-split { stroke: oklch(48% 0.05 80); stroke-width: 1; stroke-dasharray: 3 3; opacity: 0.6; }
+    #learn-stick .notch {
+      stroke: oklch(28% 0.04 80); stroke-width: 2.4; stroke-linecap: round;
+      transform-origin: center; transform-box: fill-box;
+      animation: notchPop 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+    }
+    @keyframes notchPop {
+      0%   { transform: scaleY(0); opacity: 0; }
+      60%  { transform: scaleY(1.15); opacity: 1; }
+      100% { transform: scaleY(1); opacity: 1; }
+    }
+
     /* ── CTA ── */
     .cta {
       padding: clamp(100px,14vh,160px) clamp(24px,7vw,120px);
@@ -305,6 +345,7 @@
     <a href="#mutual">The concept</a>
     <a href="#chain">Chained trust</a>
     <a href="#why">The roots</a>
+    <a href="#learn">Learn</a>
     <a href="https://iou-ui.up.railway.app/" target="_blank" rel="noopener" class="btn-primary">Try Tally</a>
   </div>
 </nav>
@@ -442,6 +483,37 @@
       <div class="feature-pill"><span class="feature-icon">◫</span>Full local transaction history</div>
       <div class="feature-pill"><span class="feature-icon">◭</span>Open source</div>
       <div class="feature-pill"><span class="feature-icon">◬</span>Peer-to-peer, data stays on device</div>
+    </div>
+  </div>
+</section>
+
+<!-- ── LEARN ── -->
+<section id="learn" class="learn">
+  <div class="learn-inner">
+    <div>
+      <div class="section-label">KEEP LEARNING</div>
+      <h2 class="learn-h2">Want to go <em>deeper?</em></h2>
+      <p class="learn-body">
+        Walk through eight short, interactive chapters — from the first notch on a
+        wooden stick to chains of trust that span the network. Tap, poke, and see
+        every idea behind Tally in motion.
+      </p>
+      <div class="learn-ctas">
+        <a href="tally-teaching.html" class="btn-primary-lg">Open the primer →</a>
+        <span class="learn-meta">8 chapters · ~10 min</span>
+      </div>
+    </div>
+    <div class="learn-stick-wrap">
+      <svg id="learn-stick" viewBox="0 0 360 140" xmlns="http://www.w3.org/2000/svg">
+        <!-- top half -->
+        <rect class="stick-body" x="20" y="22" width="320" height="42" rx="6"/>
+        <!-- bottom half -->
+        <rect class="stick-body" x="20" y="76" width="320" height="42" rx="6"/>
+        <!-- split line -->
+        <line class="stick-split" x1="20" y1="70" x2="340" y2="70"/>
+        <g id="learn-stick-notches"></g>
+      </svg>
+      <div class="learn-stick-hint">↑ tap the stick to add a notch</div>
     </div>
   </div>
 </section>
@@ -800,6 +872,37 @@ initPhysicsTree(document.getElementById('cta-tree'), {
 
 initCreditCircle(document.getElementById('credit-circle'));
 initChainDiagram(document.getElementById('chain-diagram'));
+
+// ─── Learn-section tally stick ────────────────────────────────────────────────
+// Each click adds a matching notch to both halves of a split tally stick,
+// echoing Chapter 1 of the interactive primer this section links to.
+
+(function initLearnStick() {
+  const svg     = document.getElementById('learn-stick');
+  const notches = document.getElementById('learn-stick-notches');
+  if (!svg || !notches) return;
+
+  const X_START = 50, X_GAP = 26, MAX = 11;
+  let count = 3;
+
+  function render() {
+    notches.innerHTML = '';
+    for (let i = 0; i < count; i++) {
+      const x = X_START + i * X_GAP;
+      const top    = svgEl('line', { class: 'notch', x1: x, y1: 30, x2: x, y2: 56 });
+      const bottom = svgEl('line', { class: 'notch', x1: x, y1: 84, x2: x, y2: 110 });
+      notches.appendChild(top);
+      notches.appendChild(bottom);
+    }
+  }
+
+  render();
+
+  svg.addEventListener('click', () => {
+    count = count >= MAX ? 1 : count + 1;
+    render();
+  });
+})();
 </script>
 </body>
 </html>

@@ -18,6 +18,7 @@ import {
   Heart,
   ChevronRight,
   CircleDot,
+  Bitcoin,
 } from "lucide-react";
 
 const STYLES = `
@@ -411,32 +412,57 @@ function CompareRow({ label, children }) {
 /* -------------------------------------------------- */
 /* CHAPTER 2 — Record a favour (interactive)          */
 /* -------------------------------------------------- */
-const SAMPLE_FAVOURS = [
-  { icon: Coffee, label: "covered the coffee", amount: 5, unit: "EUR" },
-  { icon: Pizza, label: "shared a pizza", amount: 12, unit: "EUR" },
-  { icon: Wrench, label: "fixed the bike", amount: 1, unit: "HOUR" },
-  { icon: Heart, label: "helped me move", amount: 3, unit: "HOUR" },
+// fromSam: true  → Sam did this for you  (you owe Sam)
+// fromSam: false → you did this for Sam  (Sam owes you)
+const SAM_HELPED_YOU = [
+  { icon: Pizza,  label: "shared a pizza",     amount: 12, unit: "EUR",  fromSam: true },
+  { icon: Wrench, label: "fixed the bike",     amount: 1,  unit: "HOUR", fromSam: true },
+  { icon: Heart,  label: "helped you move",    amount: 3,  unit: "HOUR", fromSam: true },
 ];
+
+const YOU_HELPED_SAM = [
+  { icon: Send,   label: "covered the ride",    amount: 8,  unit: "EUR",  fromSam: false },
+  { icon: Wrench, label: "fixed Sam's shelf",   amount: 1,  unit: "HOUR", fromSam: false },
+  { icon: Heart,  label: "walked Sam's dog",    amount: 2,  unit: "HOUR", fromSam: false },
+];
+
+function FavourRow({ favours, onAdd }) {
+  return (
+    <div className="flex flex-wrap gap-3">
+      {favours.map((f, i) => {
+        const Icon = f.icon;
+        const who = f.fromSam ? "Sam" : "You";
+        const hoverColor = f.fromSam ? "hover:bg-[var(--burgundy)]/10" : "hover:bg-[var(--moss)]/10";
+        const iconColor = f.fromSam ? "var(--burgundy)" : "var(--moss)";
+        return (
+          <button
+            key={i}
+            onClick={() => onAdd(f)}
+            className={`btn group inline-flex items-center gap-2.5 px-4 py-2.5 rounded-full bg-[var(--parchment-dark)] ${hoverColor} text-[var(--ink)] shadow-ink`}
+          >
+            <Icon size={16} style={{ color: iconColor }} />
+            <span className="font-display italic">{who} {f.label}</span>
+            <span className="font-mono text-xs text-[var(--ink-muted)] group-hover:text-[var(--ink)]">
+              {f.amount} {f.unit.toLowerCase()}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 function ChapterRecord() {
   const [tallies, setTallies] = useState([]);
-  const [pending, setPending] = useState({ idx: 0 });
 
-  const balance = tallies.reduce(
-    (acc, t) => {
-      acc[t.unit] = (acc[t.unit] || 0) + t.amount;
-      return acc;
-    },
-    {}
-  );
+  // Positive = you owe Sam, negative = Sam owes you
+  const balance = tallies.reduce((acc, t) => {
+    acc[t.unit] = (acc[t.unit] || 0) + (t.fromSam ? t.amount : -t.amount);
+    return acc;
+  }, {});
 
-  const add = (i) => {
-    const f = SAMPLE_FAVOURS[i];
-    setTallies((prev) => [
-      ...prev,
-      { ...f, ts: Date.now(), id: Math.random().toString(36).slice(2) },
-    ]);
-  };
+  const add = (f) =>
+    setTallies((prev) => [...prev, { ...f, ts: Date.now(), id: Math.random().toString(36).slice(2) }]);
   const reset = () => setTallies([]);
 
   return (
@@ -445,34 +471,29 @@ function ChapterRecord() {
       kicker="Record a favour"
       title={
         <>
-          When Sam buys you coffee, you both <em className="italic">notch the stick.</em>
+          Every favour gets <em className="italic">notched on the stick</em> — no matter who did it.
         </>
       }
     >
-      <p className="font-body text-lg text-[var(--ink-soft)] max-w-2xl mb-10 leading-relaxed">
-        Tap a favour below to log it. Watch the same entry appear on both
-        ledgers — yours and Sam's — with opposite signs. The data lives only
-        on your two devices.
+      <p className="font-body text-lg text-[var(--ink-soft)] max-w-2xl mb-8 leading-relaxed">
+        Tap a favour to log it. Each entry appears on both ledgers with opposite signs —
+        watch the net balance shift as the story between you and Sam unfolds.
       </p>
 
       {/* Quick-pick favours */}
-      <div className="flex flex-wrap gap-3 mb-8">
-        {SAMPLE_FAVOURS.map((f, i) => {
-          const Icon = f.icon;
-          return (
-            <button
-              key={i}
-              onClick={() => add(i)}
-              className="btn group inline-flex items-center gap-2.5 px-4 py-2.5 rounded-full bg-[var(--parchment-dark)] hover:bg-[var(--gold)]/30 text-[var(--ink)] shadow-ink"
-            >
-              <Icon size={16} className="text-[var(--burgundy)]" />
-              <span className="font-display italic">Sam {f.label}</span>
-              <span className="font-mono text-xs text-[var(--ink-muted)] group-hover:text-[var(--ink)]">
-                +{f.amount} {f.unit.toLowerCase()}
-              </span>
-            </button>
-          );
-        })}
+      <div className="space-y-4 mb-8">
+        <div>
+          <div className="font-mono text-[10px] uppercase tracking-widest text-[var(--burgundy)] mb-2">
+            Sam helped you
+          </div>
+          <FavourRow favours={SAM_HELPED_YOU} onAdd={add} />
+        </div>
+        <div>
+          <div className="font-mono text-[10px] uppercase tracking-widest text-[var(--moss)] mb-2">
+            You helped Sam
+          </div>
+          <FavourRow favours={YOU_HELPED_SAM} onAdd={add} />
+        </div>
         {tallies.length > 0 && (
           <button
             onClick={reset}
@@ -485,20 +506,8 @@ function ChapterRecord() {
 
       {/* Two ledgers */}
       <div className="grid md:grid-cols-2 gap-5 md:gap-8">
-        <Ledger
-          owner="You"
-          subtitle="kept on your phone"
-          tallies={tallies}
-          sign={-1}
-          accent="burgundy"
-        />
-        <Ledger
-          owner="Sam"
-          subtitle="kept on Sam's phone"
-          tallies={tallies}
-          sign={+1}
-          accent="moss"
-        />
+        <Ledger owner="You"  subtitle="kept on your phone"  tallies={tallies} perspective="you"  accent="burgundy" />
+        <Ledger owner="Sam"  subtitle="kept on Sam's phone" tallies={tallies} perspective="sam"  accent="moss" />
       </div>
 
       {tallies.length > 0 && (
@@ -507,20 +516,17 @@ function ChapterRecord() {
             Net balance with Sam
           </div>
           <div className="flex flex-wrap gap-x-8 gap-y-2 font-display">
-            {Object.entries(balance).map(([unit, amt]) => (
-              <div key={unit} className="flex items-baseline gap-2">
-                <span className="serif-num text-3xl text-[var(--ink)]">
-                  {amt > 0 ? "−" : "+"}
-                  {Math.abs(amt)}
-                </span>
-                <span className="text-sm text-[var(--ink-muted)] uppercase tracking-wider font-mono">
-                  {unit.toLowerCase()}
-                </span>
-                <span className="text-xs italic text-[var(--ink-muted)] ml-2">
-                  {amt > 0 ? "you owe Sam" : "Sam owes you"}
-                </span>
-              </div>
-            ))}
+            {Object.entries(balance).map(([unit, amt]) => {
+              const owes = amt > 0 ? "you owe Sam" : amt < 0 ? "Sam owes you" : "settled";
+              const color = amt > 0 ? "var(--burgundy)" : amt < 0 ? "var(--moss)" : "var(--ink-muted)";
+              return (
+                <div key={unit} className="flex items-baseline gap-2">
+                  <span className="serif-num text-3xl" style={{ color }}>{Math.abs(amt)}</span>
+                  <span className="text-sm text-[var(--ink-muted)] uppercase tracking-wider font-mono">{unit.toLowerCase()}</span>
+                  <span className="text-xs italic text-[var(--ink-muted)] ml-2">{owes}</span>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
@@ -528,7 +534,8 @@ function ChapterRecord() {
   );
 }
 
-function Ledger({ owner, subtitle, tallies, sign, accent }) {
+// perspective: "you" → positive means Sam owes you; "sam" → positive means you owe Sam
+function Ledger({ owner, subtitle, tallies, perspective, accent }) {
   const accentColor = accent === "burgundy" ? "var(--burgundy)" : "var(--moss)";
   return (
     <div className="rounded-lg deckle paper grain p-6 min-h-[320px] flex flex-col">
@@ -559,7 +566,12 @@ function Ledger({ owner, subtitle, tallies, sign, accent }) {
         )}
         {tallies.map((t) => {
           const Icon = t.icon;
-          const v = sign * t.amount;
+          // From "you" perspective: Sam helping you is negative (debt), you helping Sam is positive (credit)
+          // From "sam" perspective: the opposite
+          const v = perspective === "you"
+            ? (t.fromSam ? -t.amount : +t.amount)
+            : (t.fromSam ? +t.amount : -t.amount);
+          const who = t.fromSam ? "Sam" : "You";
           return (
             <div
               key={t.id}
@@ -569,10 +581,10 @@ function Ledger({ owner, subtitle, tallies, sign, accent }) {
               <span className="flex items-baseline gap-2 truncate">
                 <Icon
                   size={13}
-                  style={{ color: accentColor, transform: "translateY(2px)" }}
+                  style={{ color: t.fromSam ? "var(--burgundy)" : "var(--moss)", transform: "translateY(2px)" }}
                 />
                 <span className="text-[var(--ink-soft)] truncate">
-                  Sam {t.label}
+                  {who} {t.label}
                 </span>
               </span>
               <span
@@ -594,16 +606,23 @@ function Ledger({ owner, subtitle, tallies, sign, accent }) {
 /* CHAPTER 3 — Choose your unit                       */
 /* -------------------------------------------------- */
 const UNITS = [
-  { id: "eur", label: "Euro", icon: Euro, factor: 1, name: "EUR", note: "Familiar fiat unit" },
-  { id: "hour", label: "Hour", icon: Clock, factor: 0.05, name: "HOUR", note: "Time-based exchange" },
-  { id: "meal", label: "Meal", icon: Pizza, factor: 0.083, name: "MEAL", note: "Cooked dinners" },
-  { id: "favour", label: "Favour", icon: Heart, factor: 0.2, name: "FAVOUR", note: "Whatever you agree on" },
+  { id: "eur",  label: "Euro",    icon: Euro,    factor: 1,      name: "EUR",  note: "Familiar fiat unit" },
+  { id: "hour", label: "Hour",    icon: Clock,   factor: 0.05,   name: "HOUR", note: "Time-based exchange" },
+  { id: "meal", label: "Meal",    icon: Pizza,   factor: 2 / 60, name: "MEAL", note: "Home-cooked dinners" },
+  { id: "btc",  label: "Bitcoin", icon: Bitcoin, factor: 0.001 / 60, name: "BTC", note: "Decentralized cryptocurrency" },
 ];
 
 function ChapterUnits() {
   const [unit, setUnit] = useState(UNITS[0]);
   const baseAmount = 60;
-  const display = useMemo(() => baseAmount * unit.factor, [unit]);
+  // Round to 4 significant decimal places to avoid floating-point noise
+  // e.g. 60 * (2/60) = 1.9999999999999998 → rounds cleanly to 2
+  const display = useMemo(() => {
+    const raw = baseAmount * unit.factor;
+    return Math.round(raw * 10000) / 10000;
+  }, [unit]);
+
+  const displayStr = display % 1 === 0 ? String(display) : display.toFixed(display < 0.1 ? 4 : 2);
 
   return (
     <Chapter
@@ -638,7 +657,7 @@ function ChapterUnits() {
             </div>
             <div className="flex items-baseline gap-3">
               <span className="serif-num text-6xl md:text-7xl text-[var(--burgundy)] font-light">
-                {display % 1 === 0 ? display : display.toFixed(2)}
+                {displayStr}
               </span>
               <div className="flex flex-col">
                 <span className="font-display text-xl text-[var(--ink)]">
@@ -1126,6 +1145,11 @@ function LoopGraph({ phase }) {
           const cpx = mx + ox * curve;
           const cpy = my + oy * curve;
 
+          // Place label outside the arc: opposite the control-point direction
+          // (ox,oy points toward triangle centre, so negate to go outward)
+          const lx = mx - ox * 44;
+          const ly = my - oy * 44;
+
           const inLoopColor =
             phase === 1 ? "var(--gold)" : "var(--burgundy)";
           return (
@@ -1140,8 +1164,8 @@ function LoopGraph({ phase }) {
                 opacity={phase === 1 ? 0.95 : 0.8}
               />
               <text
-                x={cpx}
-                y={cpy + 4}
+                x={lx}
+                y={ly + 4}
                 textAnchor="middle"
                 fontFamily="JetBrains Mono"
                 fontSize="11"
