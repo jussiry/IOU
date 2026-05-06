@@ -120,6 +120,10 @@
       border-bottom: 1px solid var(--rule); padding-bottom: 2px;
     }
     .hero-tree { display: flex; justify-content: center; align-items: center; }
+    @media (max-width: 720px) {
+      .hero { grid-template-columns: 1fr; }
+      .hero-tree { display: none; }
+    }
     .scroll-cue {
       position: absolute; bottom: 36px; left: 50%; transform: translateX(-50%);
       display: flex; flex-direction: column; align-items: center; gap: 6px;
