@@ -54,14 +54,14 @@
       border-bottom: 1px solid var(--rule);
     }
     .nav-logo {
-      display: flex; align-items: center; gap: 10px;
+      display: flex; align-items: center; gap: 10px; margin-right: 5px;
       text-decoration: none; color: var(--ink);
       font-family: 'DM Serif Display', serif; font-size: 21px; letter-spacing: -0.01em;
     }
     .nav-logo .accent { color: var(--green); }
     .nav-links { display: flex; gap: 28px; align-items: center; }
     .nav-links a {
-      color: var(--ink-mid); text-decoration: none; font-size: 15px; transition: color 0.2s;
+      color: var(--ink-mid); text-decoration: none; font-size: 15px; transition: color 0.2s; line-height: 1.2em;
     }
     .nav-links a:hover { color: var(--green); }
     .btn-primary {
@@ -70,6 +70,46 @@
       font-size: 15px; font-weight: 500; transition: opacity 0.2s;
     }
     .btn-primary:hover { opacity: 0.82; }
+
+    /* hamburger button */
+    .nav-burger {
+      display: none; flex-direction: column; justify-content: center; gap: 5px;
+      width: 40px; height: 40px; background: none; border: none; cursor: pointer;
+      padding: 8px; border-radius: 8px; transition: background 0.15s;
+    }
+    .nav-burger:hover { background: oklch(90% 0.01 120); }
+    .nav-burger span {
+      display: block; height: 2px; border-radius: 2px;
+      background: var(--ink); transition: transform 0.25s, opacity 0.25s;
+    }
+    .nav-burger.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+    .nav-burger.open span:nth-child(2) { opacity: 0; }
+    .nav-burger.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+
+    /* mobile dropdown */
+    .nav-dropdown {
+      display: none; position: absolute; top: 64px; left: 0; right: 0;
+      background: oklch(97% 0.012 100 / 0.97);
+      backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--rule);
+      flex-direction: column; padding: 12px 0 20px;
+      box-shadow: 0 8px 24px oklch(16% 0.022 150 / 0.08);
+    }
+    .nav-dropdown.open { display: flex; z-index: 1; position: fixed; }
+    .nav-dropdown a {
+      padding: 13px clamp(24px,5vw,80px); font-size: 17px;
+      color: var(--ink-mid); text-decoration: none; transition: color 0.15s;
+    }
+    .nav-dropdown a:hover { color: var(--green); }
+    .nav-dropdown .btn-primary {
+      margin: 8px clamp(24px,5vw,80px) 0;
+      text-align: center; padding: 12px 22px;
+    }
+
+    @media (max-width: 640px) {
+      .nav-links  { display: none; }
+      .nav-burger { display: flex; }
+    }
 
     /* ── HERO ── */
     .hero {
@@ -352,7 +392,18 @@
     <a href="#learn">Learn</a>
     <a href="https://iou-ui.up.railway.app/" target="_blank" rel="noopener" class="btn-primary">Try Tally</a>
   </div>
+  <button class="nav-burger" id="nav-burger" aria-label="Open menu" aria-expanded="false">
+    <span></span><span></span><span></span>
+  </button>
 </nav>
+<div class="nav-dropdown" id="nav-dropdown">
+  <a href="#how" class="nav-dd-link">How it works</a>
+  <a href="#mutual" class="nav-dd-link">The concept</a>
+  <a href="#chain" class="nav-dd-link">Chained trust</a>
+  <a href="#why" class="nav-dd-link">The roots</a>
+  <a href="#learn" class="nav-dd-link">Learn</a>
+  <a href="https://iou-ui.up.railway.app/" target="_blank" rel="noopener" class="btn-primary">Try Tally</a>
+</div>
 
 <!-- ── HERO ── -->
 <section class="hero">
@@ -876,6 +927,34 @@ initPhysicsTree(document.getElementById('cta-tree'), {
 
 initCreditCircle(document.getElementById('credit-circle'));
 initChainDiagram(document.getElementById('chain-diagram'));
+
+// ─── Mobile nav hamburger ─────────────────────────────────────────────────────
+
+(function initMobileNav() {
+  const burger   = document.getElementById('nav-burger');
+  const dropdown = document.getElementById('nav-dropdown');
+  if (!burger || !dropdown) return;
+
+  function close() {
+    burger.classList.remove('open');
+    dropdown.classList.remove('open');
+    burger.setAttribute('aria-expanded', 'false');
+  }
+
+  burger.addEventListener('click', () => {
+    const isOpen = dropdown.classList.toggle('open');
+    burger.classList.toggle('open', isOpen);
+    burger.setAttribute('aria-expanded', String(isOpen));
+  });
+
+  // Close when any dropdown link is tapped
+  dropdown.querySelectorAll('a').forEach(a => a.addEventListener('click', close));
+
+  // Close when clicking outside
+  document.addEventListener('click', e => {
+    if (!burger.contains(e.target) && !dropdown.contains(e.target)) close();
+  });
+})();
 
 // ─── Learn-section tally stick ────────────────────────────────────────────────
 // Each click adds a matching notch to both halves of a split tally stick,
