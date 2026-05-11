@@ -47,7 +47,7 @@ export const createTransaction = async ({ friendId, amount, message }) => {
   const timestamp = new Date();
   const date = timestamp.toISOString().slice(0, 10);
   const transactionId = createId("tx");
-  const note = trimmedMessage.length ? trimmedMessage : "IOU sent";
+  const note = trimmedMessage.length ? trimmedMessage : "record signed";
 
   const txMsg = await queuePeerMessage(state, {
     toUserId: normalizedFriendId,

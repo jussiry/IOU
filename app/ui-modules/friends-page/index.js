@@ -54,7 +54,6 @@ const getFriendRowState = (friend) => {
   if (isAcceptedFriendshipStatus(friend.friendship_status)) {
     const debtValue = friend.debt_eur || 0;
     return {
-      badge: debtValue >= 0 ? "owes you" : "you owe",
       amountHtml: formatDebtWithLimit(
         debtValue,
         friend.trust_credit_limit_eur
@@ -66,7 +65,6 @@ const getFriendRowState = (friend) => {
   if (friend.friendship_status === FRIENDSHIP_STATUS_PENDING_INCOMING) {
     const suggestedTrustLimit = getPendingTrustLimit(friend);
     return {
-      badge: "incoming",
       amountHtml:
         suggestedTrustLimit > 0
           ? `${formatCurrency(suggestedTrustLimit)} <span class="trust-limit">suggested</span>`
@@ -78,7 +76,6 @@ const getFriendRowState = (friend) => {
   if (friend.friendship_status === FRIENDSHIP_STATUS_PENDING_OUTGOING) {
     const suggestedTrustLimit = getPendingTrustLimit(friend);
     return {
-      badge: "pending",
       amountHtml:
         suggestedTrustLimit > 0
           ? `${formatCurrency(suggestedTrustLimit)} <span class="trust-limit">suggested</span>`
@@ -89,14 +86,12 @@ const getFriendRowState = (friend) => {
 
   if (friend.friendship_status === FRIENDSHIP_STATUS_REJECTED) {
     return {
-      badge: "rejected",
       amountHtml: "",
       amountClassName: "amount--muted",
     };
   }
 
   return {
-    badge: "",
     amountHtml: "",
     amountClassName: "",
   };
@@ -253,7 +248,6 @@ export const bindFriends = (root, data) => {
   sortedFriends.forEach((friend) => {
     const node = friendTemplate.content.firstElementChild.cloneNode(true);
     const nameEl = node.querySelector('[data-bind="name"]');
-    const badgeEl = node.querySelector('[data-bind="badge"]');
     const amountEl = node.querySelector('[data-bind="amount"]');
     const iconEl = node.querySelector('[data-bind="friend-icon"]');
     const actionDotEl = node.querySelector('[data-bind="action-dot"]');
@@ -270,7 +264,6 @@ export const bindFriends = (root, data) => {
     if (actionDotEl) {
       actionDotEl.hidden = !hasActionableNotification(friend);
     }
-    if (badgeEl) badgeEl.textContent = rowState.badge;
     if (amountEl) {
       amountEl.innerHTML = rowState.amountHtml;
       amountEl.classList.remove("pos", "neg", "amount--muted");

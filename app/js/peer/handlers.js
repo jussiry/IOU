@@ -490,7 +490,7 @@ const applyOutboundTransactionCreated = (state, entry) => {
   if (!Number.isFinite(amount) || amount <= 0) return false;
 
   const date = asTrimmedString(entry.payload?.date) || new Date().toISOString().slice(0, 10);
-  const note = asTrimmedString(entry.payload?.note) || "IOU sent";
+  const note = asTrimmedString(entry.payload?.note) || "record signed";
 
   if (!Array.isArray(friend.recent_transactions)) friend.recent_transactions = [];
   friend.debt_eur = (friend.debt_eur || 0) - amount;

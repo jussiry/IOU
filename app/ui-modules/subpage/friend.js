@@ -53,7 +53,7 @@ export const bindFriendDetail = (root, data, friendId) => {
   const suggestionActionsEl = root.querySelector('[data-section="trust-suggestion-actions"]');
   const suggestionCancelActionsEl = root.querySelector('[data-section="trust-cancel-actions"]');
   const suggestionOkActionsEl = root.querySelector('[data-section="trust-ok-actions"]');
-  const suggestionExplainerEl = root.querySelector('[data-section="trust-suggestion-explainer"]');
+
   const paymentRequestEl = root.querySelector('[data-section="payment-request"]');
   const paymentRequestLabelEl = root.querySelector('[data-bind="payment-request-label"]');
   const paymentRequestAcceptActionsEl = root.querySelector('[data-section="payment-request-accept-actions"]');
@@ -242,7 +242,6 @@ export const bindFriendDetail = (root, data, friendId) => {
       if (suggestionLabelEl) suggestionLabelEl.textContent = amountText;
       if (suggestionOkActionsEl) suggestionOkActionsEl.hidden = false;
     } else {
-      if (suggestionExplainerEl) suggestionExplainerEl.hidden = false;
       const amountText = `Suggested trust limit* of ${formatCurrency(pendingLimit)}`;
       if (suggestionLabelEl) suggestionLabelEl.textContent = amountText;
       if (isIncoming === true && suggestionActionsEl) suggestionActionsEl.hidden = false;
@@ -254,7 +253,7 @@ export const bindFriendDetail = (root, data, friendId) => {
   if (agreeTrustButton && friendId) {
     agreeTrustButton.addEventListener("click", async () => {
       if (suggestionEl) suggestionEl.hidden = true;
-      if (suggestionExplainerEl) suggestionExplainerEl.hidden = true;
+
       await respondToTrustLimitSuggestion(friendId, true);
     });
   }
@@ -262,7 +261,7 @@ export const bindFriendDetail = (root, data, friendId) => {
   if (disagreeTrustButton && friendId) {
     disagreeTrustButton.addEventListener("click", async () => {
       if (suggestionEl) suggestionEl.hidden = true;
-      if (suggestionExplainerEl) suggestionExplainerEl.hidden = true;
+
       await respondToTrustLimitSuggestion(friendId, false);
     });
   }
@@ -270,7 +269,7 @@ export const bindFriendDetail = (root, data, friendId) => {
   if (cancelTrustButton && friendId) {
     cancelTrustButton.addEventListener("click", async () => {
       if (suggestionEl) suggestionEl.hidden = true;
-      if (suggestionExplainerEl) suggestionExplainerEl.hidden = true;
+
       await cancelTrustLimitSuggestion(friendId);
     });
   }
