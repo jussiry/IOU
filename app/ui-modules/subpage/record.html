@@ -7,28 +7,28 @@
   </div>
   <div class="content-card trust-hero send-card">
     <form class="send-form" aria-label="Record tally form">
-      <label class="form-field form-field-inline">
-        <span class="form-label">Record with</span>
-        <select class="form-select" data-bind="send-to"></select>
-      </label>
-      <label class="form-field form-field-inline">
-        <span class="form-label">Amount (EUR)</span>
+      <div class="owes-sentence">
+        <span class="owes-sentence-name owes-sentence-name--debtor" data-bind="record-preview-user-name">You</span>
+        <span class="form-label owes-sentence-verb">owes</span>
+        <select class="form-select owes-sentence-select owes-sentence-select--creditor" data-bind="send-to"></select>
         <input
-          class="form-input"
+          class="form-input owes-sentence-amount"
           type="number"
           inputmode="decimal"
           min="0"
           step="1"
-          placeholder="0.00"
+          placeholder="0"
           data-bind="send-amount"
         />
-      </label>
+        <span class="owes-sentence-currency">€</span>
+        <span class="owes-sentence-preview owes-sentence-preview--debtor" data-bind="record-preview-user-amount">−€0</span>
+        <span class="owes-sentence-preview owes-sentence-preview--creditor" data-bind="record-preview-friend-amount">+€0</span>
+      </div>
       <label class="form-field">
-        <span class="form-label"></span>
         <textarea
           class="form-textarea"
           rows="1"
-          placeholder="Add a note"
+          placeholder="because"
           data-bind="send-message"
         ></textarea>
       </label>
@@ -36,7 +36,7 @@
         <svg class="primary-button-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
           <use href="#icon-send" />
         </svg>
-        <span class="primary-button-label">Send €</span>
+        <span class="primary-button-label">Sign and send to friend</span>
       </button>
     </form>
   </div>

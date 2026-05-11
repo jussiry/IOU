@@ -9,6 +9,7 @@ The submit button label updates dynamically to "Send €[amount]" as the user ty
 import { isAcceptedFriendshipStatus } from "../../js/utils/friendships.js";
 import { loadVendorScript } from "../../js/utils/vendor-loader.js";
 import { parseIouUri } from "../../js/utils/qr-uri.js";
+import { bindOwesPreview } from "../components/owes-sentence.js";
 
 const renderEmptyState = (contentEl, allFriends) => {
   if (!contentEl) {
@@ -31,12 +32,6 @@ const renderEmptyState = (contentEl, allFriends) => {
     `;
 };
 
-const formatSubmitLabel = (amount) => {
-  const parsed = parseFloat(amount);
-  if (!amount || !Number.isFinite(parsed) || parsed <= 0) return "Send €";
-  return `Send €${parsed % 1 === 0 ? parsed : parsed.toFixed(2)}`;
-};
-
 export const bindRecord = (root, data, friendId) => {
   const titleEl = root.querySelector('[data-bind="page-title"]');
   const contentEl = root.querySelector(".send-content");
@@ -45,20 +40,26 @@ export const bindRecord = (root, data, friendId) => {
   const amountEl = root.querySelector('[data-bind="send-amount"]');
   const messageEl = root.querySelector('[data-bind="send-message"]');
   const submitEl = root.querySelector('[data-bind="send-submit"]');
-
-  if (titleEl) titleEl.textContent = "Record a tally";
-
-  // Dynamic submit button label
   const submitLabelEl = submitEl?.querySelector(".primary-button-label");
-  const updateSubmitLabel = () => {
-    const label = formatSubmitLabel(amountEl?.value);
-    if (submitLabelEl) submitLabelEl.textContent = label;
-  };
+  const previewUserAmountEl = root.querySelector('[data-bind="record-preview-user-amount"]');
 
-  if (amountEl) {
-    amountEl.addEventListener("input", updateSubmitLabel);
-    updateSubmitLabel();
-  }
+  const previewUserNameEl = root.querySelector('[data-bind="record-preview-user-name"]');
+  const previewFriendAmountEl = root.querySelector('[data-bind="record-preview-friend-amount"]');
+
+  if (titleEl) titleEl.textContent = "Send a record";
+
+  // Tally diff preview — the user (debtor) goes negative, the friend (creditor)
+  // goes positive by the same amount. The shared bindOwesPreview helper keeps
+  // the preview row in sync with the amount input.
+  let currentFriendName = "your friend";
+  const userName = data?.you?.name || "You";
+  if (previewUserNameEl) previewUserNameEl.textContent = userName;
+
+  const updatePreview = bindOwesPreview({
+    amountEl,
+    debtorAmountEl: previewUserAmountEl,
+    creditorAmountEl: previewFriendAmountEl,
+  });
 
   if (messageEl) {
     const autoGrow = () => {
@@ -90,13 +91,17 @@ export const bindRecord = (root, data, friendId) => {
 
   const getFirstName = (fullName) => fullName.split(/\s+/)[0] || fullName;
 
-  const updateExplainer = (name, alternate) => {
+  const updateSubmitLabel = (name) => {
+    if (submitLabelEl)
+      submitLabelEl.textContent = `Sign and send to ${name ? getFirstName(name) : "friend"}`;
+  };
+
+  const updateExplainer = (name) => {
     if (!explainerEl) return;
     const friendName = name ? getFirstName(name) : "your friend";
-    const otherName = alternate ? getFirstName(alternate) : "another friend";
     explainerEl.innerHTML = `
-      <p>Recording a tally means <strong>you owe</strong> this amount — it's a promise to give back that value later, the same effect as sending euros, just recorded in your mutual trust.</p>
-      <p>Tallies can be settled when your friend records one back to you. They can also cancel out in a circle: <strong>you</strong> owe <strong>${friendName}</strong> who owes <strong>${otherName}</strong> who owes <strong>you</strong>. The system resolves these automatically.</p>
+      <p>In Tally, <strong>instead of sending actual euros you sign a record saying you owe euros</strong>. Later ${friendName} can use the value of this record to buy things from you — or from someone else through you, using chained records.</p>
+      <p>This signed record is stored on your and ${friendName}'s devices, and only visible to you two.</p>
     `;
   };
 
@@ -117,30 +122,29 @@ export const bindRecord = (root, data, friendId) => {
       selectEl.value = initialSelection.person_id;
     }
 
-    const selectAlternate = (currentId) => {
-      const candidates = acceptedFriends.filter(
-        (friend) => friend.person_id !== currentId
-      );
-      if (!candidates.length) return null;
-      const pick = candidates[Math.floor(Math.random() * candidates.length)];
-      return pick?.person_name || pick?.person_id || null;
-    };
 
     const selected = acceptedFriends.find(
       (friend) => friend.person_id === selectEl.value
     );
     const selectedName = selected?.person_name || selected?.person_id;
-    updateExplainer(selectedName, selectAlternate(selectEl.value));
+    currentFriendName = selectedName || "your friend";
+    updateExplainer(selectedName);
+    updateSubmitLabel(selectedName);
+    updatePreview();
 
     selectEl.addEventListener("change", () => {
       const current = acceptedFriends.find(
         (friend) => friend.person_id === selectEl.value
       );
       const name = current?.person_name || current?.person_id;
-      updateExplainer(name, selectAlternate(selectEl.value));
+      currentFriendName = name || "your friend";
+      updateExplainer(name);
+      updateSubmitLabel(name);
+      updatePreview();
     });
   } else {
-    updateExplainer(null, null);
+    updateExplainer(null);
+    updateSubmitLabel(null);
   }
 
   // --- QR code scanning ---

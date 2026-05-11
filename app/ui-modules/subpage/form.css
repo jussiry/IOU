@@ -5,7 +5,7 @@
 
 .send-form {
   display: grid;
-  gap: 12px;
+  gap: 9px;
 }
 
 .form-field {
@@ -67,8 +67,6 @@
 .send-form .form-select {
   font-size: 20px;
   font-weight: 700;
-  text-align: left;
-  color: var(--ink);
 }
 
 /* Hide number input spinners — too small to be practical on mobile */

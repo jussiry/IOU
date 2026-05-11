@@ -1,0 +1,92 @@
+/*
+.owes-sentence — reusable two-row sentence layout reading as
+"[name-or-select] owes [name-or-select] [amount] [currency]" with optional
+preview amounts below the names. The debtor slot (column 1) renders in red,
+the creditor slot (column 3) in green. Used in both record and request flows.
+
+Slot positions are fixed by CSS so the markup order can vary between pages
+(record puts the user on the debtor side, request puts the friend there).
+*/
+
+.owes-sentence {
+  display: grid;
+  grid-template-columns: auto auto auto auto auto;
+  grid-template-rows: auto auto;
+  align-items: baseline;
+  column-gap: 8px;
+  row-gap: 0;
+}
+
+.owes-sentence-name,
+.owes-sentence-select {
+  grid-row: 1;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--ink);
+  min-width: 0;
+}
+
+.owes-sentence-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.owes-sentence-select {
+  width: fit-content(9ch);
+}
+
+.owes-sentence-name--debtor,
+.owes-sentence-select--debtor { grid-column: 1; }
+
+.owes-sentence-name--creditor,
+.owes-sentence-select--creditor { grid-column: 3; }
+
+.owes-sentence-verb {
+  grid-row: 1;
+  grid-column: 2;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.owes-sentence-amount {
+  grid-row: 1;
+  grid-column: 4;
+  width: 4ch;
+  padding: 3px;
+  text-align: right;
+}
+
+.owes-sentence-currency {
+  grid-row: 1;
+  grid-column: 5;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+/* Scoped override for the friend selector inside an owes-sentence — keeps the
+   leading edge flush with the name on the same row. */
+.send-form .owes-sentence-select.form-select {
+  text-align: left;
+  padding-left: 0;
+  padding-bottom: 5px;
+}
+
+/* Preview amounts on row 2 — aligned with the name they preview.
+   visibility: hidden keeps the row height stable when there's no amount yet. */
+.owes-sentence-preview {
+  grid-row: 2;
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+  margin-top: -2px;
+  visibility: hidden;
+  justify-self: start;
+}
+
+.owes-sentence-preview--debtor { grid-column: 1; color: var(--danger); }
+.owes-sentence-preview--creditor { grid-column: 3; color: var(--accent-deep); }
+
+.owes-sentence-preview.is-visible { visibility: visible; }

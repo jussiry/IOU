@@ -12,6 +12,9 @@ Tab state is local to this page visit; switching tabs shows/hides panels.
 import { isAcceptedFriendshipStatus } from "../../js/utils/friendships.js";
 import { loadVendorScript } from "../../js/utils/vendor-loader.js";
 import { encodePayUri } from "../../js/utils/qr-uri.js";
+import { bindOwesPreview } from "../components/owes-sentence.js";
+
+const getFirstName = (fullName) => fullName.split(/\s+/)[0] || fullName;
 
 const QR_UPDATE_DEBOUNCE_MS = 300;
 
@@ -35,6 +38,15 @@ const bindRequestFriend = (root, data) => {
   const amountEl = root.querySelector('[data-bind="request-amount"]');
   const messageEl = root.querySelector('[data-bind="request-message"]');
   const submitEl = root.querySelector('[data-bind="request-submit"]');
+  const submitLabelEl = submitEl?.querySelector(".primary-button-label");
+  const userNameEl = root.querySelector('[data-bind="request-preview-user-name"]');
+  const debtorAmountEl = root.querySelector('[data-bind="request-preview-debtor-amount"]');
+  const creditorAmountEl = root.querySelector('[data-bind="request-preview-creditor-amount"]');
+
+  // Display the current user on the creditor side of the sentence.
+  if (userNameEl) userNameEl.textContent = data?.you?.name || "You";
+
+  bindOwesPreview({ amountEl, debtorAmountEl, creditorAmountEl });
 
   if (messageEl) {
     const autoGrow = () => {
@@ -70,6 +82,11 @@ const bindRequestFriend = (root, data) => {
     return { submitEl: null, getPayload: () => ({ friendId: "", amount: NaN, message: "" }) };
   }
 
+  const updateSubmitLabel = (name) => {
+    if (submitLabelEl)
+      submitLabelEl.textContent = `Request payment from ${name ? getFirstName(name) : "friend"}`;
+  };
+
   if (selectEl) {
     selectEl.innerHTML = "";
     acceptedFriends.forEach((friend) => {
@@ -77,6 +94,16 @@ const bindRequestFriend = (root, data) => {
       option.value = friend.person_id;
       option.textContent = friend.person_name || friend.person_id;
       selectEl.appendChild(option);
+    });
+
+    const initialName =
+      acceptedFriends.find((friend) => friend.person_id === selectEl.value)
+        ?.person_name || acceptedFriends[0]?.person_name;
+    updateSubmitLabel(initialName);
+
+    selectEl.addEventListener("change", () => {
+      const current = acceptedFriends.find((friend) => friend.person_id === selectEl.value);
+      updateSubmitLabel(current?.person_name || current?.person_id);
     });
   }
 

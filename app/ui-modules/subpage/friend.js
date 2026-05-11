@@ -132,7 +132,7 @@ export const bindFriendDetail = (root, data, friendId) => {
   }
   if (labelEl) {
     labelEl.textContent = isAcceptedFriendshipStatus(friendshipStatus)
-      ? `My transactions with ${friendFirstName}`
+      ? `My records with ${friendFirstName}`
       : `Friendship with ${friendFirstName}`;
   }
   if (headerRight) {
@@ -142,7 +142,7 @@ export const bindFriendDetail = (root, data, friendId) => {
           <svg class="friend-send-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
             <use href="#icon-send" />
           </svg>
-          <span class="friend-send-label">Record</span>
+          <span class="friend-send-label">Send</span>
         </button>
       `;
     } else if (friendshipStatus === FRIENDSHIP_STATUS_REJECTED) {
