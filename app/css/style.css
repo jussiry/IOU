@@ -233,6 +233,14 @@ nav {
   color: var(--accent-light);
 }
 
+.neg {
+  color: var(--danger);
+}
+
+.pos {
+  color: var(--ok);
+}
+
 @media (min-width: 600px) {
   .app {
     max-width: 420px;

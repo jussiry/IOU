@@ -103,14 +103,6 @@
   font-size: 16px;
 }
 
-.pill .neg {
-  color: var(--danger);
-}
-
-.pill .pos {
-  color: var(--ok);
-}
-
 .inline-list .pos,
 .inline-list .neg {
   color: inherit;

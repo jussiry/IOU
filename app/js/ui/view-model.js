@@ -39,8 +39,8 @@ export const buildView = (state) => {
 
   const availableTrust = acceptedFriends.reduce((sum, friend) => {
     const trustLimit = friend.trust_credit_limit_eur || 0;
-    const debt = friend.debt_eur || 0;
-    return sum + Math.max(trustLimit + debt, 0);
+    const tally = friend.debt_eur || 0;
+    return sum + Math.max(trustLimit + tally, 0);
   }, 0);
 
   return {

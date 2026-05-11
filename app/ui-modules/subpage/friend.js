@@ -1,5 +1,5 @@
 /*
-This module binds the friend detail subpage. It renders debt/trust summary cards, injects friend-specific labels, and lists recent transactions.
+This module binds the friend detail subpage. It renders tally/trust summary cards, injects friend-specific labels, and lists recent transactions.
 
 It also exposes navigation triggers to related subpages by wiring the trust tile click target from the current friend context.
 */
@@ -37,8 +37,8 @@ export const bindFriendDetail = (root, data, friendId) => {
   const labelEl = root.querySelector('[data-bind="friend-label"]');
   const headerRight = root.querySelector('[data-slot="subpage-header-right"]');
   const bodyEl = root.querySelector('[data-section="friend-body"]');
-  const debtLabelEl = root.querySelector('[data-bind="debt-label"]');
-  const debtAmountEl = root.querySelector('[data-bind="debt-amount"]');
+  const tallyLabelEl = root.querySelector('[data-bind="tally-label"]');
+  const tallyAmountEl = root.querySelector('[data-bind="tally-amount"]');
   const trustTitleEl = root.querySelector('[data-bind="trust-title"]');
   const trustAmountEl = root.querySelector('[data-bind="trust-amount"]');
   const trustButton = root.querySelector('[data-section="trust-limit"]');
@@ -69,16 +69,16 @@ export const bindFriendDetail = (root, data, friendId) => {
   const friendName = friend?.person_name || "Friend";
   const friendFirstName = friendName.split(/\s+/)[0] || friendName;
   const friendshipStatus = friend?.friendship_status || FRIENDSHIP_STATUS_ACCEPTED;
-  const debt = friend?.debt_eur || 0;
+  const tally = friend?.debt_eur || 0;
   const isOnline = getConnectedPeerIds().includes(friendId);
   const isRelay = !isOnline && getServerPresentPeerIds().includes(friendId);
   const friendDangerActionLabel =
-    debt > 0 ? "Absolve debt" : debt < 0 ? "Default on debt" : "Deactivate friend connection";
+    tally > 0 ? "Absolve tally" : tally < 0 ? "Default on tally" : "Deactivate friend connection";
   const friendDangerBody =
-    debt > 0
-      ? `Cancel ${friendName}'s debt of **€${Math.abs(debt).toFixed(2)}** to you. With this action, you also **deactivate** your friend connection, stopping any activity between you two.\n\nIf you want to forgive the debt without deactivating the connection, you can do this by sending them an IOU of €${Math.abs(debt).toFixed(2)}.\n\nIt is still possible to reactivate the friend connection and this debt later, if both of you agree to do so.`
-      : debt < 0
-      ? `Defaulting on debt can have **serious consequences**. It is strongly recommended to talk about this with ${friendName} before taking this step. You currently owe **${Math.abs(debt).toFixed(2)} €** to ${friendName}.\n\nIn practice this action stops any activity with ${friendName} and removes this from the tally. If both of you agree, the friend connection and this debt can be reactivated later.`
+    tally > 0
+      ? `Cancel ${friendName}'s debt of **€${Math.abs(tally).toFixed(2)}** to you. With this action, you also **deactivate** your friend connection, stopping any activity between you two.\n\nIf you want to forgive the debt without deactivating the connection, you can do this by sending them an IOU of €${Math.abs(tally).toFixed(2)}.\n\nIt is still possible to reactivate the friend connection and this debt later, if both of you agree to do so.`
+      : tally < 0
+      ? `Defaulting on debt can have **serious consequences**. It is strongly recommended to talk about this with ${friendName} before taking this step. You currently owe **${Math.abs(tally).toFixed(2)} €** to ${friendName}.\n\nIn practice this action stops any activity with ${friendName} and removes this from the tally. If both of you agree, the friend connection and this debt can be reactivated later.`
       : `With this action, you deactivate your friend connection to ${friendName}, stopping any activity between you two. The transaction history will remain visible on this page.\n\nThe friend connection can be reactivated later if both of you agree to do so.`;
 
   if (titleEl) {
@@ -186,18 +186,18 @@ export const bindFriendDetail = (root, data, friendId) => {
     trustButton.classList.add("friend-stat--disabled");
     trustButton.setAttribute("aria-disabled", "true");
   }
-  if (debtLabelEl) {
+  if (tallyLabelEl) {
     if (isAcceptedFriendshipStatus(friendshipStatus)) {
-      debtLabelEl.textContent = debt >= 0 ? "owes you" : "you owe";
+      tallyLabelEl.textContent = tally >= 0 ? "owes you" : "you owe";
     } else {
-      debtLabelEl.textContent = "Friendship";
+      tallyLabelEl.textContent = "Friendship";
     }
   }
-  if (debtAmountEl) {
+  if (tallyAmountEl) {
     if (isAcceptedFriendshipStatus(friendshipStatus)) {
-      debtAmountEl.textContent = formatSigned(debt);
-      debtAmountEl.classList.toggle("pos", debt >= 0);
-      debtAmountEl.classList.toggle("neg", debt < 0);
+      tallyAmountEl.textContent = formatSigned(tally);
+      tallyAmountEl.classList.toggle("pos", tally >= 0);
+      tallyAmountEl.classList.toggle("neg", tally < 0);
     } else {
       const statusText =
         friendshipStatus === FRIENDSHIP_STATUS_PENDING_INCOMING
@@ -205,8 +205,8 @@ export const bindFriendDetail = (root, data, friendId) => {
           : friendshipStatus === FRIENDSHIP_STATUS_REJECTED
           ? "Rejected"
           : "Pending";
-      debtAmountEl.textContent = statusText;
-      debtAmountEl.classList.remove("pos", "neg");
+      tallyAmountEl.textContent = statusText;
+      tallyAmountEl.classList.remove("pos", "neg");
     }
   }
 

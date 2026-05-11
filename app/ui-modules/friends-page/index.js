@@ -1,5 +1,5 @@
 /*
-This module renders the friends list page. It sorts friendship rows, formats debt and trust summaries, and binds navigation to each friend's detail view.
+This module renders the friends list page. It sorts friendship rows, formats tally and trust summaries, and binds navigation to each friend's detail view.
 
 It also owns the add-friend button behavior and keeps accepted, pending, and rejected friendships visually distinct so the list remains useful after realtime friend requests are introduced.
 */
@@ -16,8 +16,8 @@ import {
   isAcceptedFriendshipStatus,
 } from "../../js/utils/friendships.js";
 
-const formatDebtWithLimit = (debtValue, trustLimitValue) => {
-  const formattedDebt = formatSigned(debtValue).replace("€", "");
+const formatTallyWithLimit = (tallyValue, trustLimitValue) => {
+  const formattedDebt = formatSigned(tallyValue).replace("€", "");
   const trustLimit = Math.round(trustLimitValue || 0);
   return `${formattedDebt} <span class="trust-limit">/ ${trustLimit} €</span>`;
 };
@@ -52,13 +52,13 @@ const getPendingTrustLimit = (friend) => {
 
 const getFriendRowState = (friend) => {
   if (isAcceptedFriendshipStatus(friend.friendship_status)) {
-    const debtValue = friend.debt_eur || 0;
+    const tallyValue = friend.debt_eur || 0;
     return {
-      amountHtml: formatDebtWithLimit(
-        debtValue,
+      amountHtml: formatTallyWithLimit(
+        tallyValue,
         friend.trust_credit_limit_eur
       ),
-      amountClassName: debtValue >= 0 ? "pos" : "neg",
+      amountClassName: tallyValue >= 0 ? "pos" : "neg",
     };
   }
 
@@ -235,10 +235,10 @@ export const bindFriends = (root, data) => {
       isAcceptedFriendshipStatus(leftFriend.friendship_status) &&
       isAcceptedFriendshipStatus(rightFriend.friendship_status)
     ) {
-      const debtDifference =
+      const tallyDifference =
         Math.abs(rightFriend.debt_eur || 0) - Math.abs(leftFriend.debt_eur || 0);
-      if (debtDifference !== 0) {
-        return debtDifference;
+      if (tallyDifference !== 0) {
+        return tallyDifference;
       }
     }
 

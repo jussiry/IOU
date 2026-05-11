@@ -66,29 +66,29 @@ export const bindSettings = (root, data, appVersion) => {
   if (!removeUserButton) return;
   removeUserButton.addEventListener("click", async () => {
     const friends = Array.isArray(data?.friends) ? data.friends : [];
-    const unresolvedDebts = friends.filter(
+    const unresolvedTallies = friends.filter(
       (friend) => isAcceptedFriendshipStatus(friend.friendship_status) && friend.debt_eur !== 0
     );
-    const negativeDebts = unresolvedDebts.filter((friend) => friend.debt_eur < 0);
+    const negativeTallies = unresolvedTallies.filter((friend) => friend.debt_eur < 0);
 
-    let debtWarning = "";
-    if (unresolvedDebts.length > 0) {
-      const lines = unresolvedDebts.map((friend) => {
+    let tallyWarning = "";
+    if (unresolvedTallies.length > 0) {
+      const lines = unresolvedTallies.map((friend) => {
         const amount = formatCurrency(friend.debt_eur);
         const direction = friend.debt_eur > 0 ? `owes you ${amount}` : `you owe ${amount}`;
         return `• ${friend.person_name}: ${direction}`;
       });
-      debtWarning = `\n\nUnresolved debts:\n${lines.join("\n")}\n`;
-      if (negativeDebts.length > 0) {
-        const totalOwed = negativeDebts.reduce(
+      tallyWarning = `\n\nUnresolved tallies:\n${lines.join("\n")}\n`;
+      if (negativeTallies.length > 0) {
+        const totalOwed = negativeTallies.reduce(
           (sum, friend) => sum + Math.abs(friend.debt_eur || 0),
           0
         );
-        debtWarning += `\nIf you have not transferred your user to another device, you are in practice defaulting on debt totalling **${formatCurrency(totalOwed)}**. This can have serious consequences.\n`;
+        tallyWarning += `\nIf you have not transferred your user to another device, you are in practice defaulting on a tally totalling **${formatCurrency(totalOwed)}**. This can have serious consequences.\n`;
       }
     }
 
-    const body = `This is a serious step. This will permanently remove all local data. Unless you have **transferred your user** to another device, you will not be able to retrieve your user.${debtWarning}\nDo you still want to remove your user data?`;
+    const body = `This is a serious step. This will permanently remove all local data. Unless you have **transferred your user** to another device, you will not be able to retrieve your user.${tallyWarning}\nDo you still want to remove your user data?`;
     const isConfirmed = await showConfirmModal({
       title: "Remove user data",
       body,

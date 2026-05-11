@@ -1,5 +1,5 @@
 /*
-IOU transaction command. Records that the user has taken on debt toward a
+IOU transaction command. Records that the user has signed a tally toward a
 friend (a "sent IOU"), updates the running friend tally, and propagates the
 transaction to the peer so both sides agree on the tally.
 

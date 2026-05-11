@@ -1,5 +1,5 @@
 /*
-This module binds the tally page UI. It renders totals, populates list sections for debts and trust agreements, and controls expandable detail pills.
+This module binds the tally page UI. It renders totals, populates list sections for tallies and trust agreements, and controls expandable detail pills.
 
 It keeps all tally-page specific rendering logic local to this module so the app shell can treat the page as a simple binder callback.
 */

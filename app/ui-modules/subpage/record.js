@@ -100,8 +100,8 @@ export const bindRecord = (root, data, friendId) => {
     if (!explainerEl) return;
     const friendName = name ? getFirstName(name) : "your friend";
     explainerEl.innerHTML = `
-      <p>In Tally, <strong>instead of sending actual euros you sign a record saying you owe euros</strong>. Later ${friendName} can use the value of this record to buy things from you — or from someone else through you, using chained records.</p>
-      <p>This signed record is stored on your and ${friendName}'s devices, and only visible to you two.</p>
+      <p>In Tally, <strong>instead of sending actual euros you sign a record saying you owe euros</strong>. Later ${friendName} can use the value of this record to buy things from you — or from someone else through you. This is done using chained records.</p>
+      <p>The signed record is stored on your and ${friendName}'s devices, and only visible to you two.</p>
     `;
   };
 
