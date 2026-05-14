@@ -56,6 +56,16 @@ const emitDataChange = (state) => {
   return view;
 };
 
+// Generate a stable per-device id once and persist it. Runs on first load and
+// remains the same across reconnects, browser restarts, and relay servers, so
+// peer routing can disambiguate two devices of the same user.
+const generateDeviceId = () => {
+  if (window.crypto?.randomUUID) {
+    return window.crypto.randomUUID();
+  }
+  return `dev_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+};
+
 // Exported for command modules and the realtime bridge — they need the same
 // cached state this module owns. Not meant for UI code; UI subscribes via
 // `subscribeToDataChanges` and reads the view object.
@@ -63,6 +73,15 @@ export const loadState = async () => {
   if (cachedState) return cachedState;
   const persistedState = await loadAppState();
   cachedState = normalizeAppState(persistedState);
+  if (cachedState && !cachedState.device_id) {
+    cachedState.device_id = generateDeviceId();
+    // Persist only when we already have a user — otherwise the empty state has
+    // no `user` and would fail `normalizeAppState`'s null-guard. The createUser
+    // flow seeds device_id below before its own persist.
+    if (cachedState.user) {
+      await saveAppState(cachedState);
+    }
+  }
   return cachedState;
 };
 
@@ -171,6 +190,7 @@ export const createUser = async (name, { existingNsec, ncryptsec, passphrase } =
   });
 
   const state = createEmptyAppState(user);
+  state.device_id = cachedState?.device_id || generateDeviceId();
 
   // Seed the ledger with a self-addressed name_changed entry only when this is
   // a genuinely new identity (fresh keypair). When the user is logging in with
@@ -203,6 +223,11 @@ export const createUser = async (name, { existingNsec, ncryptsec, passphrase } =
 // which strip private keys via `createPublicPersonModel` before they ever
 // reach UI code. Only the transfer flow needs this — everything else should
 // continue using the sanitized view.
+export const loadDeviceId = async () => {
+  const state = await loadState();
+  return state?.device_id || "";
+};
+
 export const loadCurrentUserPrivateKeyHex = async () => {
   const state = await loadState();
   return state?.user?.private_key_hex || "";

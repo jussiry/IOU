@@ -99,6 +99,8 @@ export type ContactsMap = Record<string, PersonModel>;
 
 export interface RootState {
   model_version: number;
+  /** Stable per-device identifier generated client-side on first app start. Persists across reconnects and across relay servers. */
+  device_id: string;
   user: PersonModel;
   contacts: ContactsMap;
   ledger: LedgerEntryModel[];
@@ -296,6 +298,7 @@ export const createPeerMessageModel = (input: any = {}): PeerMessageModel => {
 export const createEmptyAppState = (userPerson: any): RootState => {
   return {
     model_version: DATA_MODEL_VERSION,
+    device_id: "",
     user: createPersonModel(userPerson),
     contacts: {},
     ledger: [],
@@ -328,6 +331,7 @@ export const normalizeAppState = (state: any): RootState | null => {
 
   return {
     model_version: DATA_MODEL_VERSION,
+    device_id: asTrimmedStringOrDefault(state.device_id),
     user: createPersonModel(state.user),
     contacts: normalizeContactsMap(state.contacts),
     ledger: Array.isArray(state.ledger)

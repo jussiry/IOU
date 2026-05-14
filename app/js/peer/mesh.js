@@ -2,15 +2,21 @@
 This module manages WebRTC peer connections and JSON data channels between
 eligible IOU clients. It's used for two parallel overlays:
 
-  1. Friend mesh — one peer per friend npub (the key is the peer user id).
+  1. Friend mesh — one peer per (friend user id, friend device id) pair.
+     The key is `${peerUserId}|${peerDeviceId}` so a friend running on
+     multiple devices keeps a separate slot per device.
   2. Self-mesh — one peer per *other device* of the same user (the key is
-     the server-assigned peer device id; peerUserId is always my own npub).
+     the peer device id; peerUserId is always my own npub).
 
 Both overlays are instances of `createPeerMesh` with different `peerKey`
 conventions. The mesh is agnostic to the key's meaning — it just maps a
 key to an RTCPeerConnection + data channel, and every signalling message
 carries both `peerUserId` and `peerDeviceId` so the server can route to
 the exact remote device even when a user has several connected.
+
+For call sites that think in user ids (e.g. "deliver this message to
+friend X"), `findOpenPeerKeyByUserId` / `findAnyPeerKeyByUserId` resolve
+a user id to a current peer key.
 
 Offer/answer negotiation follows the "perfect negotiation" pattern: the
 non-initiator side is treated as polite and yields during simultaneous
@@ -565,6 +571,63 @@ const createPeerMesh = (
           closePeer(peerKey);
         }
       });
+    },
+    // Like `closePeersNotInSet` but filters by an arbitrary peer predicate
+    // (e.g. peer.peerUserId membership). Used by the friend mesh whose key is
+    // composite (userId|deviceId) but whose snapshot eligibility is user-id
+    // based — we want to keep all device-peers of allowed user ids.
+    closePeersNotMatching: (predicate) => {
+      if (alwaysAllow) return;
+      if (typeof predicate !== "function") return;
+      Array.from(peers.entries()).forEach(([peerKey, peer]) => {
+        let keep = false;
+        try {
+          keep = predicate({
+            peerKey,
+            peerUserId: peer.peerUserId || "",
+            peerDeviceId: peer.peerDeviceId || "",
+          }) === true;
+        } catch {
+          keep = false;
+        }
+        if (!keep) {
+          closePeer(peerKey);
+        }
+      });
+    },
+    // Returns the peerKey of the first peer with an open data channel
+    // whose `peerUserId` matches the given user id. Used by call sites that
+    // think in user ids ("deliver to friend X") in the multi-device-aware
+    // friend mesh.
+    findOpenPeerKeyByUserId: (userId) => {
+      const normalizedUserId = typeof userId === "string" ? userId.trim() : "";
+      if (!normalizedUserId) return "";
+      for (const [peerKey, peer] of peers.entries()) {
+        if (peer.peerUserId !== normalizedUserId) continue;
+        if (peer.channel?.readyState !== "open") continue;
+        return peerKey;
+      }
+      return "";
+    },
+    // Like `findOpenPeerKeyByUserId` but also matches peers that are mid-
+    // handshake (no open channel yet). Used to decide whether to ask the
+    // server for a fresh peer_connect.
+    findAnyPeerKeyByUserId: (userId) => {
+      const normalizedUserId = typeof userId === "string" ? userId.trim() : "";
+      if (!normalizedUserId) return "";
+      for (const [peerKey, peer] of peers.entries()) {
+        if (peer.peerUserId === normalizedUserId) return peerKey;
+      }
+      return "";
+    },
+    // Unique user ids that have at least one peer with an open data channel.
+    getConnectedPeerUserIds: () => {
+      const ids = new Set();
+      peers.forEach((peer) => {
+        if (peer.channel?.readyState !== "open") return;
+        if (peer.peerUserId) ids.add(peer.peerUserId);
+      });
+      return Array.from(ids);
     },
     destroy: () => {
       Array.from(peers.keys()).forEach((peerKey) => {

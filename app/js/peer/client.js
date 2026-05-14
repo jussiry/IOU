@@ -8,11 +8,13 @@ without requiring page-specific code to know about networking internals.
 
 Two parallel WebRTC overlays:
 
-  * **Friend mesh** — one peer per friend npub (keyed by peer user id).
-    Ledger state is exchanged bilaterally (`getLedgerEntriesForPeer`).
+  * **Friend mesh** — one peer per (friend user id, friend device id) pair,
+    keyed by `${peerUserId}|${peerDeviceId}` so a friend on multiple
+    devices keeps a separate slot per device. Ledger state is exchanged
+    bilaterally (`getLedgerEntriesForPeer`).
 
   * **Self-mesh** — one peer per *other device of the same user* (keyed by
-    the server-assigned `peerDeviceId`). Both devices sync the entire
+    the `peerDeviceId`). Both devices sync the entire
     ledger between them (`getAllLedgerEntries`) so each device stays in
     lock-step. Whenever a new entry is appended locally (by applying an
     inbound peer message or by the local user acting) we push it to every
@@ -88,9 +90,22 @@ const createRealtimeClient = () => {
   // envelopes for us — that way we won't re-request ledger entries we're
   // about to receive anyway via the regular inbound path.
   let serverQueueDrained = false;
-  // Friend-mesh sync tracking — keyed by peerUserId.
+  // Friend-mesh sync tracking — keyed by friend peerKey
+  // (`${peerUserId}|${peerDeviceId}`) so each of a friend's devices gets
+  // its own sync_hello / sync_data exchange.
   const pendingFriendSync = new Set();
   const syncedFriends = new Set();
+
+  // Composite friend-mesh key. Stable per (friendUserId, friendDeviceId)
+  // pair so a friend running on multiple devices keeps a separate slot
+  // per device. Returns "" if either component is missing — the caller
+  // should treat that as "no peer to address."
+  const friendPeerKey = (peerUserId, peerDeviceId) => {
+    const userId = typeof peerUserId === "string" ? peerUserId.trim() : "";
+    const deviceId = typeof peerDeviceId === "string" ? peerDeviceId.trim() : "";
+    if (!userId || !deviceId) return "";
+    return `${userId}|${deviceId}`;
+  };
   // Self-mesh sync tracking — keyed by peerDeviceId.
   const pendingSelfSync = new Map(); // deviceId -> peerUserId (= my userId)
   const syncedSelfDevices = new Set();
@@ -288,15 +303,18 @@ const createRealtimeClient = () => {
 
   const trySyncPendingPeers = () => {
     if (!serverQueueDrained) return;
-    // Friend-mesh pending hellos.
-    Array.from(pendingFriendSync).forEach((peerUserId) => {
-      if (!peerMesh.canSend(peerUserId)) return;
-      if (syncedFriends.has(peerUserId)) {
-        pendingFriendSync.delete(peerUserId);
+    // Friend-mesh pending hellos — pendingFriendSync entries are composite
+    // peer keys (userId|deviceId). We send one sync_hello per device of
+    // each friend, mirroring how the self-mesh works.
+    Array.from(pendingFriendSync).forEach((peerKey) => {
+      if (!peerMesh.canSend(peerKey)) return;
+      if (syncedFriends.has(peerKey)) {
+        pendingFriendSync.delete(peerKey);
         return;
       }
-      pendingFriendSync.delete(peerUserId);
-      void sendSyncHello(peerUserId, {
+      pendingFriendSync.delete(peerKey);
+      const peerUserId = peerKey.split("|")[0] || "";
+      void sendSyncHello(peerKey, {
         scope: SCOPE_FRIEND,
         peerUserId,
       });
@@ -319,25 +337,36 @@ const createRealtimeClient = () => {
   // --- Friend mesh --------------------------------------------------------
 
   const peerMesh = createPeerMesh({
-    getLocalKey: () => currentSnapshot?.userId || "",
+    // Composite friend keys include `${myUserId}|${myDeviceId}` for our own
+    // identity — `getLocalKey` is only consulted to guard against creating
+    // a peer for ourselves, and the server never emits peer_connect for
+    // our own (userId, deviceId), so leaving this empty is safe. We keep
+    // the function so future per-device guards can be added cheaply.
+    getLocalKey: () => "",
     sendSignal: (peerKey, signal, ctx) => {
-      // Friend mesh: peerKey is the peer user id, and we route the signal
-      // via whatever peerDeviceId we captured on the incoming peer_connect.
-      signalingClient.sendPeerSignal(peerKey, ctx?.peerDeviceId || "", signal);
+      // Friend mesh: peerKey is composite (userId|deviceId). Routing only
+      // needs the userId+deviceId pair, which we read from ctx.
+      signalingClient.sendPeerSignal(
+        ctx?.peerUserId || "",
+        ctx?.peerDeviceId || "",
+        signal,
+      );
     },
     onPeerReady: ({ peerKey, peerUserId }) => {
-      const pid = peerUserId || peerKey;
-      void updateLastSyncedAt(pid);
-      pendingFriendSync.add(pid);
+      if (peerUserId) void updateLastSyncedAt(peerUserId);
+      pendingFriendSync.add(peerKey);
       trySyncPendingPeers();
       // Flush any queued outbox messages to the newly connected peer.
       void flushOutbox();
     },
-    onPeerStatusChange: (connectedPeerKeys) => {
-      replaceConnectedPeerIds(connectedPeerKeys);
+    // Friend mesh status is exposed to the UI as a set of *user ids* (the
+    // UI doesn't know about devices). Multiple connected devices for the
+    // same friend collapse to one entry.
+    onPeerStatusChange: () => {
+      replaceConnectedPeerIds(peerMesh.getConnectedPeerUserIds());
     },
     onPeerMessage: ({ peerKey, peerUserId, message }) => {
-      void handlePeerMessage(peerKey, peerUserId || peerKey, message, SCOPE_FRIEND);
+      void handlePeerMessage(peerKey, peerUserId, message, SCOPE_FRIEND);
     },
     // When a friend peer drops unexpectedly, ask the server to re-pair us.
     // We only retry if the connection had previously reached "connected" —
@@ -345,6 +374,10 @@ const createRealtimeClient = () => {
     // a tight loop is pointless. Intentional closes (server_disconnect,
     // stale_replaced) are skipped.
     onPeerClosed: ({ peerUserId, peerKey, reason, wasConnected }) => {
+      // Drop sync state for this specific device-peer so a reconnect
+      // re-runs sync_hello on the fresh data channel.
+      pendingFriendSync.delete(peerKey);
+      syncedFriends.delete(peerKey);
       if (!wasConnected) return;
       if (
         reason === "server_disconnect" ||
@@ -353,7 +386,7 @@ const createRealtimeClient = () => {
         return;
       }
       requestPeerConnectionIfNeeded(
-        peerUserId || peerKey,
+        peerUserId,
         "Retrying peer connection after unexpected close"
       );
     },
@@ -403,11 +436,14 @@ const createRealtimeClient = () => {
         });
         return;
       }
-      // Different user → friend mesh keyed by peerUserId.
+      // Different user → friend mesh keyed by `${userId}|${deviceId}` so
+      // a friend's multiple devices each get their own WebRTC slot.
       // Track server presence so the UI can show a "partly online" state
       // when the relay sees the friend but WebRTC hasn't established yet.
       addServerPresentPeer(peerUserId, peerDeviceId);
-      peerMesh.ensurePeer(peerUserId, {
+      const peerKey = friendPeerKey(peerUserId, peerDeviceId);
+      if (!peerKey) return;
+      peerMesh.ensurePeer(peerKey, {
         initiator,
         peerUserId,
         peerDeviceId,
@@ -424,7 +460,10 @@ const createRealtimeClient = () => {
       }
       logRealtimeEvent(`Peer disconnected from server (${peerUserId?.slice(0, 10)}…)`);
       removeServerPresentPeer(peerUserId, peerDeviceId);
-      peerMesh.closePeer(peerUserId);
+      // Close exactly this device's peer record; other devices of the
+      // same friend (if any) keep their slots.
+      const peerKey = friendPeerKey(peerUserId, peerDeviceId);
+      if (peerKey) peerMesh.closePeer(peerKey);
     },
     onPeerSignal: ({ peerUserId, peerDeviceId, signal }) => {
       const myUserId = currentSnapshot?.userId || "";
@@ -435,7 +474,9 @@ const createRealtimeClient = () => {
         });
         return;
       }
-      void peerMesh.handleSignal(peerUserId, signal, {
+      const peerKey = friendPeerKey(peerUserId, peerDeviceId);
+      if (!peerKey) return;
+      void peerMesh.handleSignal(peerKey, signal, {
         peerUserId,
         peerDeviceId,
       });
@@ -463,7 +504,11 @@ const createRealtimeClient = () => {
   });
 
   const requestPeerConnectionIfNeeded = (peerUserId, logTitle = "Requesting peer connection") => {
-    if (!peerUserId || peerMesh.canSend(peerUserId) || peerMesh.hasPeer(peerUserId)) {
+    if (!peerUserId) return;
+    // Skip if any device of this friend is already connected or
+    // mid-handshake — the server will fan out new peer_connects for
+    // additional devices on its own.
+    if (peerMesh.findAnyPeerKeyByUserId(peerUserId)) {
       return;
     }
 
@@ -482,8 +527,12 @@ const createRealtimeClient = () => {
     }
 
     for (const message of currentSnapshot.outbox) {
-      const directlyConnected = peerMesh.canSend(message.to_user_id);
-      if (directlyConnected && peerMesh.hasInflightMessage(message.to_user_id, message.id)) {
+      // Resolve to the composite peerKey of *any* connected device of the
+      // recipient. If the recipient runs on multiple devices, sending to one
+      // is enough — their self-mesh replicates within their devices.
+      const directPeerKey = peerMesh.findOpenPeerKeyByUserId(message.to_user_id);
+      const directlyConnected = Boolean(directPeerKey);
+      if (directlyConnected && peerMesh.hasInflightMessage(directPeerKey, message.id)) {
         continue;
       }
       if (!directlyConnected && envelopesSentToServer.has(message.id)) {
@@ -501,7 +550,7 @@ const createRealtimeClient = () => {
       }
 
       if (directlyConnected) {
-        peerMesh.sendPeerMessage(message.to_user_id, envelope);
+        peerMesh.sendPeerMessage(directPeerKey, envelope);
         continue;
       }
 
@@ -553,8 +602,8 @@ const createRealtimeClient = () => {
   const syncRealtimeState = async () => {
     currentSnapshot = await getRealtimeSnapshot();
     if (!currentSnapshot) {
-      signalingClient.setSession({ userId: "", peerIds: [] });
-      peerMesh.closePeersNotInSet([]);
+      signalingClient.setSession({ userId: "", deviceId: "", peerIds: [] });
+      peerMesh.closePeersNotMatching(() => false);
       selfMesh.closePeersNotInSet([]);
       replaceConnectedPeerIds([]);
       replaceConnectedSelfDeviceIds([]);
@@ -564,9 +613,14 @@ const createRealtimeClient = () => {
 
     signalingClient.setSession({
       userId: currentSnapshot.userId,
+      deviceId: currentSnapshot.deviceId,
       peerIds: currentSnapshot.peerIds,
     });
-    peerMesh.closePeersNotInSet(currentSnapshot.peerIds);
+    // Friend-mesh keys are composite (userId|deviceId) but the snapshot
+    // eligibility set is user-id based — keep every device-peer whose
+    // user id is still in the friend snapshot.
+    const allowedFriendUserIds = new Set(currentSnapshot.peerIds);
+    peerMesh.closePeersNotMatching(({ peerUserId }) => allowedFriendUserIds.has(peerUserId));
     // Self-mesh never closes on snapshot (alwaysAllow=true) — passing an
     // empty set just updates internal bookkeeping harmlessly.
     selfMesh.closePeersNotInSet([]);
@@ -608,16 +662,17 @@ const createRealtimeClient = () => {
       result: acknowledgeResult,
     });
 
-    // Prefer replying on the same WebRTC channel we received on, then fall
-    // back to the user-id-based friend mesh. Self-mesh receipts are a no-op:
-    // the sender sees its own broadcast land on its own ledger, no ack needed.
+    // Prefer replying on the same WebRTC channel we received on (composite
+    // peer key for the friend mesh), then fall back to any open device-peer
+    // of the sender's user. Self-mesh receipts are a no-op: the sender sees
+    // its own broadcast land on its own ledger, no ack needed.
     if (preferredPeerKey && peerMesh.canSend(preferredPeerKey)) {
       peerMesh.sendControlMessage(preferredPeerKey, receipt);
       logRealtimeEvent(`Sent receipt via WebRTC (preferred channel)`);
       return;
     }
-    const fallbackKey = innerMessage.from_user_id;
-    if (fallbackKey && peerMesh.canSend(fallbackKey)) {
+    const fallbackKey = peerMesh.findOpenPeerKeyByUserId(innerMessage.from_user_id);
+    if (fallbackKey) {
       peerMesh.sendControlMessage(fallbackKey, receipt);
       logRealtimeEvent(`Sent receipt via WebRTC (fallback channel)`);
       return;
@@ -786,7 +841,9 @@ const createRealtimeClient = () => {
     }
 
     const target = String(nameOrKey).trim().toLowerCase();
-    const connectedIds = currentSnapshot.peerIds.filter((id) => peerMesh.canSend(id));
+    // Connected friend user ids — collapses across multiple devices of the
+    // same friend so debug pings target the friend (any device).
+    const connectedIds = peerMesh.getConnectedPeerUserIds();
     const peerNames = currentSnapshot.peerNames || {};
 
     // Match by exact public key, key prefix, or friend name
@@ -804,16 +861,22 @@ const createRealtimeClient = () => {
       return Promise.resolve(null);
     }
 
-    peerMesh.sendControlMessage(peerId, {
+    const targetPeerKey = peerMesh.findOpenPeerKeyByUserId(peerId);
+    if (!targetPeerKey) {
+      console.log(`[Ping] Lost peer to ${peerId} between lookup and send`);
+      return Promise.resolve(null);
+    }
+
+    peerMesh.sendControlMessage(targetPeerKey, {
       type: PEER_MESSAGE_TYPE_PING,
       timestamp: Date.now(),
     });
 
     return new Promise((resolve) => {
-      pendingPings.set(peerId, resolve);
+      pendingPings.set(targetPeerKey, resolve);
       setTimeout(() => {
-        if (pendingPings.has(peerId)) {
-          pendingPings.delete(peerId);
+        if (pendingPings.has(targetPeerKey)) {
+          pendingPings.delete(targetPeerKey);
           console.log(`[Ping] Timeout — no pong from ${peerId}`);
           resolve(null);
         }

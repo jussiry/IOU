@@ -71,6 +71,7 @@ export const getRealtimeSnapshot = async () => {
 
   return {
     userId: state.user.id,
+    deviceId: state.device_id || "",
     userName: state.user.name,
     userPrivateKeyHex: state.user.private_key_hex || "",
     peerIds: Array.from(new Set([...relationshipPeerIds, ...queuedPeerIds])),

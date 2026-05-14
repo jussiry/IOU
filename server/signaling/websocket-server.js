@@ -3,11 +3,15 @@ This module owns the backend websocket signaling server for the IOU app. It
 keeps track of online devices, their eligible peer targets, and the signaling
 messages needed to establish direct WebRTC sessions.
 
-A single user may be connected from multiple devices at the same time. Every
-websocket gets its own server-assigned `deviceId` (opaque to the client — it
-just gets routed back in peer_connect / webrtc_signal payloads). Routing is
-device-scoped so the right device's RTCPeerConnection gets the right ICE
-candidate, even when two of the user's devices are negotiating in parallel.
+A single user may be connected from multiple devices at the same time. Each
+device generates and persists its own `deviceId` client-side on first start
+and sends it in the `register` message. The server uses that id for routing
+peer_connect / webrtc_signal messages back to the exact device. A stable id
+across reconnects (and, later, across multiple relay servers) lets dedup work
+on (userId, deviceId) instead of churning on every reconnect.
+
+For legacy clients that don't include a `device_id`, the server mints one
+(via randomUUID) so older builds keep working during rollout.
 
 The server intentionally limits itself to presence and offer/answer/ICE
 routing. Once peers are connected, application data stays on the WebRTC data
@@ -300,11 +304,33 @@ const createSignalingServer = (server) => {
     });
   };
 
-  const registerClient = (client, userId) => {
+  const isValidDeviceId = (value) =>
+    typeof value === "string" && value.length > 0 && value.length <= 128;
+
+  const registerClient = (client, userId, deviceId) => {
     const normalizedUserId = typeof userId === "string" ? userId.trim() : "";
     if (!normalizedUserId) {
       return;
     }
+
+    // Determine the deviceId for this client:
+    // - prefer the client-provided id (stable across reconnects/servers)
+    // - fall back to a server-minted UUID for legacy clients that don't send one
+    // - if a different device of the same user already owns this id, evict it
+    //   so routing maps stay consistent
+    const clientProvided = typeof deviceId === "string" ? deviceId.trim() : "";
+    const nextDeviceId = isValidDeviceId(clientProvided) ? clientProvided : randomUUID();
+    if (client.deviceId && client.deviceId !== nextDeviceId) {
+      clientsByDeviceId.delete(client.deviceId);
+    }
+    const existing = clientsByDeviceId.get(nextDeviceId);
+    if (existing && existing !== client) {
+      // Stale entry: another socket previously claimed this id. The new
+      // socket is the live owner; drop the old mapping.
+      clientsByDeviceId.delete(nextDeviceId);
+    }
+    client.deviceId = nextDeviceId;
+    clientsByDeviceId.set(nextDeviceId, client);
 
     // Unlike the single-device era, we no longer kick out existing clients
     // for the same user — the server now supports multiple devices per user
@@ -383,15 +409,16 @@ const createSignalingServer = (server) => {
   });
 
   websocketServer.on("connection", (socket) => {
-    const deviceId = randomUUID();
+    // deviceId is now provided by the client on `register` so it stays stable
+    // across reconnects and across relay servers. We keep a server-minted
+    // fallback for transitional compatibility with older clients.
     const client = {
       socket,
-      deviceId,
+      deviceId: "",
       userId: "",
       peerIds: new Set(),
     };
     clientsBySocket.set(socket, client);
-    clientsByDeviceId.set(deviceId, client);
 
     socket.on("message", (rawMessage) => {
       const payload = safeParseJson(rawMessage.toString());
@@ -400,7 +427,7 @@ const createSignalingServer = (server) => {
       }
 
       if (payload.type === "register") {
-        registerClient(client, payload.user_id);
+        registerClient(client, payload.user_id, payload.device_id);
         return;
       }
 

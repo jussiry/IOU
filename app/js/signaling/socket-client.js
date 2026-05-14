@@ -5,9 +5,11 @@ IOU app for online presence and WebRTC signaling.
 Signaling is *device-scoped*: every WebRTC offer/answer/candidate must be
 routed to a specific remote device, because one user may have multiple
 devices connected at the same time (same npub, different WebSocket session).
-The server assigns each device a `deviceId` and includes it in every
-peer-scoped message; the client threads it back on outgoing `webrtc_signal`
-so ICE candidates reach the exact device that sent the matching offer.
+Each device generates and persists its own `deviceId` once on first app
+start (see `app-state.js`) and sends it on `register`. The server uses
+that id to route peer_connect / webrtc_signal messages back to the exact
+device, and the client threads remote device ids back on outgoing
+`webrtc_signal` so ICE candidates reach the peer that sent the offer.
 
 It keeps websocket lifecycle concerns isolated from the peer transport layer,
 so higher-level realtime code can focus on peer sessions and queued delivery
@@ -66,6 +68,7 @@ const createSignalingClient = (
   let reconnectTimer = null;
   let session = {
     userId: "",
+    deviceId: "",
     peerIds: [],
   };
 
@@ -86,6 +89,7 @@ const createSignalingClient = (
     sendJson(socket, {
       type: "register",
       user_id: session.userId,
+      device_id: session.deviceId,
     });
     sendJson(socket, {
       type: "peer_candidates",
@@ -173,9 +177,10 @@ const createSignalingClient = (
   connect();
 
   return {
-    setSession: ({ userId = "", peerIds = [] } = {}) => {
+    setSession: ({ userId = "", deviceId = "", peerIds = [] } = {}) => {
       session = {
         userId: typeof userId === "string" ? userId.trim() : "",
+        deviceId: typeof deviceId === "string" ? deviceId.trim() : "",
         peerIds: normalizePeerIds(peerIds),
       };
 
