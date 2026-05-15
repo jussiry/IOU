@@ -76,10 +76,10 @@ export const bindFriendDetail = (root, data, friendId) => {
     tally > 0 ? "Absolve tally" : tally < 0 ? "Default on tally" : "Deactivate friend connection";
   const friendDangerBody =
     tally > 0
-      ? `Cancel ${friendName}'s debt of **€${Math.abs(tally).toFixed(2)}** to you. With this action, you also **deactivate** your friend connection, stopping any activity between you two.\n\nIf you want to forgive the debt without deactivating the connection, you can do this by sending them an IOU of €${Math.abs(tally).toFixed(2)}.\n\nIt is still possible to reactivate the friend connection and this debt later, if both of you agree to do so.`
+      ? `${friendName} currently **owes you ${Math.abs(tally)} €**. This action will absolve ${friendName} and also deactivate your friend connection, stopping any activity between you two.\n\nIf you want to reset the tally without deactivating the connection, you can do this by sending them €${Math.abs(tally)}.\n\nIt is still possible to reactivate the friend connection and this tally later, if both of you agree to do so.`
       : tally < 0
-      ? `Defaulting on debt can have **serious consequences**. It is strongly recommended to talk about this with ${friendName} before taking this step. You currently owe **${Math.abs(tally).toFixed(2)} €** to ${friendName}.\n\nIn practice this action stops any activity with ${friendName} and removes this from the tally. If both of you agree, the friend connection and this debt can be reactivated later.`
-      : `With this action, you deactivate your friend connection to ${friendName}, stopping any activity between you two. The transaction history will remain visible on this page.\n\nThe friend connection can be reactivated later if both of you agree to do so.`;
+      ? `You currently **owe {friendName} ${Math.abs(tally)} €**. Resetting the tally can damage you friendship badly. It is strongly recommended to talk this through with ${friendName} before taking this step.\n\nThis action also stops any activity between you two. Though if both of you agree, the friend connection and current tally can be reactivated later.`
+      : `With this action, you deactivate your friend connection to ${friendName}, stopping any activity between you two. The record history will remain visible on this page.\n\nThe friend connection can be reactivated later if both of you agree to do so.`;
 
   if (titleEl) {
     titleEl.textContent = friendName;

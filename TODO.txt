@@ -1,7 +1,7 @@
 
-IOU -> Tally process
-- on recod page read/fix "hold to confirm" prompt text
-- read through default texts: on friend page, three variants and on settings page
+
+
+
 
 
 Create a migration process (checks app version and runs migrations when app version change matches) to change IOU -> record, anything else that needs changing?

@@ -88,7 +88,7 @@ export const bindSettings = (root, data, appVersion) => {
       }
     }
 
-    const body = `This is a serious step. This will permanently remove all local data. Unless you have **transferred your user** to another device, you will not be able to retrieve your user.${tallyWarning}\nDo you still want to remove your user data?`;
+    const body = `This is a serious step. This will permanently remove all local data. Unless you have **transferred your user** to another device, your will not be able to retrieve your user.${tallyWarning}\nDo you still want to remove your user data?`;
     const isConfirmed = await showConfirmModal({
       title: "Remove user data",
       body,

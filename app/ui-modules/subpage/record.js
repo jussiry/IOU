@@ -46,7 +46,7 @@ export const bindRecord = (root, data, friendId) => {
   const previewUserNameEl = root.querySelector('[data-bind="record-preview-user-name"]');
   const previewFriendAmountEl = root.querySelector('[data-bind="record-preview-friend-amount"]');
 
-  if (titleEl) titleEl.textContent = "Send a record";
+  if (titleEl) titleEl.textContent = "Send a signed record";
 
   // Tally diff preview — the user (debtor) goes negative, the friend (creditor)
   // goes positive by the same amount. The shared bindOwesPreview helper keeps
