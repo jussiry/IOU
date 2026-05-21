@@ -471,7 +471,7 @@ function ChapterRecord() {
       kicker="Record a favour"
       title={
         <>
-          Every favour gets <em className="italic">notched on the stick</em> — no matter who did it.
+          Every favour gets <em className="italic">notched on the stick</em> — and both have their sides of it.
         </>
       }
     >

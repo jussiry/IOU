@@ -130,7 +130,7 @@
   color: currentColor;
 }
 
-.send-explainer-card {
+.explainer-card {
   --surface-radius: 18px;
   margin: 16px 20px 0;
   padding: 16px 18px;
@@ -139,10 +139,10 @@
   line-height: 1.5;
 }
 
-.send-explainer-card p {
+.explainer-card p {
   margin: 0 0 10px;
 }
 
-.send-explainer-card p:last-child {
+.explainer-card p:last-child {
   margin-bottom: 0;
 }

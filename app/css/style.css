@@ -233,13 +233,11 @@ nav {
   color: var(--accent-light);
 }
 
-.neg {
-  color: var(--danger);
-}
+.neg { color: var(--danger); }
 
-.pos {
-  color: var(--ok);
-}
+.pos { color: var(--ok); }
+
+.bold { font-weight: bold; }
 
 @media (min-width: 600px) {
   .app {
