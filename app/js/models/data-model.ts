@@ -53,6 +53,14 @@ export interface FriendModel {
   last_synced_at: string;
   pending_payment_request: PaymentRequestModel | null;
   pending_name_change: PendingNameChange | null;
+  /**
+   * Relay-server URLs this friend has told us they use. Populated by an
+   * incoming `my_relays` peer message (only when both sides have opted in via
+   * `state.share_my_relays`). Used to suggest popular-among-friends relays in
+   * the add-relay UI. Empty when the friend hasn't shared (or we haven't
+   * received their hint yet).
+   */
+  relays: string[];
 }
 
 /** Backwards compatibility alias for FriendModel */
@@ -101,6 +109,20 @@ export interface RootState {
   model_version: number;
   /** Stable per-device identifier generated client-side on first app start. Persists across reconnects and across relay servers. */
   device_id: string;
+  /**
+   * Secondary relay-server URLs the user has added in settings. The "main"
+   * relay (the WebSocket on the host that served the app bundle) is not
+   * stored here — it is always available implicitly and prepended at view
+   * build time. See `utils/relay-url.js`.
+   */
+  relays: string[];
+  /**
+   * Whether to tell friends which relay servers we use, via a `my_relays`
+   * peer message exchanged when both sides come online. Defaults to true.
+   * Friends use the aggregated info to suggest popular relays in their
+   * own add-relay flow. See TIP-003 §10 for drawbacks and rationale.
+   */
+  share_my_relays: boolean;
   user: PersonModel;
   contacts: ContactsMap;
   ledger: LedgerEntryModel[];
@@ -228,6 +250,7 @@ export const createFriendModel = (input: any = {}): FriendModel => {
       typeof input.pending_name_change.newName === "string"
         ? { oldName: input.pending_name_change.oldName, newName: input.pending_name_change.newName }
         : null,
+    relays: normalizeStringList(input.relays),
   };
 };
 
@@ -299,6 +322,8 @@ export const createEmptyAppState = (userPerson: any): RootState => {
   return {
     model_version: DATA_MODEL_VERSION,
     device_id: "",
+    relays: [],
+    share_my_relays: true,
     user: createPersonModel(userPerson),
     contacts: {},
     ledger: [],
@@ -332,6 +357,9 @@ export const normalizeAppState = (state: any): RootState | null => {
   return {
     model_version: DATA_MODEL_VERSION,
     device_id: asTrimmedStringOrDefault(state.device_id),
+    relays: normalizeStringList(state.relays),
+    // Default-on for new state; preserved when explicitly stored as boolean.
+    share_my_relays: typeof state.share_my_relays === "boolean" ? state.share_my_relays : true,
     user: createPersonModel(state.user),
     contacts: normalizeContactsMap(state.contacts),
     ledger: Array.isArray(state.ledger)

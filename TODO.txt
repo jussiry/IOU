@@ -1,11 +1,13 @@
 
 
+- Multiple relay servers to connect to
+  * fanning all messages through all connected servers
+  * settings page allows adding / removing new servers
+  * needed before https://iou-ui.up.railway.app/ -> app.tally.earth move can be made (to move users)
 
 
 
 
-Create a migration process (checks app version and runs migrations when app version change matches) to change IOU -> record, anything else that needs changing?
-  * make search for IOU
 
 FEATURES
 Add inactivate friend button.
@@ -22,10 +24,6 @@ Inactive frient
 
 
 BUGS:
-- with multiple devices, only one of them shows friends online status correctly - webrtc connection to only one of them?
-  * add e2e test case for multiple devices online
-    * test to see online status (current bug)
-    * fanning messages to devices
 - getting name passed to second device still bugs.. (brave user with incognito firefox)
 
 CHECK
@@ -35,14 +33,14 @@ SMALL
 - on a friend page highlight latest transaction(s) since the page was last visited
 
 
+MEDIUM
+
+Create a migration process (checks app version and runs migrations when app version change matches) to change IOU -> record, anything else that needs changing?
+  * make search for IOU
 
 
 MAJOR
 
-- Multiple relay servers to connect to
-  * fanning all messages through all connected servers
-  * settings page allows adding / removing new servers
-  * needed before https://iou-ui.up.railway.app/ -> app.tally.earth move can be made (to move users)
 
 - Currencies sivu
   * listaa kaikki itse käytetyt ja kaverien käyttämät valuutat

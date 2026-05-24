@@ -23,6 +23,60 @@
       </svg>
     </button>
   </div>
+  <h3 class="settings-subtitle">Relay servers</h3>
+  <div class="settings-relays surface-box">
+    <ul class="relay-list" data-list="relay-list"></ul>
+    <div class="relay-add">
+      <button class="relay-add-open" type="button" data-action="open-add-relay" aria-label="Add relay server">
+        <span class="relay-add-plus" aria-hidden="true">+</span>
+        <span class="relay-add-label">Add relay</span>
+      </button>
+      <form class="relay-add-form" data-form="add-relay" hidden>
+        <input
+          class="relay-add-input"
+          type="text"
+          inputmode="url"
+          autocomplete="off"
+          autocapitalize="off"
+          spellcheck="false"
+          placeholder="wss://relay.example.com/ws"
+          data-action="relay-url-input"
+        />
+        <div class="relay-add-actions">
+          <button class="relay-add-confirm" type="submit">Add</button>
+          <button class="relay-add-cancel" type="button" data-action="cancel-add-relay">Cancel</button>
+        </div>
+        <div class="relay-add-error" data-bind="add-relay-error" hidden></div>
+      </form>
+    </div>
+    <div class="relay-share-row">
+      <span class="relay-share-label">Tell friends what relays you use</span>
+      <button
+        class="check-toggle"
+        type="button"
+        data-bind="share-relays-toggle"
+        aria-pressed="true"
+        aria-label="Tell friends what relays you use"
+      >
+        <span class="check-toggle-track">
+          <span class="check-toggle-thumb"></span>
+        </span>
+      </button>
+    </div>
+  </div>
+
+  <template data-template="relay-item">
+    <li class="relay-item">
+      <span class="relay-status" data-bind="status" aria-hidden="true"></span>
+      <span class="relay-url" data-bind="url"></span>
+      <button class="relay-remove" type="button" data-action="remove-relay" aria-label="Remove relay">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <use href="#icon-delete" />
+        </svg>
+      </button>
+    </li>
+  </template>
+
   <button class="settings-big-button surface-box" type="button" data-action="transfer-user">
     <svg class="settings-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
       <path

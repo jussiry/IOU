@@ -7,6 +7,7 @@ data so that page binders never need to compute these values themselves.
 
 import { createPublicPersonModel } from "../models/data-model.js";
 import { isAcceptedFriendshipStatus } from "../utils/friendships.js";
+import { getMainRelayUrl } from "../utils/relay-url.js";
 
 export const buildView = (state) => {
   const user = state.user;
@@ -43,6 +44,23 @@ export const buildView = (state) => {
     return sum + Math.max(trustLimit + tally, 0);
   }, 0);
 
+  // Relay list: the main relay (current host) is always first and undeletable.
+  // Secondary relays come from `state.relays`. Connection status is "connected"
+  // for the main relay (we're on the page so it is reachable) and "pending"
+  // for secondaries until the relay pool transport is wired up. This shape
+  // lets the settings UI render today and the pool fill in real statuses
+  // later without touching the binder.
+  const mainRelayUrl = getMainRelayUrl();
+  const secondaryRelayUrls = Array.isArray(state.relays) ? state.relays : [];
+  const relays = [
+    { url: mainRelayUrl, is_main: true, status: "connected" },
+    ...secondaryRelayUrls.map((url) => ({
+      url,
+      is_main: false,
+      status: "pending",
+    })),
+  ];
+
   return {
     you: createPublicPersonModel(user),
     friends: friendsWithInbound,
@@ -54,5 +72,7 @@ export const buildView = (state) => {
       availableTrust,
     },
     ledger: Array.isArray(state.ledger) ? state.ledger : [],
+    relays,
+    shareMyRelays: state.share_my_relays !== false,
   };
 };
