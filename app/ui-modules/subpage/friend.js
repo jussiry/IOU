@@ -354,17 +354,18 @@ export const bindFriendDetail = (root, data, friendId) => {
 
     friendRelaysSectionEl.innerHTML = "";
 
+    if (friendRelays.length === 0) {
+      // Friend hasn't shared relay info — hide the section entirely.
+      // We don't know if they want to share, so showing a warning would be misleading.
+      return;
+    }
+
     const labelEl = document.createElement("div");
     labelEl.className = "friend-key-label";
     labelEl.textContent = "Relay servers";
     friendRelaysSectionEl.appendChild(labelEl);
 
-    if (friendRelays.length === 0) {
-      const warningEl = document.createElement("div");
-      warningEl.className = "friend-relay-warning";
-      warningEl.textContent = `No relay servers shared yet. Connect with ${friendFirstName} to exchange relay info.`;
-      friendRelaysSectionEl.appendChild(warningEl);
-    } else {
+    {
       const listEl = document.createElement("ul");
       listEl.className = "friend-relay-list";
       friendRelays.forEach((url) => {
