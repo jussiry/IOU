@@ -19,8 +19,11 @@ export const getMainRelayUrl = () => {
 
 // Liberal input parser:
 // - trim whitespace
-// - if no protocol, assume wss://
-// - reject http(s) so the user notices the typo
+// - if no protocol, match the page protocol: `http:` page → `ws://`,
+//   `https:` page → `wss://`. This makes plain-WebSocket dev relays usable
+//   from a local dev page without forcing the user to type `ws://` every time,
+//   while still defaulting to TLS in production where mixed content is blocked.
+// - reject http(s) URLs so the user notices the typo
 // - reject anything that doesn't parse as a URL with a host
 // - strip trailing slash so two equivalent URLs compare equal
 // Returns the normalised URL string, or `null` if invalid.
@@ -31,10 +34,15 @@ export const normalizeRelayUrl = (input) => {
   const lower = trimmed.toLowerCase();
   if (lower.startsWith("http://") || lower.startsWith("https://")) return null;
 
+  const defaultProtocol =
+    typeof window !== "undefined" && window.location?.protocol === "https:"
+      ? "wss://"
+      : "ws://";
+
   const withProtocol =
     lower.startsWith("ws://") || lower.startsWith("wss://")
       ? trimmed
-      : `wss://${trimmed}`;
+      : `${defaultProtocol}${trimmed}`;
 
   try {
     const url = new URL(withProtocol);
