@@ -16,7 +16,11 @@ so higher-level realtime code can focus on peer sessions and queued delivery
 instead of reconnect and JSON routing details.
 */
 
-const RECONNECT_DELAY_MS = 2500;
+// First failure retries quickly (transient blip). Every failure after that
+// waits 5 minutes — if the relay didn't answer, it's most likely offline
+// and hammering it just bloats the console.
+const RECONNECT_FIRST_MS = 2500;
+const RECONNECT_RETRY_MS = 5 * 60 * 1000;
 
 const getDefaultSocketUrl = () => {
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
@@ -69,6 +73,8 @@ const createSignalingClient = (
   const socketUrl = url || getDefaultSocketUrl();
   let socket = null;
   let reconnectTimer = null;
+  let consecutiveFailures = 0;
+  let destroyed = false;
   let session = {
     userId: "",
     deviceId: "",
@@ -104,14 +110,17 @@ const createSignalingClient = (
   };
 
   const scheduleReconnect = () => {
-    if (reconnectTimer) {
+    if (reconnectTimer || destroyed) {
       return;
     }
 
+    const delay = consecutiveFailures === 0 ? RECONNECT_FIRST_MS : RECONNECT_RETRY_MS;
+    consecutiveFailures += 1;
+
     reconnectTimer = window.setTimeout(() => {
       reconnectTimer = null;
-      connect();
-    }, RECONNECT_DELAY_MS);
+      if (!destroyed) connect();
+    }, delay);
   };
 
   const handleMessage = (event) => {
@@ -163,6 +172,7 @@ const createSignalingClient = (
 
     socket.addEventListener("open", () => {
       clearReconnectTimer();
+      consecutiveFailures = 0;
       sendRegistration({ notifyReady: true });
     });
 
@@ -176,7 +186,9 @@ const createSignalingClient = (
     });
 
     socket.addEventListener("error", () => {
-      socket.close();
+      // The browser logs "WebSocket connection failed" itself — nothing to
+      // add here. The "close" event fires automatically after an error and
+      // schedules the next reconnect attempt via scheduleReconnect().
     });
   };
 
@@ -233,6 +245,7 @@ const createSignalingClient = (
       });
     },
     destroy: () => {
+      destroyed = true;
       clearReconnectTimer();
       socket?.close();
       socket = null;
