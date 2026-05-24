@@ -38,11 +38,20 @@ import { appendLedgerEntryFromMessage } from "./ledger.js";
 import { signInnerMessage } from "./peer/envelope.js";
 import { createPeerMessageModel } from "./models/data-model.js";
 import { PEER_MESSAGE_TYPE_NAME_CHANGED } from "./peer/messages.js";
+import { subscribeToRelayStatusChanges } from "./signaling/relay-status-registry.js";
 
 const VERSION_KEY = "iou_version";
 
 let cachedState = null;
 const dataListeners = new Set();
+
+// When a relay flips between connected/disconnected, re-emit the view so the
+// settings page can rebuild from the latest statuses. The state itself is
+// unchanged — we just want subscribers to re-run buildView(). Subscribed once
+// at module load so the registry never needs to know about app-state.
+subscribeToRelayStatusChanges(() => {
+  if (cachedState) emitDataChange(cachedState);
+});
 
 const emitDataChange = (state) => {
   const view = buildView(state);

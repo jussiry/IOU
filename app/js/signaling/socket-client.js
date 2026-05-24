@@ -18,7 +18,7 @@ instead of reconnect and JSON routing details.
 
 const RECONNECT_DELAY_MS = 2500;
 
-const getSocketUrl = () => {
+const getDefaultSocketUrl = () => {
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
   return `${protocol}//${window.location.host}/ws`;
 };
@@ -56,14 +56,17 @@ const normalizePeerIds = (peerIds) => {
 
 const createSignalingClient = (
   {
+    url = "",
     onPeerConnect = null,
     onPeerDisconnect = null,
     onPeerSignal = null,
     onPeerEnvelopeFromServer = null,
     onSessionReady = null,
     onQueueDrained = null,
+    onSocketClose = null,
   } = {}
 ) => {
+  const socketUrl = url || getDefaultSocketUrl();
   let socket = null;
   let reconnectTimer = null;
   let session = {
@@ -156,7 +159,7 @@ const createSignalingClient = (
   };
 
   const connect = () => {
-    socket = new WebSocket(getSocketUrl());
+    socket = new WebSocket(socketUrl);
 
     socket.addEventListener("open", () => {
       clearReconnectTimer();
@@ -166,6 +169,9 @@ const createSignalingClient = (
     socket.addEventListener("message", handleMessage);
 
     socket.addEventListener("close", () => {
+      if (typeof onSocketClose === "function") {
+        try { onSocketClose(); } catch { /* ignore */ }
+      }
       scheduleReconnect();
     });
 

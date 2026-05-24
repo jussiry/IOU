@@ -61,7 +61,7 @@ import {
   getLedgerEntriesForPeer,
   verifyLedgerEntrySignature,
 } from "../ledger.js";
-import { createSignalingClient } from "../signaling/socket-client.js";
+import { createRelayPool } from "../signaling/relay-pool.js";
 import { createPeerMesh } from "./mesh.js";
 import {
   replaceConnectedPeerIds,
@@ -423,7 +423,7 @@ const createRealtimeClient = () => {
 
   // --- Signaling ----------------------------------------------------------
 
-  const signalingClient = createSignalingClient({
+  const signalingClient = createRelayPool({
     onPeerConnect: ({ peerUserId, peerDeviceId, initiator }) => {
       const myUserId = currentSnapshot?.userId || "";
       if (myUserId && peerUserId === myUserId) {
@@ -602,6 +602,7 @@ const createRealtimeClient = () => {
   const syncRealtimeState = async () => {
     currentSnapshot = await getRealtimeSnapshot();
     if (!currentSnapshot) {
+      signalingClient.setRelays([]);
       signalingClient.setSession({ userId: "", deviceId: "", peerIds: [] });
       peerMesh.closePeersNotMatching(() => false);
       selfMesh.closePeersNotInSet([]);
@@ -611,6 +612,10 @@ const createRealtimeClient = () => {
       return;
     }
 
+    // Reconcile the relay pool first: any newly-added relays open their
+    // sockets here and any removed ones close cleanly. setSession then runs
+    // against the current set.
+    signalingClient.setRelays(currentSnapshot.relays);
     signalingClient.setSession({
       userId: currentSnapshot.userId,
       deviceId: currentSnapshot.deviceId,

@@ -8,6 +8,7 @@ data so that page binders never need to compute these values themselves.
 import { createPublicPersonModel } from "../models/data-model.js";
 import { isAcceptedFriendshipStatus } from "../utils/friendships.js";
 import { getMainRelayUrl } from "../utils/relay-url.js";
+import { getRelayStatus } from "../signaling/relay-status-registry.js";
 
 export const buildView = (state) => {
   const user = state.user;
@@ -45,19 +46,18 @@ export const buildView = (state) => {
   }, 0);
 
   // Relay list: the main relay (current host) is always first and undeletable.
-  // Secondary relays come from `state.relays`. Connection status is "connected"
-  // for the main relay (we're on the page so it is reachable) and "pending"
-  // for secondaries until the relay pool transport is wired up. This shape
-  // lets the settings UI render today and the pool fill in real statuses
-  // later without touching the binder.
+  // Secondary relays come from `state.relays`. Live connection statuses come
+  // from `relay-status-registry`, which the relay pool writes to as sockets
+  // open and close. The view-model reads the current snapshot at build time
+  // and the pool re-emits the view whenever a status flips.
   const mainRelayUrl = getMainRelayUrl();
   const secondaryRelayUrls = Array.isArray(state.relays) ? state.relays : [];
   const relays = [
-    { url: mainRelayUrl, is_main: true, status: "connected" },
+    { url: mainRelayUrl, is_main: true, status: getRelayStatus(mainRelayUrl) },
     ...secondaryRelayUrls.map((url) => ({
       url,
       is_main: false,
-      status: "pending",
+      status: getRelayStatus(url),
     })),
   ];
 

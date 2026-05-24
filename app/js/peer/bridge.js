@@ -31,6 +31,7 @@ import {
   removeQueuedPeerMessage,
 } from "./outbox.js";
 import { findFriend, getFriend, syncUserNameAcrossContacts } from "../friends-helpers.js";
+import { getMainRelayUrl } from "../utils/relay-url.js";
 import {
   createInboundProcessingResult,
   routeInboundEntry,
@@ -69,6 +70,13 @@ export const getRealtimeSnapshot = async () => {
     }
   });
 
+  // Build the relay URL set the realtime pool should connect to. The main
+  // relay (the server that served this app bundle) is always included;
+  // user-added secondaries from `state.relays` follow. Deduped so the user
+  // adding their own main URL by hand doesn't cause a duplicate connection.
+  const secondaryRelays = Array.isArray(state.relays) ? state.relays : [];
+  const relays = Array.from(new Set([getMainRelayUrl(), ...secondaryRelays].filter(Boolean)));
+
   return {
     userId: state.user.id,
     deviceId: state.device_id || "",
@@ -78,6 +86,7 @@ export const getRealtimeSnapshot = async () => {
     peerNames,
     outbox: Array.isArray(state.outbox) ? state.outbox.map((entry) => createPeerMessageModel(entry)) : [],
     ledger: Array.isArray(state.ledger) ? state.ledger.map((entry) => createLedgerEntryModel(entry)) : [],
+    relays,
   };
 };
 

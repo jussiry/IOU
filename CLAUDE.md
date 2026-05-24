@@ -1,9 +1,5 @@
 # IOU — Claude Development Guide
 
-> **COMMIT RULE:** Never run `git commit` or `git push` without explicit user approval first. Propose a message and wait. Exception: if the user says "deploy", then run add + commit + push.
-
----
-
 ## Quick start
 
 ```bash
@@ -17,6 +13,10 @@ npm run dev   # starts server at http://localhost:3000 with auto-reload
   * Be forward thinking: e.g. when creating commonly used UI components, make them first as a reusable component, and then use that component to implement requested feature.
 - At the beginning of each JS file describe that code in few paragraphs.
 - In UI modules (or "components") put related JS, HTML and CSS files inside the same folder.
+
+---
+
+> **COMMIT RULE:** Never run `git commit` or `git push` without explicit user approval first. Propose a message and wait. Exception: if the user says "deploy", then run add + commit + push.
 
 ---
 
