@@ -56,7 +56,7 @@ No second WebSocket connection, no changes to the server, and no WebRTC establis
 
 ### 1. Importing the old key
 
-The user imports the old private key into the new device using the same encrypted key export that already exists for "Transfer user to another device" (NIP-49 / `ncryptsec` blob + passphrase). No new key-transport primitive is needed.
+The user imports the old private key into the new device using the same encrypted key export that already exists for "Transfer user to another device or server" (NIP-49 / `ncryptsec` blob + passphrase). No new key-transport primitive is needed.
 
 Once imported, the new device holds both private keys temporarily — the new user's (permanent) and the old user's (used only to produce and sign the merge announcement and subsequent deprecation messages).
 

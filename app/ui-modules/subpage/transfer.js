@@ -56,7 +56,7 @@ export const bindTransfer = (root, data) => {
   const copyButtonEl = root.querySelector('[data-action="copy-ncryptsec"]');
   const copyFeedbackEl = root.querySelector('[data-bind="copy-feedback"]');
 
-  if (titleEl) titleEl.textContent = "Transfer user to new device";
+  if (titleEl) titleEl.textContent = "Transfer user";
 
   const setError = (message) => {
     if (!errorEl) return;
