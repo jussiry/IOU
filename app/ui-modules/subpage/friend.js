@@ -31,6 +31,7 @@ import { createFriendIcon, setFriendIconStatus } from "../components/friend-icon
 import { initInfiniteList } from "../../js/ui/infinite-list.js";
 import { getConnectedPeerIds, getServerPresentPeerIds } from "../../js/peer/status.js";
 import { showConfirmModal } from "../components/confirm-modal.js";
+import { isSameRelayUrl } from "../../js/utils/relay-url.js";
 
 export const bindFriendDetail = (root, data, friendId) => {
   const titleEl = root.querySelector('[data-bind="page-title"]');
@@ -344,6 +345,47 @@ export const bindFriendDetail = (root, data, friendId) => {
 
   const friendKeyEl = root.querySelector('[data-bind="friend-public-key"]');
   if (friendKeyEl) friendKeyEl.textContent = friendId;
+
+  // Relay servers shared by the friend
+  const friendRelaysSectionEl = root.querySelector('[data-section="friend-relays"]');
+  if (friendRelaysSectionEl) {
+    const friendRelays = Array.isArray(friend?.relays) ? friend.relays : [];
+    const myRelayUrls = Array.isArray(data?.relays) ? data.relays.map((r) => r.url) : [];
+
+    friendRelaysSectionEl.innerHTML = "";
+
+    const labelEl = document.createElement("div");
+    labelEl.className = "friend-key-label";
+    labelEl.textContent = "Relay servers";
+    friendRelaysSectionEl.appendChild(labelEl);
+
+    if (friendRelays.length === 0) {
+      const warningEl = document.createElement("div");
+      warningEl.className = "friend-relay-warning";
+      warningEl.textContent = `No relay servers shared yet. Connect with ${friendFirstName} to exchange relay info.`;
+      friendRelaysSectionEl.appendChild(warningEl);
+    } else {
+      const listEl = document.createElement("ul");
+      listEl.className = "friend-relay-list";
+      friendRelays.forEach((url) => {
+        const isShared = myRelayUrls.some((myUrl) => isSameRelayUrl(myUrl, url));
+        const li = document.createElement("li");
+        const span = document.createElement("span");
+        span.className = `friend-relay-url ${isShared ? "friend-relay-url--shared" : "friend-relay-url--other"}`;
+        // Format same as settings: strip protocol, show host+path
+        try {
+          const parsed = new URL(url);
+          const path = parsed.pathname === "/" ? "" : parsed.pathname;
+          span.textContent = `${parsed.host}${path}`;
+        } catch {
+          span.textContent = url;
+        }
+        li.appendChild(span);
+        listEl.appendChild(li);
+      });
+      friendRelaysSectionEl.appendChild(listEl);
+    }
+  }
 
   if (!bodyEl || !listEl || !txTemplate) return;
   listEl.innerHTML = "";
