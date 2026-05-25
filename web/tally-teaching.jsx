@@ -609,7 +609,7 @@ const UNITS = [
   { id: "eur",  label: "Euro",    icon: Euro,    factor: 1,      name: "EUR",  note: "Familiar fiat unit" },
   { id: "hour", label: "Hour",    icon: Clock,   factor: 0.05,   name: "HOUR", note: "Time-based exchange" },
   { id: "meal", label: "Meal",    icon: Pizza,   factor: 2 / 60, name: "MEAL", note: "Home-cooked dinners" },
-  { id: "btc",  label: "Bitcoin", icon: Bitcoin, factor: 0.001 / 60, name: "BTC", note: "Decentralized cryptocurrency" },
+  { id: "fav",  label: "Favour",  icon: Repeat,  factor: 1 / 60, name: "FAV", note: "Friend based favour" },
 ];
 
 function ChapterUnits() {
