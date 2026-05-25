@@ -1,0 +1,20 @@
+name: Smoke test
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  smoke:
+    name: Post-deploy smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Wait for Railway deploy
+        # Railway typically deploys in 2-4 minutes. Waiting 5 minutes gives
+        # a comfortable buffer. Increase if you see false failures.
+        run: sleep 300
+
+      - name: Run smoke test
+        run: node scripts/smoke-test.cjs
