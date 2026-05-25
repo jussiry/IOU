@@ -11,7 +11,8 @@ ENV HOST=0.0.0.0
 ENV PORT=8080
 
 RUN npm run build
+RUN npm run build:web
 
 EXPOSE 8080
 
-CMD ["node", "backend/server.js"]
+CMD ["node", "server/server.js"]
