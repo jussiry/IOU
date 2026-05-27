@@ -1483,7 +1483,7 @@ function CTA() {
 
         <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
           <a
-            href="https://iou-ui.up.railway.app/"
+            href="https://app.tally.earth/"
             target="_blank"
             rel="noopener noreferrer"
             className="btn cta-stamp text-[var(--parchment)] font-display text-lg px-8 py-4 rounded-full inline-flex items-center gap-3"

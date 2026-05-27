@@ -1,11 +1,5 @@
 
 
-- Multiple relay servers to connect to
-  * fanning all messages through all connected servers
-  * settings page allows adding / removing new servers
-  * needed before https://iou-ui.up.railway.app/ -> app.tally.earth move can be made (to move users)
-
-
 
 
 
