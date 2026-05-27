@@ -13,6 +13,7 @@ import { isAcceptedFriendshipStatus } from "../../js/utils/friendships.js";
 import { loadVendorScript } from "../../js/utils/vendor-loader.js";
 import { encodePayUri } from "../../js/utils/qr-uri.js";
 import { bindOwesPreview } from "../components/owes-sentence.js";
+import { randomNotePlaceholder } from "../../js/utils/note-placeholders.js";
 
 const getFirstName = (fullName) => fullName.split(/\s+/)[0] || fullName;
 
@@ -45,6 +46,7 @@ const bindRequestFriend = (root, data) => {
 
   // Display the current user on the creditor side of the sentence.
   if (userNameEl) userNameEl.textContent = data?.you?.name || "You";
+  if (messageEl) messageEl.placeholder = randomNotePlaceholder();
 
   bindOwesPreview({ amountEl, debtorAmountEl, creditorAmountEl });
 

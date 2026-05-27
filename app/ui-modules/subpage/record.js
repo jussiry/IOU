@@ -10,6 +10,8 @@ import { isAcceptedFriendshipStatus } from "../../js/utils/friendships.js";
 import { loadVendorScript } from "../../js/utils/vendor-loader.js";
 import { parseIouUri } from "../../js/utils/qr-uri.js";
 import { bindOwesPreview } from "../components/owes-sentence.js";
+import { randomNotePlaceholder } from "../../js/utils/note-placeholders.js";
+
 
 const renderEmptyState = (contentEl, allFriends) => {
   if (!contentEl) {
@@ -47,6 +49,7 @@ export const bindRecord = (root, data, friendId) => {
   const previewFriendAmountEl = root.querySelector('[data-bind="record-preview-friend-amount"]');
 
   if (titleEl) titleEl.textContent = "Send a signed record";
+  if (messageEl) messageEl.placeholder = randomNotePlaceholder();
 
   // Tally diff preview — the user (debtor) goes negative, the friend (creditor)
   // goes positive by the same amount. The shared bindOwesPreview helper keeps
