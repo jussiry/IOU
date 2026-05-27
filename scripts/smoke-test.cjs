@@ -16,11 +16,12 @@ const http = require("http");
 // URLs to check
 // ---------------------------------------------------------------------------
 const URLS = [
-  "https://www.tally.earth/tally-teaching.html",
-  "https://www.tally.earth/dist/tally-teaching.js",
   "https://tally.earth",
+  "https://app.tally.earth",
+  "https://app.tally.earth/dist/js/app.js",
   "https://iou-ui.up.railway.app",
-  "https://iou-ui.up.railway.app/dist/js/app.js",
+  "https://tally.earth/tally-teaching.html",
+  "https://tally.earth/dist/tally-teaching.js"
 ];
 
 // ---------------------------------------------------------------------------
