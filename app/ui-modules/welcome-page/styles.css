@@ -89,8 +89,8 @@
   font-size: 20px;
   font-weight: 700;
   color: #fff;
-  background: linear-gradient(135deg, #1f6ecf, #0b519f);
-  box-shadow: 0 16px 28px rgba(16, 64, 125, 0.28);
+  background: oklch(48% 0.14 120 / 0.5);
+  box-shadow: 0 16px 28px rgba(15, 12, 8, 0.12);
   cursor: pointer;
 }
 
