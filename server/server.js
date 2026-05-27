@@ -142,12 +142,13 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
-  // Serve landing page for tally.earth domain or /web/ path prefix
+  // Serve landing page for tally.earth domain or /web/ path prefix (localhost only)
   const hostname = (request.headers.host || "").split(":")[0].toLowerCase();
   const isWebDomain = WEB_DOMAINS.has(hostname);
+  const isLocalhost = hostname === "localhost" || hostname === "127.0.0.1";
   const isWebPrefix = requestUrl.pathname === WEB_PREFIX || requestUrl.pathname.startsWith(WEB_PREFIX + "/");
 
-  if (isWebDomain || isWebPrefix) {
+  if (isWebDomain || (isWebPrefix && isLocalhost)) {
     const webPath = isWebPrefix
       ? requestUrl.pathname.slice(WEB_PREFIX.length) || "/"
       : requestUrl.pathname;
