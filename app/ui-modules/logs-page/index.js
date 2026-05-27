@@ -22,7 +22,7 @@ const formatEur = (amount) => {
 const getPeerDisplayName = (namesById, peerId, fallback = "") =>
   namesById[peerId] || fallback || peerId;
 
-const formatLedgerEntry = (entry, myId, namesById) => {
+const formatLedgerEntry = (entry, myId, namesById, context = {}) => {
   const isOutgoing = entry.from_user_id === myId;
   const peerId = isOutgoing ? entry.to_user_id : entry.from_user_id;
   const peerName = getPeerDisplayName(namesById, peerId);
@@ -73,9 +73,11 @@ const formatLedgerEntry = (entry, myId, namesById) => {
     }
     case "name_changed": {
       const newName = typeof payload.name === "string" ? payload.name : "";
-      return isOutgoing
-        ? `You changed your name to **${newName}**`
-        : `${peerBold} changed name to **${newName}**`;
+      if (isOutgoing) {
+        return `You changed your name to **${newName}**`;
+      }
+      const subjectBold = context.previousName ? `**${context.previousName}**` : peerBold;
+      return `${subjectBold} changed name to **${newName}**`;
     }
     default:
       return `${entry.type} ${isOutgoing ? "→" : "←"} ${peerBold}`;
@@ -112,6 +114,26 @@ export const bindLogs = (root, data) => {
 
   const entries = Array.isArray(data.ledger) ? data.ledger : [];
 
+  // For each name_changed entry, find the previous name by scanning the ledger
+  // chronologically. We track the last known name per user as we go so
+  // "Alice changed name from X to Alice" shows the right X rather than "Alice".
+  const previousNameByEntryId = {};
+  const nameAtTime = {}; // userId → name just before this point in time
+  const chronological = [...entries].sort((a, b) => {
+    const aTs = a.originated_at || a.timestamp || "";
+    const bTs = b.originated_at || b.timestamp || "";
+    return aTs < bTs ? -1 : aTs > bTs ? 1 : 0;
+  });
+  chronological.forEach((entry) => {
+    if (entry.type === "name_changed" && typeof entry.payload?.name === "string") {
+      const userId = entry.from_user_id;
+      if (nameAtTime[userId]) {
+        previousNameByEntryId[entry.id] = nameAtTime[userId];
+      }
+      nameAtTime[userId] = entry.payload.name;
+    }
+  });
+
   initInfiniteList(listEl, entries, (entry) => {
     const node = itemTemplate.content.firstElementChild.cloneNode(true);
     const timeEl = node.querySelector('[data-bind="time"]');
@@ -129,7 +151,7 @@ export const bindLogs = (root, data) => {
     }
     if (textEl) {
       textEl.innerHTML = formatMarkdownish(
-        formatLedgerEntry(entry, myId, namesById)
+        formatLedgerEntry(entry, myId, namesById, { previousName: previousNameByEntryId[entry.id] })
       );
     }
     node.addEventListener("click", () => {
