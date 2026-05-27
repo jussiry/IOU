@@ -357,8 +357,7 @@ export const bindFriendDetail = (root, data, friendId) => {
     if (friendRelays.length === 0) {
       // Friend hasn't shared relay info — hide the section entirely.
       // We don't know if they want to share, so showing a warning would be misleading.
-      return;
-    }
+    } else {
 
     const labelEl = document.createElement("div");
     labelEl.className = "friend-key-label";
@@ -386,6 +385,7 @@ export const bindFriendDetail = (root, data, friendId) => {
       });
       friendRelaysSectionEl.appendChild(listEl);
     }
+  }
   }
 
   if (!bodyEl || !listEl || !txTemplate) return;
