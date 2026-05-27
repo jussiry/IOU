@@ -4,9 +4,11 @@
 |---------|-------|
 | Number  | TIP-003 |
 | Title   | Multiple Relay Servers |
-| Status  | Draft |
+| Status  | Implemented |
 | Author  | Jussi Rytkönen |
 | Created | 2026-05-21 |
+
+> **Note:** Phase 2 (my_relays peer message exchange) and Phase 3 refinements are tracked in the root TIPs folder as TIP-003-relay-sharing.md.
 
 ---
 
@@ -167,14 +169,14 @@ What is easy in the current code base:
 - **Outbox** in `peer/outbox.js` already deals with retry — fan-out to N relays is a one-line change in `queuePeerEnvelopeOnServer`.
 - **Signaling client** is a closure with a clean callback surface — instantiating N of them is straightforward.
 
-What is new:
+What was new:
 
-- `relay-pool.js` (small wrapper, ~150 LOC estimate).
-- Settings UI for relay list (~one-evening JS+CSS module mirroring existing settings rows).
+- `relay-pool.js` (~150 LOC).
+- Settings UI for relay list.
 - Schema field on `state.user.relays` + normaliser entry in `data-model.ts`.
 - Presence union: per-relay tracking of which relay reports each peer online.
 
-What does not need to change:
+What did not need to change:
 
 - Server code (`websocket-server.js`) — already idempotent per the protocol property.
 - `peer/client.js` — same singleton-shaped interface, just behind a pool.
@@ -246,81 +248,24 @@ Currently absent (any origin can open the WebSocket). Secondary relays may want 
 
 9. **Per-friend relay scoping.** Should a user be able to say "use relay X only for friend group A"? Adds significant complexity and runs against the simpler "all relays are interchangeable" model. Defer indefinitely unless there's a clear use case.
 
-10. **Relay-set exchange between friends — `my_relays` message.** See §10 below for the full design. The settings toggle is shipped now; the message exchange and suggestion UI are deferred to v2.
-
 ---
 
-## §10 — Telling Friends What Relays You Use
+## §10 — Telling Friends What Relays You Use (Phase 1)
 
-### Concept
+### What shipped
 
-When a user is connected to a friend (over WebRTC) and **both sides have opted in**, they exchange a `my_relays` peer message. Each side stores the other's relay list in `state.user.friends[].relays`. The aggregated info is surfaced in the add-relay UI as a list of popular-among-your-friends relays you don't yet use, to help users converge on overlapping relay sets without a central directory.
-
-This complements the QR-code relay-hint approach (Open Question 1) — that one handles new-friend discovery; this one keeps existing friends' relay sets fresh.
-
-### Drawbacks
-
-These shaped the final design and are worth keeping in mind when the suggestion-ranking algorithm is built:
-
-1. **Centralization-via-popularity.** A naive "most-used among friends" suggestion creates a network effect that pushes the social graph toward a few popular relays — exactly what multi-relay is trying to prevent. Friend networks overlap heavily; the popular list reinforces itself.
-2. **Metadata aggregation by friends.** Each friend now carries a persisted copy of the user's relay set. A compromised friend gives an adversary a directory of every relay the user is on, including secondaries chosen for privacy.
-3. **Sock-puppet manipulation.** A hostile relay operator can create fake friend identities, get added by real users, and inflate the popularity ranking of their own relay. Once a hostile relay reaches the suggested list, it onboards by social proof without anyone explicitly vetting it.
-4. **Stale data, no clean revocation.** The user can't reliably "untell" a friend that they've stopped using relay X, especially friends offline at the moment of change. Stale info will accumulate.
-5. **Cross-friend linkability.** Unusual relay overlap between two friends can be used by a third party (who is friends with both) to infer that those two friends know each other — a side-channel leak of social-graph structure.
-6. **Default-on raises consent expectations.** Relay choice is the kind of preference some users feel privately about. Default-on means a user who doesn't read the toggle carefully shares silently.
-
-### Design
-
-**State:**
 - `state.share_my_relays: boolean` — defaults to `true`. User toggles it in settings.
-- `state.user.friends[].relays: string[]` — populated by inbound `my_relays` messages. Empty when the friend hasn't shared (or hasn't yet been online with us since the relay-pool rolled out).
+- `friends[].relays: string[]` — schema field in place, ready to receive data from Phase 2.
+- Settings toggle bound to the flag: "Tell friends what relays you use".
 
-**UI:**
-- Toggle inside the relay surface-box: "Tell friends what relays you use".
-- (v2) Add-relay form shows a suggestions row above the input — relays your friends use that you don't, ranked by the chosen algorithm.
-
-**Message — `my_relays`:**
-```
-{
-  type: "my_relays",
-  from_user_id: <user pubkey>,
-  to_user_id: <friend pubkey>,
-  payload: { relays: ["wss://...", ...] }   // urls only, no flags
-}
-```
-- Sent when: a WebRTC channel opens with an eligible friend AND `share_my_relays` is true, debounced so we don't resend unchanged lists every reconnect.
-- The list is the same union the pool uses: main relay + secondary relays the user added in settings.
-- A separately-toggled `omit_from_share` flag on individual relays (so the user can mark specific entries as private) is left as a possible refinement; not in v1.
-
-**Suggestion-ranking refinements** (when the suggestion UI ships):
-- **Popularity ranking**: sort by number of friends using the relay. Simple and correct — any attempt to apply a "diversity bias" (weight against the consensus) collapses to the same ranking when the diversity signal is derived from the same friend list. A genuine diversity signal would require an external data source (a crawled global relay directory or second-degree relay propagation), both of which are out of scope for v1. Drawback 1 (centralization) is a real risk; it is mitigated by the floor below, not by a ranking trick.
-- **Per-friend dedup**: count each friend's relay set once; don't let one friend with many relays dominate.
-- **TTL**: drop entries older than N days so a long-disconnected friend doesn't anchor suggestions to defunct relays.
-- **Floor**: don't suggest relays seen on fewer than M friends (Sybil resistance against drawback 3).
-
-### Implementation phases
-
-**Phase 1 — shipped with this TIP's initial implementation:**
-- `state.share_my_relays` (default `true`) + `friends[].relays` schema fields.
-- Settings toggle bound to the flag.
-- Forward-compatible: when the message exchange ships, no further schema migration is needed.
-
-**Phase 2 — ships with the relay-pool transport:**
-- `my_relays` peer message type, send-on-channel-open + debounce.
-- Inbound handler that updates `friends[].relays`.
-- Suggestion row in the add-relay form, ranked by friend-popularity with the floor + TTL above.
-
-**Phase 3 — possible v2 refinements:**
-- Per-relay private flag for selective sharing.
-- Embedded relay hints in friend-add QR codes (Open Question 1 path).
-- TTL background job to drop expired relay info.
+Phase 2 (the actual `my_relays` message exchange) and Phase 3 (refinements) are tracked separately in TIP-003-relay-sharing.md.
 
 ---
 
 ## Implementation Notes
 
 **Schema (`data-model.ts`)**
-- Add `state.user.relays: Array<{ url: string, enabled: boolean }>` with default seeded from `constants.RELAY_DEFAULTS`.
+- Added `state.user.relays: Array<{ url: string, enabled: boolean }>` with default seeded from `constants.RELAY_DEFAULTS`.
 - Normaliser: trim URLs, deduplicate, drop entries that don't parse as `wss://…/ws`.
 
 **New module: `app/js/signaling/relay-pool.js`**
@@ -329,21 +274,15 @@ These shaped the final design and are worth keeping in mind when the suggestion-
 - Emits `onPeerDisconnect` only when the last relay reporting that peer disconnects.
 
 **`peer/client.js`**
-- Replace `createSignalingClient(…)` with `createRelayPool({ relays: snapshot.relays, callbacks: … })`.
+- Replaced `createSignalingClient(…)` with `createRelayPool({ relays: snapshot.relays, callbacks: … })`.
 - `setSession` now also passes the relay list; pool reconciles add/remove against current connections.
 
 **Settings UI (`app/ui-modules/settings-page`)**
-- New row group for relays. Reuse existing settings row styling (`form.css` patterns).
-- Live status read from `pool.getStatuses()` on a 1s tick.
-
-**Outbox / envelope queuing**
-- `peer/outbox.js` already calls `signalingClient.queuePeerEnvelopeOnServer` for each retry. The pool's implementation returns success if **any** relay accepted the envelope, which is the right semantic for outbox progression.
+- New row group for relays. Reuses existing settings row styling.
+- Live status read from relay-status-registry on data change.
 
 **Defaults**
-- A new constants module `app/js/constants/relay-defaults.js` exporting the default list. Easy to update without touching the schema.
-
-**Backwards-compat on first run after this TIP ships**
-- `loadState` migration: if `state.user.relays` is missing, seed from defaults. Idempotent on subsequent runs.
+- `app/js/constants/relay-defaults.js` exports the default list.
 
 ---
 
