@@ -6,7 +6,7 @@
 }
 
 .friend-icon--online {
-  color: #27a857;
+  color: var(--ok-light);
 }
 
 .friend-icon--relay {

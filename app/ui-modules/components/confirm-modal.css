@@ -126,11 +126,11 @@
 /* Success (green) variant — used for large-amount send confirmation */
 .confirm-modal-confirm--success {
   background: #e3f6e8;
-  color: #27a857;
+  color: var(--ok-light);
 }
 
 .confirm-modal-confirm--success .confirm-modal-confirm-fill {
-  background: #27a857;
+  background: var(--ok-light);
 }
 
 .confirm-modal-confirm--success.confirm-modal-confirm-holding {
