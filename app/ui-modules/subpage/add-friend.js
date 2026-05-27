@@ -22,7 +22,7 @@ const selectInputText = (inputEl) => {
 };
 
 const copyTextToClipboard = async (text, inputEl) => {
-  const normalizedText = typeof text === "string" ? text : "";
+  const normalizedText = text || "";
   if (!normalizedText) {
     return false;
   }

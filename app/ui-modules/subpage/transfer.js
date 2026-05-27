@@ -27,7 +27,7 @@ const selectInputText = (inputEl) => {
 };
 
 const copyTextToClipboard = async (text, fallbackInputEl) => {
-  const normalizedText = typeof text === "string" ? text : "";
+  const normalizedText = text || "";
   if (!normalizedText) return false;
   try {
     if (navigator.clipboard?.writeText) {

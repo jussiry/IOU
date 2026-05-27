@@ -46,8 +46,8 @@ import {
 } from "./relay-status-registry.js";
 
 const peerKey = (userId, deviceId) => {
-  const u = typeof userId === "string" ? userId.trim() : "";
-  const d = typeof deviceId === "string" ? deviceId.trim() : "";
+  const u = userId?.trim() || "";
+  const d = deviceId?.trim() || "";
   if (!u) return "";
   return `${u}|${d}`;
 };

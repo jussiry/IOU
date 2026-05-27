@@ -23,7 +23,7 @@ const RELAY_STATUS_DISCONNECTED = "disconnected";
 const statuses = new Map(); // normalisedUrl → status
 const listeners = new Set();
 
-const normaliseKey = (url) => normalizeRelayUrl(url) || (typeof url === "string" ? url.trim() : "");
+const normaliseKey = (url) => normalizeRelayUrl(url) || url?.trim() || "";
 
 export const getRelayStatus = (url) => {
   const key = normaliseKey(url);

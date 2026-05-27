@@ -18,7 +18,6 @@ npm run dev   # starts server at http://localhost:3000 with auto-reload
 - At the beginning of each JS file describe that code in few paragraphs.
 - In UI modules (or "components") put related JS, HTML and CSS files inside the same folder.
 - Avoid single-use variables — inline the expression directly unless the line becomes too long to read comfortably.
-- Skip defensive `typeof` checks when a simple fallback works: prefer `user.name || ""` over `typeof user.name === "string" ? user.name : ""`.
 
 ---
 
