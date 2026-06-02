@@ -64,7 +64,7 @@ const readSnapshot = async (client) => {
     const state = await mod.loadAppState();
     if (!state) return null;
     return {
-      connections: (state.user?.connections || []).map((c) => ({
+      connections: (state.user?.friends || state.user?.connections || []).map((c) => ({
         person_id: c.person_id,
         person_name: c.person_name,
         friendship_status: c.friendship_status,
@@ -114,7 +114,7 @@ module.exports = {
         public_key_hex: CAROL.publicKeyHex,
         private_key: CAROL.privateKeyNsec,
         private_key_hex: CAROL.privateKeyHex,
-        connections: [],
+        friends: [],
       },
       contacts: {},
       ledger: [],

@@ -68,7 +68,7 @@ const getFriendRowState = (friend) => {
       amountHtml:
         suggestedTrustLimit > 0
           ? `${formatCurrency(suggestedTrustLimit)} <span class="trust-limit">suggested</span>`
-          : "Pending",
+          : "Incoming request",
       amountClassName: "amount--muted",
     };
   }
@@ -79,7 +79,7 @@ const getFriendRowState = (friend) => {
       amountHtml:
         suggestedTrustLimit > 0
           ? `${formatCurrency(suggestedTrustLimit)} <span class="trust-limit">suggested</span>`
-          : "Pending",
+          : "Request sent",
       amountClassName: "amount--muted",
     };
   }

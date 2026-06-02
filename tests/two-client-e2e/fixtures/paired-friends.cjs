@@ -49,7 +49,7 @@ const buildState = (self, peers) => ({
     public_key_hex: self.publicKeyHex,
     private_key: self.privateKeyNsec,
     private_key_hex: self.privateKeyHex,
-    connections: peers.map((peer) => ({
+    friends: peers.map((peer) => ({
       person_id: peer.publicKeyNpub,
       person_name: peer.name,
       friendship_status: "accepted",
@@ -79,7 +79,7 @@ const buildSoloState = (self) => ({
     public_key_hex: self.publicKeyHex,
     private_key: self.privateKeyNsec,
     private_key_hex: self.privateKeyHex,
-    connections: [],
+    friends: [],
   },
   contacts: {},
   ledger: [],
