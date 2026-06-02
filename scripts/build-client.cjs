@@ -107,6 +107,26 @@ const writePrecacheManifest = () => {
   return { count: entries.length, version };
 };
 
+// Regenerate the precache manifest after every (re)build. Without this, watch
+// mode would write the manifest only once at startup, so in-session edits would
+// never bump __PRECACHE_VERSION — the service worker would keep serving the
+// stale snapshot and never mint a new "waiting" worker. esbuild watches the
+// source entry points (not dist/), so writing the manifest into dist/ here does
+// not retrigger a build.
+const precacheManifestPlugin = {
+  name: "precache-manifest",
+  setup(build) {
+    build.onEnd((result) => {
+      if (result.errors && result.errors.length > 0) return;
+      const precache = writePrecacheManifest();
+      console.log(
+        `[build-client] precache manifest @ ${precache.version} ` +
+          `(${precache.count} assets)`,
+      );
+    });
+  },
+};
+
 const buildOptions = () => {
   const entryPoints = [
     ...collectEntryPoints(path.join(CLIENT_DIR, "js"), [".ts", ".js"]),
@@ -117,6 +137,7 @@ const buildOptions = () => {
     entryPoints,
     outdir: OUT_DIR,
     outbase: CLIENT_DIR,
+    plugins: [precacheManifestPlugin],
     bundle: false,
     format: "esm",
     target: "es2022",
@@ -138,23 +159,20 @@ const run = async () => {
 
   if (WATCH) {
     const ctx = await esbuild.context(options);
+    // The precacheManifestPlugin's onEnd writes the manifest on this first
+    // build and on every subsequent incremental rebuild.
     await ctx.rebuild();
     await ctx.watch();
-    const precache = writePrecacheManifest();
-    console.log(
-      `[build-client] watching ${options.entryPoints.length} files ` +
-        `(precache ${precache.count} assets @ ${precache.version})`,
-    );
+    console.log(`[build-client] watching ${options.entryPoints.length} files`);
     // Leave the process alive; esbuild's watcher runs in the background.
   } else {
     const result = await esbuild.build(options);
     if (result.errors && result.errors.length > 0) {
       process.exit(1);
     }
-    const precache = writePrecacheManifest();
+    // The precacheManifestPlugin's onEnd already wrote the manifest.
     console.log(
-      `[build-client] built ${options.entryPoints.length} files → app/dist ` +
-        `(precache ${precache.count} assets @ ${precache.version})`,
+      `[build-client] built ${options.entryPoints.length} files → app/dist`,
     );
   }
 };

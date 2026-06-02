@@ -57,9 +57,15 @@ export const registerServiceWorker = async () => {
       updateViaCache: "none",
     });
 
-    // A worker already waiting from a previous visit.
+    // A worker already waiting at page-load time means an update was installed
+    // on an earlier visit but never activated. A load (manual reload or fresh
+    // open) is a safe moment to switch versions, so apply it now — this is what
+    // makes a normal browser reload pick up the newest version. The controller-
+    // change listener below then reloads onto the fresh assets. (In-session
+    // updates are handled by `updatefound` and stay parked in "waiting" so we
+    // never reload the page out from under an active interaction.)
     if (registration.waiting && navigator.serviceWorker.controller) {
-      setWaitingWorker(registration.waiting);
+      registration.waiting.postMessage({ type: "SKIP_WAITING" });
     }
 
     registration.addEventListener("updatefound", () => {
