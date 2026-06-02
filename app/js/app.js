@@ -37,6 +37,8 @@ import { setActiveNav, updateNavBadges } from "./ui/nav.js";
 import { getSlideDirection, swapPage } from "./ui/page-transitions.js";
 import { getAppVersion } from "./version.js";
 import { initSwipeNavigation } from "./ui/swipe.js";
+import { registerServiceWorker, onUpdateChange } from "./ui/app-update.js";
+import { showNotification } from "./ui/notifications.js";
 
 const navButtons = Array.from(document.querySelectorAll(".nav-item[data-page]"));
 const contentRoot = document.getElementById("page-content");
@@ -478,6 +480,16 @@ const initApp = async () => {
   subscribeToDataChanges(scheduleRouteRefresh);
   subscribeToPeerStatusChanges(scheduleRouteRefresh);
   createRealtimeClient();
+
+  // Offline shell + update detection. When a new version finishes installing,
+  // surface it as a transient toast and refresh the route so the settings nav
+  // badge and in-page update banner appear.
+  onUpdateChange(() => {
+    showNotification({ text: "A new version of Tally is ready — open Settings to update.", hash: "settings" });
+    scheduleRouteRefresh();
+  });
+  void registerServiceWorker();
+
   await loadActiveRoute();
 };
 

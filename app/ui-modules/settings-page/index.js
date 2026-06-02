@@ -11,6 +11,7 @@ import { isAcceptedFriendshipStatus } from "../../js/utils/friendships.js";
 import { formatCurrency } from "../../js/ui/format.js";
 import { initCheckToggle } from "../components/check-toggle.js";
 import { showConfirmModal } from "../components/confirm-modal.js";
+import { isUpdateAvailable, applyUpdate } from "../../js/ui/app-update.js";
 
 // Render the relay list inside the settings surface-box. Each row is cloned
 // from the <template data-template="relay-item"> in the page HTML. The main
@@ -188,6 +189,15 @@ export const bindSettings = (root, data, appVersion) => {
   }
 
   bindRelaySection(root, data);
+
+  // Update banner — only shown once the service worker has a new version
+  // waiting. Clicking applies it (the worker activates and the page reloads).
+  const updateBanner = root.querySelector('[data-bind="update-banner"]');
+  if (updateBanner) {
+    updateBanner.hidden = !isUpdateAvailable();
+    const applyButton = updateBanner.querySelector('[data-action="apply-update"]');
+    if (applyButton) applyButton.addEventListener("click", () => applyUpdate());
+  }
 
   const versionEl = root.querySelector('[data-bind="app-version"]');
   if (versionEl && appVersion) {

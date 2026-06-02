@@ -5,9 +5,15 @@ Centralizing nav state changes prevents duplicated button toggling logic across 
 */
 
 import { hasActionableNotification } from "../utils/friendships.js";
+import { isUpdateAvailable } from "./app-update.js";
 
 const getActionableCountsByPage = (data) => {
   const counts = {};
+
+  // Settings has no notifications of its own, so a pending app update surfaces
+  // there as a single badge prompting the user to apply it.
+  if (isUpdateAvailable()) counts.settings = 1;
+
   if (!data?.friends) return counts;
 
   const friendsCount = data.friends.filter(hasActionableNotification).length;
