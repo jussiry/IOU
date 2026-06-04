@@ -10,6 +10,7 @@ via self-mesh sync from another device.
 */
 
 import { normalizeCurrencyAmount } from "../models/data-model.js";
+import { normalizeRelayUrl } from "../utils/relay-url.js";
 import {
   PEER_MESSAGE_TYPE_FRIEND_ACCEPT,
   PEER_MESSAGE_TYPE_FRIEND_REQUEST,
@@ -38,7 +39,7 @@ import {
 import { appendLedgerEntryFromMessage } from "../ledger.js";
 import { routeOutboundEntry } from "../peer/handlers.js";
 
-export const createFriend = async ({ friendId, trustLimit }) => {
+export const createFriend = async ({ friendId, trustLimit, name, relays }) => {
   const normalizedFriendId = asTrimmedString(friendId);
   if (!normalizedFriendId) {
     return loadData();
@@ -94,6 +95,21 @@ export const createFriend = async ({ friendId, trustLimit }) => {
   });
   appendLedgerEntryFromMessage(state, requestMsg);
   routeOutboundEntry(state, requestMsg);
+  // Pre-populate the display name from the scanned QR so the pending friend
+  // row shows a real name while the request is still unaccepted. The name gets
+  // overwritten by the authoritative value from the friend_accept message once
+  // the peer responds.
+  const friend = getFriend(state, normalizedFriendId);
+  if (friend) {
+    const scannedName = asTrimmedString(name);
+    if (scannedName) friend.person_name = scannedName;
+    // Store relay hints from the scanned QR so later logic can use them to
+    // establish a connection even when the two users don't share a relay.
+    const scannedRelays = Array.isArray(relays)
+      ? relays.map(normalizeRelayUrl).filter(Boolean)
+      : [];
+    if (scannedRelays.length) friend.relays = scannedRelays;
+  }
   return persistAndBuildView(state);
 };
 

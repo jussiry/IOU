@@ -61,6 +61,14 @@ export const bindAddFriend = (root, data) => {
   const trustLimitEl = root.querySelector('[data-bind="trust-limit"]');
   const submitEl = root.querySelector('[data-bind="add-friend-submit"]');
   const userPublicKey = data?.you?.id || "";
+  const userName = data?.you?.name || "";
+  // Only embed our relay URLs in the QR when the user has opted in to sharing
+  // them ("Tell friends what relays you use"). When off, the QR carries just
+  // the key (and name), keeping relay choice private.
+  const userRelayUrls =
+    data?.shareMyRelays === false ? [] : (data?.relays || []).map((r) => r.url);
+  let scannedFriendName = "";
+  let scannedFriendRelays = [];
   let hasAttemptedInvalidSubmit = false;
 
   if (titleEl) {
@@ -140,7 +148,7 @@ export const bindAddFriend = (root, data) => {
   if (myKeyQrEl && userPublicKey) {
     loadVendorScript("dist/js/vendor/qrcode.js", "QRCode").then((QRCode) => {
       const canvas = document.createElement("canvas");
-      QRCode.toCanvas(canvas, encodeAddFriendUri(userPublicKey), {
+      QRCode.toCanvas(canvas, encodeAddFriendUri(userPublicKey, { name: userName, relays: userRelayUrls }), {
         width: 180,
         margin: 2,
         color: { dark: "#1b1b1b", light: "#ffffff" },
@@ -172,6 +180,9 @@ export const bindAddFriend = (root, data) => {
   const onScanSuccess = (decodedText) => {
     const parsed = parseIouUri(decodedText);
     const key = parsed?.key || decodedText.trim();
+    // Capture name and relay hints from the scanned URI for use on submit.
+    scannedFriendName = parsed?.name || "";
+    scannedFriendRelays = parsed?.relays || [];
     if (friendKeyEl) {
       friendKeyEl.value = key;
       friendKeyEl.dispatchEvent(new Event("input", { bubbles: true }));
@@ -227,6 +238,8 @@ export const bindAddFriend = (root, data) => {
       return {
         friendId: isValidNpub(friendId) ? friendId : "",
         trustLimit,
+        name: scannedFriendName,
+        relays: scannedFriendRelays,
       };
     },
   };

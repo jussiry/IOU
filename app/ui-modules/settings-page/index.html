@@ -35,25 +35,31 @@
     <ul class="relay-list" data-list="relay-list"></ul>
     <div class="relay-add">
       <button class="relay-add-open" type="button" data-action="open-add-relay" aria-label="Add relay server">
-        <span class="relay-add-plus" aria-hidden="true">+</span>
+        <span class="relay-add-plus" data-bind="relay-add-sign" aria-hidden="true">+</span>
         <span class="relay-add-label">Add relay</span>
       </button>
       <form class="relay-add-form" data-form="add-relay" hidden>
-        <input
-          class="relay-add-input"
-          type="text"
-          inputmode="url"
-          autocomplete="off"
-          autocapitalize="off"
-          spellcheck="false"
-          placeholder="wss://relay.example.com/ws"
-          data-action="relay-url-input"
-        />
-        <div class="relay-add-actions">
-          <button class="relay-add-confirm" type="submit">Add</button>
-          <button class="relay-add-cancel" type="button" data-action="cancel-add-relay">Cancel</button>
+        <div class="relay-add-row">
+          <input
+            class="relay-add-input"
+            type="text"
+            inputmode="url"
+            autocomplete="off"
+            autocapitalize="off"
+            spellcheck="false"
+            placeholder="wss://relay.example.com/ws"
+            data-action="relay-url-input"
+          />
+          <div class="relay-add-actions">
+            <button class="relay-add-confirm" type="submit">Add</button>
+            <button class="relay-add-cancel" type="button" data-action="cancel-add-relay">Cancel</button>
+          </div>
         </div>
         <div class="relay-add-error" data-bind="add-relay-error" hidden></div>
+        <div class="relay-suggestions" data-bind="relay-suggestions" hidden>
+          <span class="relay-suggestions-label">Used by your friends</span>
+          <div class="relay-suggestions-list" data-list="relay-suggestions"></div>
+        </div>
       </form>
     </div>
     <div class="relay-share-row">

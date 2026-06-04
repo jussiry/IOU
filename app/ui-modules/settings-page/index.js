@@ -12,6 +12,7 @@ import { formatCurrency } from "../../js/ui/format.js";
 import { initCheckToggle } from "../components/check-toggle.js";
 import { showConfirmModal } from "../components/confirm-modal.js";
 import { isUpdateAvailable, applyUpdate } from "../../js/ui/app-update.js";
+import { isSameRelayUrl, normalizeRelayUrl } from "../../js/utils/relay-url.js";
 
 // Render the relay list inside the settings surface-box. Each row is cloned
 // from the <template data-template="relay-item"> in the page HTML. The main
@@ -75,12 +76,75 @@ const renderRelayList = (root, relays, { onRemove }) => {
   });
 };
 
+// Rank relays that friends use but the user does not yet use, by how many
+// friends use each (per-friend de-duplicated). This is the popularity signal
+// from TIP-003 Phase 2: it helps users converge on overlapping relay sets
+// without a central directory. We deliberately keep the floor at 1 (suggest a
+// relay seen on a single friend) — the network is small today; the Sybil-
+// resistance floor (TIP-003 drawback 3) becomes relevant once relay sets are
+// exchanged automatically via `my_relays` rather than only through QR scans.
+const computeRelaySuggestions = (data) => {
+  const usedRelays = Array.isArray(data?.relays)
+    ? data.relays.map((relay) => relay.url)
+    : [];
+  const isUsed = (url) => usedRelays.some((used) => isSameRelayUrl(used, url));
+
+  const counts = new Map(); // url -> { url, count }
+  const friends = Array.isArray(data?.friends) ? data.friends : [];
+  friends.forEach((friend) => {
+    const seen = new Set(); // de-dupe within a single friend's relay set
+    (Array.isArray(friend.relays) ? friend.relays : []).forEach((rawUrl) => {
+      const url = normalizeRelayUrl(rawUrl);
+      if (!url || isUsed(url) || seen.has(url)) return;
+      seen.add(url);
+      const entry = counts.get(url) || { url, count: 0 };
+      entry.count += 1;
+      counts.set(url, entry);
+    });
+  });
+
+  return [...counts.values()].sort(
+    (a, b) => b.count - a.count || a.url.localeCompare(b.url)
+  );
+};
+
+const renderRelaySuggestions = (root, data, { onPick }) => {
+  const containerEl = root.querySelector('[data-bind="relay-suggestions"]');
+  const listEl = root.querySelector('[data-list="relay-suggestions"]');
+  if (!containerEl || !listEl) return;
+
+  const suggestions = computeRelaySuggestions(data);
+  listEl.innerHTML = "";
+  containerEl.hidden = suggestions.length === 0;
+
+  suggestions.forEach(({ url, count }) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "relay-suggestion";
+    button.dataset.relayUrl = url;
+
+    const urlSpan = document.createElement("span");
+    urlSpan.className = "relay-suggestion-url";
+    urlSpan.textContent = formatRelayUrlForDisplay(url);
+
+    const countSpan = document.createElement("span");
+    countSpan.className = "relay-suggestion-count";
+    countSpan.textContent = String(count);
+    countSpan.title = `${count} ${count === 1 ? "friend uses" : "friends use"} this relay`;
+
+    button.append(urlSpan, countSpan);
+    button.addEventListener("click", () => onPick(url));
+    listEl.appendChild(button);
+  });
+};
+
 const bindRelaySection = (root, data) => {
   const formEl = root.querySelector('[data-form="add-relay"]');
   const openButtonEl = root.querySelector('[data-action="open-add-relay"]');
   const cancelButtonEl = root.querySelector('[data-action="cancel-add-relay"]');
   const inputEl = root.querySelector('[data-action="relay-url-input"]');
   const errorEl = root.querySelector('[data-bind="add-relay-error"]');
+  const signEl = root.querySelector('[data-bind="relay-add-sign"]');
 
   const showError = (reason) => {
     if (!errorEl) return;
@@ -95,33 +159,44 @@ const bindRelaySection = (root, data) => {
   };
 
   const openForm = () => {
-    if (!formEl || !openButtonEl) return;
+    if (!formEl) return;
     clearError();
     if (inputEl) inputEl.value = "";
     formEl.hidden = false;
-    openButtonEl.hidden = true;
-    inputEl?.focus();
+    if (signEl) signEl.textContent = "−";
+    // Only auto-focus the text input when there are no friend suggestions —
+    // if chips are visible the user likely wants to pick one first.
+    const hasSuggestions = computeRelaySuggestions(data).length > 0;
+    if (!hasSuggestions) inputEl?.focus();
   };
+
   const closeForm = () => {
-    if (!formEl || !openButtonEl) return;
+    if (!formEl) return;
     clearError();
     formEl.hidden = true;
-    openButtonEl.hidden = false;
+    if (signEl) signEl.textContent = "+";
   };
 
-  openButtonEl?.addEventListener("click", openForm);
-  cancelButtonEl?.addEventListener("click", closeForm);
-  inputEl?.addEventListener("input", clearError);
-
-  formEl?.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const value = inputEl?.value || "";
+  const submitRelay = async (value) => {
     const result = await addRelay(value);
     if (result?.ok) {
       closeForm();
     } else {
       showError(result?.reason || "invalid");
     }
+  };
+
+  renderRelaySuggestions(root, data, { onPick: (url) => void submitRelay(url) });
+
+  openButtonEl?.addEventListener("click", () => {
+    formEl?.hidden ? openForm() : closeForm();
+  });
+  cancelButtonEl?.addEventListener("click", closeForm);
+  inputEl?.addEventListener("input", clearError);
+
+  formEl?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    await submitRelay(inputEl?.value || "");
   });
 
   renderRelayList(root, data?.relays, {

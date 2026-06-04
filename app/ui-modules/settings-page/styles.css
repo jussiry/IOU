@@ -298,7 +298,15 @@
   padding: 6px 0;
 }
 
+.relay-add-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .relay-add-input {
+  flex: 1;
+  min-width: 0;
   font-size: 14px;
   color: var(--ink);
   border: 1.5px solid rgba(15, 12, 8, 0.12);
@@ -312,10 +320,71 @@
   border-color: var(--accent, #4f6ef7);
 }
 
+.relay-suggestions {
+  display: grid;
+  gap: 6px;
+}
+
+.relay-suggestions[hidden] {
+  display: none;
+}
+
+.relay-suggestions-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.relay-suggestions-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.relay-suggestion {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  border: 1px solid rgba(15, 12, 8, 0.12);
+  border-radius: 999px;
+  padding: 5px 6px 5px 12px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--ink);
+}
+
+.relay-suggestion:hover {
+  border-color: var(--accent, #4f6ef7);
+}
+
+.relay-suggestion-url {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.relay-suggestion-count {
+  flex-shrink: 0;
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--accent, #4f6ef7);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .relay-add-actions {
   display: flex;
+  flex-shrink: 0;
   gap: 6px;
-  justify-content: flex-end;
 }
 
 .relay-add-confirm,
