@@ -80,6 +80,9 @@ const createSignalingClient = (
     deviceId: "",
     peerIds: [],
   };
+  // Web Push subscription for this device, re-sent on every (re)register so a
+  // relay that restarts re-learns where to push. Null until the user opts in.
+  let pushSubscription = null;
 
   const clearReconnectTimer = () => {
     if (!reconnectTimer) {
@@ -104,6 +107,12 @@ const createSignalingClient = (
       type: "peer_candidates",
       peer_user_ids: session.peerIds,
     });
+    if (pushSubscription) {
+      sendJson(socket, {
+        type: "push_subscribe",
+        subscription: pushSubscription,
+      });
+    }
     if (notifyReady && typeof onSessionReady === "function") {
       onSessionReady();
     }
@@ -243,6 +252,18 @@ const createSignalingClient = (
         type: "queue_peer_envelope",
         envelope,
       });
+    },
+    setPushSubscription: (subscription) => {
+      pushSubscription = subscription || null;
+      if (pushSubscription && socket?.readyState === WebSocket.OPEN) {
+        sendJson(socket, { type: "push_subscribe", subscription: pushSubscription });
+      }
+    },
+    sendPushUnsubscribe: (endpoint) => {
+      pushSubscription = null;
+      if (endpoint && socket?.readyState === WebSocket.OPEN) {
+        sendJson(socket, { type: "push_unsubscribe", endpoint });
+      }
     },
     destroy: () => {
       destroyed = true;

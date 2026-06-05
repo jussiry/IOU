@@ -56,6 +56,8 @@ import {
   unwrapPeerEnvelope,
   wrapPeerMessage,
 } from "./envelope.js";
+import { buildOsNotificationHint } from "../notify/notification-policy.js";
+import { encryptForPeer } from "../crypto/peer-crypto.js";
 import {
   getAllLedgerEntries,
   getLedgerEntriesForPeer,
@@ -554,6 +556,25 @@ const createRealtimeClient = () => {
         continue;
       }
 
+      // Offline path: attach an encrypted OS-notification hint so the relay can
+      // wake the recipient via Web Push without ever seeing the plaintext. Only
+      // a few message types are OS-notifiable (see notification-policy.js).
+      const hint = buildOsNotificationHint(message, {
+        senderName: currentSnapshot.userName,
+      });
+      if (hint) {
+        try {
+          envelope.push_hint = await encryptForPeer(JSON.stringify(hint), {
+            privateKeyHex,
+            peerPublicKey: message.to_user_id,
+          });
+        } catch (error) {
+          logRealtimeEvent(
+            `Failed to encrypt push hint for ${message.to_user_id?.slice(0, 10)}…: ${String(error?.message || error)}`
+          );
+        }
+      }
+
       const queued = signalingClient.queuePeerEnvelopeOnServer(envelope);
       if (queued) {
         envelopesSentToServer.add(message.id);
@@ -896,8 +917,16 @@ const createRealtimeClient = () => {
 
   window.ping = ping;
 
-  return {
+  const instance = {
     ping,
+    // Register/replace this device's Web Push subscription with every relay so
+    // offline peer messages can wake it. Called by the settings opt-in flow.
+    setPushSubscription: (subscription) => {
+      signalingClient.setPushSubscription(subscription);
+    },
+    sendPushUnsubscribe: (endpoint) => {
+      signalingClient.sendPushUnsubscribe(endpoint);
+    },
     destroy: () => {
       replaceConnectedPeerIds([]);
       replaceConnectedSelfDeviceIds([]);
@@ -907,9 +936,17 @@ const createRealtimeClient = () => {
       selfMesh.destroy();
       signalingClient.destroy();
       delete window.ping;
+      if (activeRealtimeClient === instance) activeRealtimeClient = null;
     },
   };
+  activeRealtimeClient = instance;
+  return instance;
 };
+
+// Singleton accessor so UI code (e.g. the settings push opt-in) can reach the
+// live realtime client without threading the instance through every layer.
+let activeRealtimeClient = null;
+export const getRealtimeClient = () => activeRealtimeClient;
 
 export {
   createRealtimeClient,

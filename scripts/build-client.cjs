@@ -150,12 +150,34 @@ const buildOptions = () => {
   };
 };
 
+// The service worker is a classic worker (importScripts, no ESM), so it can't
+// consume the per-file ESM output. It needs the secp256k1 ECDH + AES-GCM
+// decrypt path as a single self-contained classic script. Bundle sw-crypto-
+// entry.js into dist/sw-crypto.js as an IIFE; it exposes self.__tallyPushCrypto.
+// Built before the main build's precache manifest is written so the SW bundle
+// is included in the precache list.
+const buildServiceWorkerCrypto = () =>
+  esbuild.build({
+    entryPoints: [path.join(CLIENT_DIR, "sw-crypto-entry.js")],
+    outfile: path.join(OUT_DIR, "sw-crypto.js"),
+    bundle: true,
+    format: "iife",
+    target: "es2022",
+    platform: "browser",
+    sourcemap: "linked",
+    logLevel: "info",
+  });
+
 const run = async () => {
   const options = buildOptions();
 
   // Clean the dist dir so a renamed or deleted source file does not leave a
   // stale output behind. Cheap — rm -rf of a build output.
   fs.rmSync(OUT_DIR, { recursive: true, force: true });
+
+  // Emit the SW crypto bundle first so the precache manifest (written by the
+  // main build's onEnd) picks it up.
+  await buildServiceWorkerCrypto();
 
   if (WATCH) {
     const ctx = await esbuild.context(options);

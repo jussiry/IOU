@@ -18,6 +18,9 @@ is the worker's own content-hash versioning, separate from data/version.json
 */
 
 importScripts("dist/precache-manifest.js");
+// secp256k1 ECDH + AES-GCM decrypt for Web Push hints. Bundled separately
+// because the SW is a classic worker and WebCrypto can't do secp256k1.
+importScripts("dist/sw-crypto.js");
 
 const VERSION = self.__PRECACHE_VERSION || "dev";
 const CACHE_NAME = `tally-precache-${VERSION}`;
@@ -100,4 +103,107 @@ self.addEventListener("fetch", (event) => {
   }
 
   // Everything else (signaling, runtime data) goes straight to the network.
+});
+
+// --- Web Push (OS notifications) -------------------------------------------
+// A push arrives only when no device of the recipient was online to receive the
+// peer envelope over WebSocket (see server/signaling/websocket-server.js). The
+// payload carries the sender's id plus an encrypted hint; we decrypt the hint
+// locally with the user's private key so the relay never learns the text.
+
+const APP_NAME = "Tally";
+const GENERIC_NOTIFICATION = { title: APP_NAME, body: "You have new Tally activity" };
+
+const DB_NAME = "iou_client_db";
+const STORE_NAME = "app_state";
+const APP_STATE_KEY = "root_state";
+
+// Read the persisted root state straight from IndexedDB. The SW has no access
+// to the app's in-memory state, so this is the only way to reach the private
+// key needed for ECDH decryption.
+const readAppState = () =>
+  new Promise((resolve) => {
+    let settled = false;
+    const finish = (value) => {
+      if (settled) return;
+      settled = true;
+      resolve(value);
+    };
+    try {
+      const request = indexedDB.open(DB_NAME);
+      request.onerror = () => finish(null);
+      request.onsuccess = () => {
+        const db = request.result;
+        if (!db.objectStoreNames.contains(STORE_NAME)) {
+          finish(null);
+          return;
+        }
+        const tx = db.transaction(STORE_NAME, "readonly");
+        const getRequest = tx.objectStore(STORE_NAME).get(APP_STATE_KEY);
+        getRequest.onsuccess = () => finish(getRequest.result || null);
+        getRequest.onerror = () => finish(null);
+      };
+    } catch {
+      finish(null);
+    }
+  });
+
+// Turn a push payload into the notification to show. Falls back to a generic
+// message whenever decryption can't proceed (no key, malformed payload, etc.)
+// so the user still learns "something happened" without leaking specifics.
+const resolveNotification = async (payload) => {
+  const hint = payload?.hint;
+  const fromUserId = payload?.from_user_id;
+  if (!hint || !fromUserId || !self.__tallyPushCrypto) {
+    return GENERIC_NOTIFICATION;
+  }
+  try {
+    const state = await readAppState();
+    const privateKeyHex = state?.user?.private_key_hex;
+    if (!privateKeyHex) return GENERIC_NOTIFICATION;
+    const plaintext = await self.__tallyPushCrypto.decryptHint(hint, privateKeyHex, fromUserId);
+    const parsed = JSON.parse(plaintext);
+    if (parsed && typeof parsed.body === "string") {
+      return { title: parsed.title || APP_NAME, body: parsed.body };
+    }
+  } catch {
+    // Any failure → generic notification below.
+  }
+  return GENERIC_NOTIFICATION;
+};
+
+self.addEventListener("push", (event) => {
+  let payload = null;
+  try {
+    payload = event.data ? event.data.json() : null;
+  } catch {
+    payload = null;
+  }
+
+  event.waitUntil(
+    (async () => {
+      const { title, body } = await resolveNotification(payload);
+      await self.registration.showNotification(title, {
+        body,
+        icon: "icons/icon-192.png",
+        badge: "icons/icon-192.png",
+        data: { url: "./" },
+      });
+    })(),
+  );
+});
+
+// Focus an existing app window (or open one) when a notification is tapped.
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const targetUrl = event.notification.data?.url || "./";
+  event.waitUntil(
+    (async () => {
+      const allClients = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+      for (const client of allClients) {
+        if ("focus" in client) return client.focus();
+      }
+      if (self.clients.openWindow) return self.clients.openWindow(targetUrl);
+    })(),
+  );
 });

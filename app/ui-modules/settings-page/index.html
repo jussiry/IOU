@@ -30,6 +30,26 @@
       </svg>
     </button>
   </div>
+  <h3 class="settings-subtitle">Notifications</h3>
+  <div class="settings-notify surface-box">
+    <div class="relay-share-row">
+      <span class="relay-share-label">Notify me on this device</span>
+      <button
+        class="check-toggle"
+        type="button"
+        data-bind="os-notify-toggle"
+        aria-pressed="false"
+        aria-label="Enable notifications on this device"
+        hidden
+      >
+        <span class="check-toggle-track">
+          <span class="check-toggle-thumb"></span>
+        </span>
+      </button>
+    </div>
+    <div class="settings-notify-hint" data-bind="os-notify-hint" hidden></div>
+  </div>
+
   <h3 class="settings-subtitle">Relay servers</h3>
   <div class="settings-relays surface-box">
     <ul class="relay-list" data-list="relay-list"></ul>

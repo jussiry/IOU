@@ -1,3 +1,4 @@
 node_modules/
 app/dist/
 web/dist/
+server/push/.vapid.json

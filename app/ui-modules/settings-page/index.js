@@ -13,6 +13,7 @@ import { initCheckToggle } from "../components/check-toggle.js";
 import { showConfirmModal } from "../components/confirm-modal.js";
 import { isUpdateAvailable, applyUpdate } from "../../js/ui/app-update.js";
 import { isSameRelayUrl, normalizeRelayUrl } from "../../js/utils/relay-url.js";
+import { getPushState, enablePush, disablePush } from "../../js/push/push-subscribe.js";
 
 // Render the relay list inside the settings surface-box. Each row is cloned
 // from the <template data-template="relay-item"> in the page HTML. The main
@@ -222,6 +223,59 @@ const bindRelaySection = (root, data) => {
   }
 };
 
+// Bind the "Notify me on this device" toggle. Push permission and subscription
+// are device-local, so the toggle reflects the *current browser's* live state
+// (queried via getPushState) rather than anything in the synced app state.
+const bindNotifySection = async (root) => {
+  const toggleEl = root.querySelector('[data-bind="os-notify-toggle"]');
+  const hintEl = root.querySelector('[data-bind="os-notify-hint"]');
+  if (!toggleEl) return;
+
+  const setHint = (message) => {
+    if (!hintEl) return;
+    hintEl.textContent = message || "";
+    hintEl.hidden = !message;
+  };
+
+  const state = await getPushState();
+  if (state === "unsupported") {
+    setHint("This browser doesn't support notifications.");
+    return;
+  }
+
+  toggleEl.hidden = false;
+  if (state === "denied") {
+    setHint("Notifications are blocked in your browser settings.");
+  }
+
+  // Guard the initial onChange that initCheckToggle fires during setup, and any
+  // programmatic correction we make below, so neither triggers a real opt-in.
+  let isSyncing = true;
+  const toggle = initCheckToggle(toggleEl, {
+    checked: state === "enabled",
+    onChange: async (isChecked) => {
+      if (isSyncing) return;
+      const result = isChecked ? await enablePush() : await disablePush();
+
+      if (result === "denied") {
+        setHint("Notifications are blocked in your browser settings.");
+      } else {
+        setHint("");
+      }
+
+      // Reconcile the visual state with what actually happened (e.g. the user
+      // dismissed the permission prompt, leaving us disabled).
+      const shouldBeChecked = result === "enabled";
+      if (shouldBeChecked !== isChecked) {
+        isSyncing = true;
+        toggle.setChecked(shouldBeChecked);
+        isSyncing = false;
+      }
+    },
+  });
+  isSyncing = false;
+};
+
 export const bindSettings = (root, data, appVersion) => {
   const userNameEl = root.querySelector('[data-bind="user-name"]');
   const editNameButton = root.querySelector('[data-action="edit-user-name"]');
@@ -263,6 +317,7 @@ export const bindSettings = (root, data, appVersion) => {
     if (cancelBtn) cancelBtn.addEventListener("click", exitEdit);
   }
 
+  void bindNotifySection(root);
   bindRelaySection(root, data);
 
   // Update banner — only shown once the service worker has a new version

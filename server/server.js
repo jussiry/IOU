@@ -132,6 +132,8 @@ const resolveWebFilePath = async (requestPath) => {
   }
 };
 
+let pushService = null;
+
 const server = http.createServer(async (request, response) => {
   const method = request.method || "GET";
   const requestUrl = new URL(request.url || "/", `http://${request.headers.host || "localhost"}`);
@@ -139,6 +141,17 @@ const server = http.createServer(async (request, response) => {
   if (!["GET", "HEAD"].includes(method)) {
     response.setHeader("Allow", "GET, HEAD");
     sendText(response, 405, "Method not allowed.");
+    return;
+  }
+
+  // The browser needs our VAPID public key to create a push subscription. It's
+  // safe to expose — it only authenticates pushes as coming from this server.
+  if (requestUrl.pathname === "/push/vapid-public-key") {
+    response.writeHead(200, {
+      "Content-Type": "text/plain; charset=utf-8",
+      "Cache-Control": "no-cache",
+    });
+    response.end(pushService?.publicKey || "");
     return;
   }
 
@@ -170,7 +183,7 @@ const server = http.createServer(async (request, response) => {
   await sendFile(request, response, filePath);
 });
 
-createSignalingServer(server);
+({ pushService } = createSignalingServer(server));
 
 process.on('SIGTERM', () => {
   console.log('SIGTERM received, shutting down gracefully...');

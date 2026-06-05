@@ -26,6 +26,7 @@ WebRTC the same way peers do during recovery.
 
 const { WebSocket, WebSocketServer } = require("ws");
 const { randomUUID } = require("crypto");
+const { createPushService } = require("../push/push-service");
 
 const SIGNALING_PATH = "/ws";
 
@@ -68,6 +69,7 @@ const PER_RECIPIENT_ENVELOPE_LIMIT = 500;
 
 const createSignalingServer = (server) => {
   const websocketServer = new WebSocketServer({ noServer: true });
+  const pushService = createPushService();
   const clientsBySocket = new Map();
   // userId -> Set<client>. Multiple devices of the same user coexist here.
   const clientsByUserId = new Map();
@@ -187,6 +189,20 @@ const createSignalingServer = (server) => {
 
     if (!deliveredToAny) {
       storeEnvelopeForRecipient(recipientUserId, envelope);
+      // No device of the recipient is online to receive over WebSocket — wake
+      // them with a Web Push. The hint is ciphertext the sender encrypted for
+      // the recipient; this server only forwards it. Best-effort: a failed or
+      // absent subscription just means no OS notification this time.
+      if (envelope.push_hint) {
+        pushService
+          .sendToUser(recipientUserId, {
+            type: "peer_message",
+            from_user_id: envelope.from_user_id,
+            message_id: envelope.id,
+            hint: envelope.push_hint,
+          })
+          .catch(() => {});
+      }
     }
   };
 
@@ -453,6 +469,24 @@ const createSignalingServer = (server) => {
 
       if (payload.type === "queue_peer_envelope") {
         handleQueuePeerEnvelope(client, payload.envelope);
+        return;
+      }
+
+      if (payload.type === "push_subscribe") {
+        // Bind the subscription to this user so offline envelopes can wake the
+        // device. We require a registered userId so a push can be routed.
+        if (client.userId && payload.subscription) {
+          pushService.addSubscription(client.userId, payload.subscription);
+        }
+        return;
+      }
+
+      if (payload.type === "push_unsubscribe") {
+        const endpoint =
+          typeof payload.endpoint === "string" ? payload.endpoint : payload.subscription?.endpoint;
+        if (client.userId && endpoint) {
+          pushService.removeSubscription(client.userId, endpoint);
+        }
       }
     });
 
@@ -465,7 +499,7 @@ const createSignalingServer = (server) => {
     });
   });
 
-  return websocketServer;
+  return { websocketServer, pushService };
 };
 
 module.exports = {

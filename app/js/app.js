@@ -39,6 +39,7 @@ import { getAppVersion } from "./version.js";
 import { initSwipeNavigation } from "./ui/swipe.js";
 import { registerServiceWorker, onUpdateChange } from "./ui/app-update.js";
 import { showNotification } from "./ui/notifications.js";
+import { resyncPushSubscription } from "./push/push-subscribe.js";
 
 const navButtons = Array.from(document.querySelectorAll(".nav-item[data-page]"));
 const contentRoot = document.getElementById("page-content");
@@ -489,6 +490,9 @@ const initApp = async () => {
     scheduleRouteRefresh();
   });
   void registerServiceWorker();
+  // Re-publish an existing push subscription to the relays (no-op unless the
+  // user previously opted in on this device).
+  void resyncPushSubscription();
 
   await loadActiveRoute();
 };

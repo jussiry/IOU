@@ -67,6 +67,9 @@ export const createRelayPool = ({
   // The last session snapshot we were asked to register with. Newly-added
   // relays use this to register immediately.
   let lastSession = null;
+  // The last push subscription we were given, so relays added later also learn
+  // where to deliver Web Push for this device.
+  let lastPushSubscription = null;
 
   const presenceAdd = (key, url) => {
     let set = presence.get(key);
@@ -231,11 +234,25 @@ export const createRelayPool = ({
     if (lastSession) {
       entries.forEach((entry) => entry.client?.setSession(lastSession));
     }
+    // Seed any newly-added relays with the push subscription too.
+    if (lastPushSubscription) {
+      entries.forEach((entry) => entry.client?.setPushSubscription(lastPushSubscription));
+    }
   };
 
   const setSession = (session) => {
     lastSession = session || null;
     entries.forEach((entry) => entry.client?.setSession(session));
+  };
+
+  const setPushSubscription = (subscription) => {
+    lastPushSubscription = subscription || null;
+    entries.forEach((entry) => entry.client?.setPushSubscription(subscription));
+  };
+
+  const sendPushUnsubscribe = (endpoint) => {
+    lastPushSubscription = null;
+    entries.forEach((entry) => entry.client?.sendPushUnsubscribe(endpoint));
   };
 
   const requestPeerConnection = (peerUserId) => {
@@ -281,6 +298,8 @@ export const createRelayPool = ({
     requestPeerConnection,
     sendPeerSignal,
     queuePeerEnvelopeOnServer,
+    setPushSubscription,
+    sendPushUnsubscribe,
     getStatuses,
     destroy,
   };

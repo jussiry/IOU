@@ -416,6 +416,28 @@
   display: none;
 }
 
+.settings-notify {
+  padding: 6px 0;
+}
+
+.settings-notify .relay-share-row {
+  border-top: none;
+}
+
+.settings-notify-hint {
+  padding: 0 14px 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.settings-notify-hint[hidden] {
+  display: none;
+}
+
+.check-toggle[hidden] {
+  display: none;
+}
+
 .relay-share-row {
   display: flex;
   align-items: center;
