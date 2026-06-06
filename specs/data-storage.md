@@ -63,7 +63,7 @@ When the user asks to be "removed" from the device, the implementation deletes t
 }
 ```
 
-`model_version` is checked on load. Migration is not yet implemented; a mismatch causes the caller to treat the record as absent and fall back to the welcome flow. The constant `DATA_MODEL_VERSION = 3` is exported from `client/js/models/data-model.js`.
+`model_version` is checked on load by the app-state migration runner before normalization. Migrations are versioned by `DATA_MODEL_VERSION`; after migration, `normalizeAppState(state)` coerces the record into the current model shape and the migrated state is saved back to IndexedDB. The constant `DATA_MODEL_VERSION = 3` is exported from `client/js/models/data-model.js`.
 
 ---
 
@@ -200,7 +200,7 @@ There is no partial-update API; the entire root state is always written atomical
 
 ## 6. State Normalisation
 
-`normalizeAppState(state)` runs every model field through the corresponding factory function, producing a clean `RootState` from whatever is loaded from disk. This is the only point where unknown fields are stripped and defaults are applied. It also re-applies `DATA_MODEL_VERSION` so old records are silently upgraded in shape (though the version number itself is not yet used for migration logic).
+`normalizeAppState(state)` runs every model field through the corresponding factory function, producing a clean `RootState` from whatever is loaded from disk. This is the point where unknown fields are stripped and defaults are applied. App-state migrations run before normalization so they can still see old fields that the current factories might otherwise discard. Normalization then re-applies `DATA_MODEL_VERSION`.
 
 `createEmptyAppState(userPerson)` builds a minimal valid state for a brand-new user: empty connections, contacts, ledger, outbox, and processed-IDs list.
 

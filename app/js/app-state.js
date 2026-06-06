@@ -24,6 +24,7 @@ import {
   loadAppState,
   saveAppState,
 } from "./storage/indexeddb.js";
+import { migrateAppState } from "./storage/migrations.js";
 import {
   generateNostrKeyPair,
   decodeNsecToHex,
@@ -81,7 +82,8 @@ const generateDeviceId = () => {
 export const loadState = async () => {
   if (cachedState) return cachedState;
   const persistedState = await loadAppState();
-  cachedState = normalizeAppState(persistedState);
+  const migrationResult = migrateAppState(persistedState);
+  cachedState = normalizeAppState(migrationResult.state);
   if (cachedState && !cachedState.device_id) {
     cachedState.device_id = generateDeviceId();
     // Persist only when we already have a user — otherwise the empty state has
@@ -90,6 +92,8 @@ export const loadState = async () => {
     if (cachedState.user) {
       await saveAppState(cachedState);
     }
+  } else if (cachedState && migrationResult.migrated) {
+    await saveAppState(cachedState);
   }
   return cachedState;
 };
