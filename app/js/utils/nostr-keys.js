@@ -181,6 +181,17 @@ export const isValidNpub = (encodedValue) => {
 export const decodeNsecToHex = (encodedValue) => decodeNip19Key(encodedValue, "nsec");
 export const decodeNpubToHex = (encodedValue) => decodeNip19Key(encodedValue, "npub");
 
+// Coerce a peer identifier (npub or raw x-only hex) to lowercase x-only hex —
+// the form every ECDH path (AES-GCM and NIP-44) needs. Used wherever a peer's
+// `user.id` (which may be an npub) feeds a crypto primitive.
+export const normalizePublicKeyHex = (peerPublicKey) => {
+  const trimmed = typeof peerPublicKey === "string" ? peerPublicKey.trim() : "";
+  if (!trimmed) {
+    throw new Error("Peer public key is required.");
+  }
+  return trimmed.startsWith("npub1") ? decodeNpubToHex(trimmed) : trimmed.toLowerCase();
+};
+
 export const encodeNpubFromPublicKeyHex = (publicKeyHex) => encodeNip19Key("npub", publicKeyHex);
 export const encodeNsecFromPrivateKeyHex = (privateKeyHex) => encodeNip19Key("nsec", privateKeyHex);
 

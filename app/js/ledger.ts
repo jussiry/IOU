@@ -15,11 +15,12 @@ untrusted entries are vetted before they enter the local log.
 
 import {
   createLedgerEntryModel,
+  type AuthorshipProof,
   type LedgerEntryModel,
   type PeerMessageModel,
   type RootState,
 } from "./models/data-model.js";
-import { verifyInnerSignature } from "./peer/envelope.js";
+import { verifyTallyAuthorship } from "./peer/authorship.js";
 import { createId } from "./state-utils.js";
 
 // ---------------------------------------------------------------------------
@@ -33,6 +34,7 @@ export interface AppendLedgerEntryOptions {
   toUserId?: string;
   payload?: Record<string, unknown>;
   signature?: string;
+  authorship?: AuthorshipProof | null;
   originatedAt?: string;
 }
 
@@ -48,6 +50,7 @@ export const appendLedgerEntry = (
     toUserId,
     payload = {},
     signature = "",
+    authorship = null,
     originatedAt = "",
   }: AppendLedgerEntryOptions = {}
 ): LedgerEntryModel => {
@@ -59,6 +62,7 @@ export const appendLedgerEntry = (
     from_user_id: fromUserId || "",
     to_user_id: toUserId || "",
     signature,
+    authorship,
     originated_at: originatedAt,
     payload,
   });
@@ -83,6 +87,7 @@ export const appendLedgerEntryFromMessage = (
     toUserId: message.to_user_id,
     payload: message.payload,
     signature: message.signature,
+    authorship: message.authorship,
     originatedAt: message.created_at,
   });
 };
@@ -121,16 +126,19 @@ export const getAllLedgerEntries = (
 // Signature verification for untrusted entries
 // ---------------------------------------------------------------------------
 
-// Reconstructs the original inner-message shape from a stored ledger entry
-// and runs the Schnorr verification that `peer-envelope` uses for live
+// Reconstructs the original inner-message shape from a stored ledger entry and
+// runs the same authorship verification that `peer-envelope` uses for live
 // messages. AES-GCM on the sync envelope only proves the *transport* peer
-// produced the batch — for forwarded or third-party entries we also need
-// this signature check to trust authorship.
-export const verifyLedgerEntrySignature = async (
+// produced the batch — for forwarded or third-party entries we also need this
+// authorship check to trust who actually authored the entry.
+//
+// Accepts either a TIP-006 authorship proof (`tally-nostr-event-v1` /
+// `tally-canonical-schnorr-v1`) or, for pre-migration entries, a bare
+// top-level `signature` — `verifyTallyAuthorship` handles both.
+export const verifyLedgerEntryAuthorship = async (
   entry: LedgerEntryModel | null | undefined
 ): Promise<boolean> => {
   if (!entry || typeof entry !== "object") return false;
-  if (typeof entry.signature !== "string" || !entry.signature) return false;
   const innerShape = {
     id: entry.id,
     type: entry.type,
@@ -139,8 +147,9 @@ export const verifyLedgerEntrySignature = async (
     created_at: entry.originated_at || entry.timestamp || "",
     payload: entry.payload || {},
     signature: entry.signature,
+    authorship: entry.authorship || null,
   };
-  return verifyInnerSignature(innerShape);
+  return verifyTallyAuthorship(innerShape);
 };
 
 // ---------------------------------------------------------------------------
@@ -167,10 +176,10 @@ export const mergeSyncedLedgerEntries = async (
   for (const entry of entries) {
     const normalized = createLedgerEntryModel(entry);
     if (!normalized.id || existingIds.has(normalized.id)) continue;
-    const signatureValid = await verifyLedgerEntrySignature(normalized);
-    if (!signatureValid) {
+    const authorshipValid = await verifyLedgerEntryAuthorship(normalized);
+    if (!authorshipValid) {
       console.warn(
-        "[Ledger] Rejected synced entry with missing or invalid signature:",
+        "[Ledger] Rejected synced entry with missing or invalid authorship:",
         normalized.id
       );
       continue;

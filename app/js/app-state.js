@@ -36,8 +36,8 @@ import { decryptNcryptsec } from "./crypto/nip49.js";
 import { asTrimmedString, createId, hasUser } from "./state-utils.js";
 import { buildView } from "./ui/view-model.js";
 import { appendLedgerEntryFromMessage } from "./ledger.js";
-import { signInnerMessage } from "./peer/envelope.js";
-import { createLocalKeyProvider } from "./crypto/key-provider.js";
+import { signTallyMessage } from "./peer/authorship.js";
+import { createLocalKeyProvider, isNip07Available } from "./crypto/key-provider.js";
 import { createPeerMessageModel } from "./models/data-model.js";
 import { PEER_MESSAGE_TYPE_NAME_CHANGED } from "./peer/messages.js";
 import { subscribeToRelayStatusChanges } from "./signaling/relay-status-registry.js";
@@ -171,8 +171,52 @@ export const markFriendTransactionsViewed = async (friendId, transactionIds = []
   return true;
 };
 
-export const createUser = async (name, { existingNsec, ncryptsec, passphrase } = {}) => {
+// Build a user whose signing key lives in a NIP-07 extension. We ask the
+// extension for its public key once, derive the npub identity from it, and store
+// a person with empty private-key fields plus `signer_type: "nip07"`. No initial
+// name_changed entry is seeded — like nsec/ncryptsec login, the account may
+// already have synced history under this key, and a fresh entry would shadow the
+// real name. The chosen name is still stored locally and propagates on first
+// rename.
+const createNip07User = async (trimmedName) => {
+  if (!isNip07Available()) {
+    throw new Error("No NIP-07 signer extension is available.");
+  }
+
+  const publicKeyHex = await window.nostr.getPublicKey();
+  if (!publicKeyHex || typeof publicKeyHex !== "string") {
+    throw new Error("The NIP-07 extension did not return a public key.");
+  }
+  const publicKeyNpub = encodeNpubFromPublicKeyHex(publicKeyHex);
+
+  const user = createPersonModel({
+    id: publicKeyNpub,
+    name: trimmedName || publicKeyNpub,
+    public_key: publicKeyNpub,
+    public_key_hex: publicKeyHex,
+    private_key: "",
+    private_key_hex: "",
+    signer_type: "nip07",
+    connections: [],
+  });
+
+  const state = createEmptyAppState(user);
+  state.device_id = cachedState?.device_id || generateDeviceId();
+  return persistAndBuildView(state);
+};
+
+export const createUser = async (
+  name,
+  { existingNsec, ncryptsec, passphrase, useNip07 } = {}
+) => {
   const trimmedName = asTrimmedString(name);
+
+  // NIP-07 path: the private key stays in the browser extension. We only ever
+  // learn (and persist) the public key; signing and NIP-44 encryption later
+  // round-trip to the extension via the nip07 key provider.
+  if (useNip07) {
+    return createNip07User(trimmedName);
+  }
 
   let privateKeyHex, privateKeyNsec, publicKeyHex, publicKeyNpub;
 
@@ -224,8 +268,8 @@ export const createUser = async (name, { existingNsec, ncryptsec, passphrase } =
     });
     try {
       const keyProvider = createLocalKeyProvider({ privateKeyHex, publicKeyHex });
-      const signature = await signInnerMessage(initMsg, { keyProvider });
-      appendLedgerEntryFromMessage(state, { ...initMsg, signature });
+      const authorship = await signTallyMessage(initMsg, keyProvider);
+      appendLedgerEntryFromMessage(state, { ...initMsg, authorship });
     } catch {
       // Non-fatal: name entry will be missing until the user renames themselves.
     }

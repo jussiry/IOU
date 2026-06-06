@@ -20,6 +20,22 @@ export const PEER_MESSAGE_TYPE_SYNC_DATA = "sync_data";
 export const PEER_RECEIPT_RESULT_PROCESSED = "peer_processed";
 export const PEER_RECEIPT_RESULT_IGNORED = "peer_ignored";
 
+// Transport-only message types: live control frames, sync containers, and
+// acknowledgements. These are NOT durable ledger facts, so they carry no
+// authorship proof (TIP-006 §"Sync transport messages"/"Receipts") and are
+// not authorship-verified on receipt. Everything else is a durable message
+// whose authorship must be proven before it can be applied or stored.
+const NON_DURABLE_PEER_MESSAGE_TYPES = new Set([
+  PEER_MESSAGE_TYPE_PING,
+  PEER_MESSAGE_TYPE_PONG,
+  PEER_MESSAGE_TYPE_RECEIVED,
+  PEER_MESSAGE_TYPE_SYNC_HELLO,
+  PEER_MESSAGE_TYPE_SYNC_DATA,
+]);
+
+export const isDurablePeerMessageType = (type) =>
+  typeof type === "string" && type.length > 0 && !NON_DURABLE_PEER_MESSAGE_TYPES.has(type);
+
 const createRuntimeMessageId = () => {
   if (window.crypto?.randomUUID) {
     return `peer_${window.crypto.randomUUID()}`;

@@ -6,6 +6,7 @@ Login uses NIP-49 exclusively: the user pastes the encoded key (`ncryptsec1...`)
 
 import { initCheckToggle } from "../components/check-toggle.js";
 import { isValidNcryptsec } from "../../js/crypto/nip49.js";
+import { isNip07Available } from "../../js/crypto/key-provider.js";
 
 export const bindWelcome = (root, { onCreateUser } = {}) => {
   const formElement = root.querySelector('[data-form="welcome"]');
@@ -16,9 +17,16 @@ export const bindWelcome = (root, { onCreateUser } = {}) => {
   const keyPanel = root.querySelector('[data-section="existing-key-panel"]');
   const passphraseInput = root.querySelector('[data-bind="login-passphrase-input"]');
   const ncryptsecInput = root.querySelector('[data-bind="login-ncryptsec-input"]');
+  const nip07Panel = root.querySelector('[data-section="nip07-panel"]');
+  const nip07Button = root.querySelector('[data-action="create-user-nip07"]');
 
   if (!formElement || !nameInput || !createButton || typeof onCreateUser !== "function") {
     return;
+  }
+
+  // The extension option is only meaningful when a NIP-07 signer is installed.
+  if (nip07Panel && isNip07Available()) {
+    nip07Panel.hidden = false;
   }
 
   const toggle = initCheckToggle(toggleButton, {
@@ -110,6 +118,32 @@ export const bindWelcome = (root, { onCreateUser } = {}) => {
   formElement.addEventListener("submit", (event) => {
     void handleSubmit(event);
   });
+
+  // NIP-07: hand off to the extension. The name is optional here — an existing
+  // Nostr identity may already carry a name via synced history; if blank we fall
+  // back to the npub. The extension prompts the user to approve key access.
+  if (nip07Button) {
+    nip07Button.addEventListener("click", async () => {
+      setError("");
+      const enteredName = nameInput.value.trim();
+      const previousLabel = nip07Button.textContent;
+      try {
+        createButton.disabled = true;
+        nip07Button.disabled = true;
+        nip07Button.textContent = "Waiting for extension...";
+        await onCreateUser(enteredName, { useNip07: true });
+      } catch (error) {
+        setError(
+          /denied|reject/i.test(String(error?.message || ""))
+            ? "The extension request was declined."
+            : "Could not connect to your signer extension. Please try again."
+        );
+        createButton.disabled = false;
+        nip07Button.disabled = false;
+        nip07Button.textContent = previousLabel;
+      }
+    });
+  }
 
   setTimeout(() => {
     nameInput.focus();

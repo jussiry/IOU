@@ -60,7 +60,7 @@ import { buildOsNotificationHint } from "../notify/notification-policy.js";
 import {
   getAllLedgerEntries,
   getLedgerEntriesForPeer,
-  verifyLedgerEntrySignature,
+  verifyLedgerEntryAuthorship,
 } from "../ledger.js";
 import { createRelayPool } from "../signaling/relay-pool.js";
 import { createPeerMesh } from "./mesh.js";
@@ -218,16 +218,16 @@ const createRealtimeClient = () => {
     // but are not routed through the inbound message handler.
     const selfAddressed = [];
     for (const entry of entries) {
-      // Every synced entry must carry a valid Schnorr signature by its
-      // claimed `from_user_id`. This check applies to self-sync too — the
-      // signing key is the same for both devices (both hold the user's
-      // private key), so entries authored on device A verify cleanly on
-      // device B. We keep the check so a compromised same-user channel
-      // can't inject forged third-party history.
-      const signatureValid = await verifyLedgerEntrySignature(entry);
-      if (!signatureValid) {
+      // Every synced entry must carry a valid authorship proof by its claimed
+      // `from_user_id`. This check applies to self-sync too — the signing key
+      // is the same for both devices (both hold the user's private key), so
+      // entries authored on device A verify cleanly on device B. We keep the
+      // check so a compromised same-user channel can't inject forged
+      // third-party history.
+      const authorshipValid = await verifyLedgerEntryAuthorship(entry);
+      if (!authorshipValid) {
         logRealtimeEvent(
-          `Rejected entry with invalid signature (${scope}, from ${entry?.from_user_id?.slice(0, 10)}…)`
+          `Rejected entry with invalid authorship (${scope}, from ${entry?.from_user_id?.slice(0, 10)}…)`
         );
         continue;
       }
@@ -266,11 +266,12 @@ const createRealtimeClient = () => {
           from_user_id: entry.from_user_id,
           to_user_id: entry.to_user_id,
           // Preserve the sender's original `created_at` — it's what the
-          // Schnorr signature was computed over, and what `originated_at`
+          // authorship proof was computed over, and what `originated_at`
           // should track in the resulting ledger entry.
           created_at: entry.originated_at || entry.timestamp,
           payload: entry.payload,
           signature: entry.signature,
+          authorship: entry.authorship,
         });
       } catch (err) {
         if (entry?.id) broadcastedLedgerIds.delete(entry.id);
@@ -563,7 +564,7 @@ const createRealtimeClient = () => {
       });
       if (hint) {
         try {
-          envelope.push_hint = await keyProvider.encryptForPeer(
+          envelope.push_hint = await keyProvider.nip44Encrypt(
             message.to_user_id,
             JSON.stringify(hint)
           );

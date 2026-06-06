@@ -19,7 +19,7 @@ import {
   PEER_MESSAGE_TYPE_FRIEND_REJECT,
   PEER_MESSAGE_TYPE_FRIEND_REQUEST,
 } from "./peer/messages.js";
-import { appendLedgerEntry } from "./ledger.js";
+import { appendLedgerEntryFromMessage } from "./ledger.js";
 import { asTrimmedString, hasUser } from "./state-utils.js";
 import {
   FRIENDSHIP_STATUS_ACCEPTED,
@@ -222,15 +222,7 @@ export const cancelPendingFriendRequest = async (
     });
   }
   if (!skipLog && rejectMessage) {
-    appendLedgerEntry(state, {
-      id: rejectMessage.id,
-      type: rejectMessage.type,
-      fromUserId: rejectMessage.from_user_id,
-      toUserId: rejectMessage.to_user_id,
-      payload: rejectMessage.payload,
-      signature: rejectMessage.signature,
-      originatedAt: rejectMessage.created_at,
-    });
+    appendLedgerEntryFromMessage(state, rejectMessage);
   }
   // direction/displayName currently unused; kept for call-site compatibility
   void direction;

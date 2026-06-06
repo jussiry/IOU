@@ -13,7 +13,7 @@ ledger — so recovering peers can verify authorship offline.
 
 import { createPeerMessageModel } from "../models/data-model.js";
 import { PEER_MESSAGE_TYPE_TRUST_LIMIT_SUGGESTION } from "./messages.js";
-import { signInnerMessage } from "./envelope.js";
+import { signTallyMessage } from "./authorship.js";
 import { createKeyProviderFromState } from "../crypto/key-provider.js";
 import { asTrimmedString, createId, hasUser } from "../state-utils.js";
 
@@ -51,20 +51,23 @@ export const queuePeerMessage = async (state, { toUserId, type, payload = {} } =
     payload,
   });
 
+  // Durable messages get a Tally authorship proof at queue time, so the proof
+  // travels with the message through retries, persists across reloads, and is
+  // mirrored into the ledger for offline verification by recovering peers.
   const keyProvider = createKeyProviderFromState(state);
-  let signature = "";
+  let authorship = null;
   if (keyProvider) {
     try {
-      signature = await signInnerMessage(unsigned, { keyProvider });
+      authorship = await signTallyMessage(unsigned, keyProvider);
     } catch {
-      // Signing should not fail, but if it does we still queue the message
-      // unsigned so delivery can proceed; recipients enforcing signatures
-      // will reject it and we'll surface the issue that way.
-      signature = "";
+      // Signing should not fail for a local key. If it does (e.g. an external
+      // signer rejection), we still queue the message; recipients enforcing
+      // authorship will reject it and we'll surface the issue that way.
+      authorship = null;
     }
   }
 
-  const message = createPeerMessageModel({ ...unsigned, signature });
+  const message = createPeerMessageModel({ ...unsigned, authorship });
   state.outbox.push(message);
   return message;
 };

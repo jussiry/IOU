@@ -12,7 +12,7 @@ ECDH(myPrivKey, theirPubKey) is sufficient to authenticate the sender — the
 only other entity that could have produced the ciphertext is the recipient.
 */
 
-import { deriveSharedSecretXHex, decodeNpubToHex } from "../utils/nostr-keys.js";
+import { deriveSharedSecretXHex, normalizePublicKeyHex } from "../utils/nostr-keys.js";
 
 const AES_KEY_BITS = 256;
 const AES_IV_BYTES = 12;
@@ -53,16 +53,7 @@ const concatBytes = (left, right) => {
   return combined;
 };
 
-const normalizePeerPublicKeyHex = (peerPublicKey) => {
-  const trimmed = typeof peerPublicKey === "string" ? peerPublicKey.trim() : "";
-  if (!trimmed) {
-    throw new Error("Peer public key is required.");
-  }
-  if (trimmed.startsWith("npub1")) {
-    return decodeNpubToHex(trimmed);
-  }
-  return trimmed.toLowerCase();
-};
+const normalizePeerPublicKeyHex = (peerPublicKey) => normalizePublicKeyHex(peerPublicKey);
 
 // Derive a 256-bit AES-GCM key from the secp256k1 ECDH shared secret. The
 // shared x-coordinate is high-entropy, so a single SHA-256 is enough to spread

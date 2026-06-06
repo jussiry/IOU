@@ -11,7 +11,7 @@ or network payloads hand over and coerce it into a known good structure. The
 
 import { FRIENDSHIP_STATUS_ACCEPTED } from "../utils/friendships.js";
 
-export const DATA_MODEL_VERSION = 3;
+export const DATA_MODEL_VERSION = 4;
 
 // ---------------------------------------------------------------------------
 // Model types — the canonical shapes the rest of the app consumes.
@@ -75,9 +75,40 @@ export interface PersonModel {
   private_key: string;
   /** Always `""` when produced by `createPublicPersonModel`. */
   private_key_hex: string;
+  /**
+   * Where this user's signing key lives. `"local"` (default) means the private
+   * key is held in `private_key_hex`; `"nip07"` means the key lives in a browser
+   * extension (window.nostr) and the private-key fields are empty. Not secret,
+   * so it survives `createPublicPersonModel`.
+   */
+  signer_type: SignerType;
   friends: FriendModel[];
   /** @deprecated Use friends instead */
   connections?: FriendModel[];
+}
+
+export type SignerType = "local" | "nip07";
+
+/** A signed Nostr event (NIP-01) used as a Tally authorship proof. */
+export interface SignedNostrEvent {
+  id: string;
+  pubkey: string;
+  created_at: number;
+  kind: number;
+  tags: string[][];
+  content: string;
+  sig: string;
+}
+
+/**
+ * Authorship proof attached to durable messages and ledger entries (TIP-006).
+ * `tally-nostr-event-v1` carries `event`; the legacy `tally-canonical-schnorr-v1`
+ * carries `signature`. One field shape, discriminated by `scheme`.
+ */
+export interface AuthorshipProof {
+  scheme: string;
+  event?: SignedNostrEvent;
+  signature?: string;
 }
 
 export interface LedgerEntryModel {
@@ -88,8 +119,14 @@ export interface LedgerEntryModel {
   to_user_id: string;
   /** Sender's asserted `created_at` — part of the signed digest. */
   originated_at: string;
-  /** Schnorr (BIP-340) signature hex. May be `""` for legacy entries. */
+  /**
+   * Legacy Schnorr (BIP-340) signature hex over the canonical digest. May be
+   * `""`. Retained for one release alongside `authorship` for rollback; new
+   * code reads `authorship`.
+   */
   signature: string;
+  /** Authorship proof (TIP-006). `null` for legacy entries not yet migrated. */
+  authorship: AuthorshipProof | null;
   payload: Record<string, unknown>;
 }
 
@@ -99,7 +136,10 @@ export interface PeerMessageModel {
   from_user_id: string;
   to_user_id: string;
   created_at: string;
+  /** Legacy raw signature; retained transitionally. New code reads `authorship`. */
   signature: string;
+  /** Authorship proof (TIP-006). `null` for transport/non-durable messages. */
+  authorship: AuthorshipProof | null;
   payload: Record<string, unknown>;
 }
 
@@ -161,6 +201,40 @@ const clonePlainObject = (value: any): Record<string, unknown> => {
   } catch {
     return {};
   }
+};
+
+// Defensive normalizer for an embedded signed Nostr event. Coerces the NIP-01
+// fields into known types; callers verify cryptographically before trusting.
+const normalizeSignedEvent = (input: any): SignedNostrEvent | undefined => {
+  if (!input || typeof input !== "object") return undefined;
+  return {
+    id: asTrimmedStringOrDefault(input.id),
+    pubkey: asTrimmedStringOrDefault(input.pubkey),
+    created_at: asNumberOrDefault(input.created_at, 0),
+    kind: asNumberOrDefault(input.kind, 0),
+    tags: Array.isArray(input.tags)
+      ? input.tags
+          .filter((tag: any) => Array.isArray(tag))
+          .map((tag: any) => tag.map((part: any) => asStringOrDefault(part)))
+      : [],
+    content: asStringOrDefault(input.content),
+    sig: asTrimmedStringOrDefault(input.sig),
+  };
+};
+
+// Normalize an authorship proof. Keeps whichever discriminated payload the
+// scheme uses (`event` for signed-event proofs, `signature` for legacy). Returns
+// null when there is no usable proof so the field has one absent representation.
+const normalizeAuthorship = (input: any): AuthorshipProof | null => {
+  if (!input || typeof input !== "object") return null;
+  const scheme = asTrimmedStringOrDefault(input.scheme);
+  if (!scheme) return null;
+  const proof: AuthorshipProof = { scheme };
+  const event = normalizeSignedEvent(input.event);
+  if (event) proof.event = event;
+  const signature = asTrimmedStringOrDefault(input.signature);
+  if (signature) proof.signature = signature;
+  return proof;
 };
 
 const normalizeStringList = (values: any): string[] => {
@@ -279,6 +353,7 @@ export const createPersonModel = (
     public_key_hex: asTrimmedStringOrDefault(input.public_key_hex),
     private_key: includePrivateKeys ? asTrimmedStringOrDefault(input.private_key) : "",
     private_key_hex: includePrivateKeys ? asTrimmedStringOrDefault(input.private_key_hex) : "",
+    signer_type: input.signer_type === "nip07" ? "nip07" : "local",
     friends,
   };
 };
@@ -298,10 +373,10 @@ export const createLedgerEntryModel = (input: any = {}): LedgerEntryModel => {
     // alongside the locally-authoritative `timestamp` so the signed digest can
     // be reconstructed and verified after the fact.
     originated_at: asTrimmedStringOrDefault(input.originated_at),
-    // Schnorr signature (hex) over the canonical inner-message digest.
-    // Present on entries that originated from peer messages; may be empty for
-    // legacy data where no signature was produced.
+    // Legacy Schnorr signature (hex) over the canonical inner-message digest.
+    // Retained transitionally; `authorship` is the field new code reads.
     signature: asTrimmedStringOrDefault(input.signature),
+    authorship: normalizeAuthorship(input.authorship),
     payload: clonePlainObject(input.payload),
   };
 };
@@ -314,6 +389,7 @@ export const createPeerMessageModel = (input: any = {}): PeerMessageModel => {
     to_user_id: asTrimmedStringOrDefault(input.to_user_id),
     created_at: asTrimmedStringOrDefault(input.created_at),
     signature: asTrimmedStringOrDefault(input.signature),
+    authorship: normalizeAuthorship(input.authorship),
     payload: clonePlainObject(input.payload),
   };
 };

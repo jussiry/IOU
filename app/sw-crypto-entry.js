@@ -6,15 +6,18 @@ were encrypted with secp256k1 ECDH — which WebCrypto cannot do (it only suppor
 the NIST P-curves). The rest of the app reaches the same noble-curves code via
 normal ES module imports; the SW can't, so we ship it this one bundled file.
 
-It mirrors crypto/peer-crypto.js's decryptFromPeer, but uses the service-worker
-globals (self.crypto.subtle, atob) instead of the window-scoped ones. The shared
-secret is the secp256k1 ECDH x-coordinate (noble), hashed with SHA-256 into an
-AES-256-GCM key (WebCrypto); the 12-byte IV is prepended to the ciphertext.
+Push hints now travel as NIP-44 v2 (matching peer envelope v3). crypto/nip44.js
+is deliberately WebCrypto-free and globalThis-based, so it runs unchanged inside
+the classic worker. We still accept the legacy AES-GCM path so hints queued
+before the sender upgraded can be drained: a NIP-44 payload starts with the
+version byte 0x02 once base64-decoded, while the old AES path prepended a random
+12-byte IV — so we try NIP-44 first and fall back to AES-GCM on failure.
 
 Exposes one global: self.__tallyPushCrypto.decryptHint(ciphertextB64,
 myPrivateKeyHex, senderPublicKey) -> Promise<string>.
 */
 
+import { decryptWithKey, getConversationKey } from "./js/crypto/nip44.js";
 import { deriveSharedSecretXHex, hexToBytes } from "./js/crypto/secp256k1.js";
 import { decodeNpubToHex } from "./js/utils/nostr-keys.js";
 
@@ -35,8 +38,10 @@ const toPublicKeyHex = (userId) => {
   return trimmed.startsWith("npub1") ? decodeNpubToHex(trimmed) : trimmed.toLowerCase();
 };
 
-const decryptHint = async (ciphertextB64, myPrivateKeyHex, senderPublicKey) => {
-  const sharedHex = deriveSharedSecretXHex(myPrivateKeyHex, toPublicKeyHex(senderPublicKey));
+// Legacy AES-GCM hint decrypt — secp256k1 ECDH x-coordinate hashed into an
+// AES-256-GCM key, 12-byte IV prepended. Kept only to drain pre-upgrade hints.
+const decryptHintAes = async (ciphertextB64, myPrivateKeyHex, senderHex) => {
+  const sharedHex = deriveSharedSecretXHex(myPrivateKeyHex, senderHex);
   const keyMaterial = await self.crypto.subtle.digest("SHA-256", hexToBytes(sharedHex));
   const cryptoKey = await self.crypto.subtle.importKey(
     "raw",
@@ -58,6 +63,18 @@ const decryptHint = async (ciphertextB64, myPrivateKeyHex, senderPublicKey) => {
     ciphertext
   );
   return new TextDecoder().decode(plaintext);
+};
+
+const decryptHint = async (ciphertextB64, myPrivateKeyHex, senderPublicKey) => {
+  const senderHex = toPublicKeyHex(senderPublicKey);
+  try {
+    const conversationKey = getConversationKey(myPrivateKeyHex, senderHex);
+    return decryptWithKey(ciphertextB64, conversationKey);
+  } catch {
+    // Fall back to the legacy AES-GCM path for hints encrypted before the
+    // sender upgraded to NIP-44.
+    return decryptHintAes(ciphertextB64, myPrivateKeyHex, senderHex);
+  }
 };
 
 self.__tallyPushCrypto = { decryptHint };

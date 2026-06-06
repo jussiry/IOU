@@ -5,72 +5,56 @@ from, to) in plaintext so the signaling server can deliver messages to offline
 peers without learning their contents, while the inner message — the original
 peer message model — is encrypted to the recipient's public key.
 
-Inner messages are Schnorr-signed by the sender before encryption. The
-signature covers a canonical JSON digest of the message (id, type, from, to,
-created_at, payload) and travels inside the encrypted inner blob. This gives
-us non-repudiation and lets a recipient verify messages authored by a third
-party that are forwarded during ledger sync — AES-GCM authentication only
-tells us "someone with the ECDH shared secret produced this," which isn't
-enough once messages can travel transitively.
+Durable inner messages (transactions, friend requests, name changes, …) carry a
+Tally *authorship proof* (TIP-006) rather than a bare signature. The proof is a
+signed Nostr event embedded in the encrypted inner blob; it lets a recipient
+verify messages authored by a third party that are forwarded during ledger
+sync — transport encryption alone only proves "someone with the ECDH shared
+secret produced this," which isn't enough once messages travel transitively.
 
-After decryption, callers must trust the returned `inner` only after:
-  1. The envelope's plaintext claims match the inner fields (AES-GCM already
-     authenticates the inner content; mismatched outer fields mean the
-     plaintext envelope was tampered with).
-  2. The Schnorr signature on the inner message verifies against
-     `from_user_id` as an x-only public key.
+Transport-only messages (sync_hello/sync_data, receipts, ping/pong) are NOT
+durable ledger facts, so they carry no authorship proof and are not
+authorship-verified — they are authenticated by the encrypted channel and
+their security-critical contents (ledger entries inside a sync batch) carry
+their own proofs.
+
+After decryption, callers may trust the returned `inner` only after:
+  1. The envelope's plaintext claims match the inner fields.
+  2. For durable messages, the authorship proof verifies against `from_user_id`.
+
+Encryption itself is delegated to the caller's KeyProvider, so this module
+never touches raw key material. (Envelope version 2 uses the provider's
+AES-GCM path; NIP-44 / version 3 is introduced in a later layer.)
 */
 
-import { canonicalJsonForSigning } from "../crypto/canonical.js";
+import { isDurablePeerMessageType } from "./messages.js";
 import {
-  schnorrVerifyHex,
-  sha256HexOfString,
-} from "../crypto/secp256k1.js";
-import { decodeNpubToHex } from "../utils/nostr-keys.js";
+  signTallyMessage,
+  verifyTallyAuthorship,
+  hasAuthorshipProof,
+} from "./authorship.js";
 
 export const PEER_ENVELOPE_TYPE = "peer_envelope";
-export const PEER_ENVELOPE_VERSION = 2;
+// Current outbound version. v3 encrypts the inner blob with NIP-44 v2; v2 used
+// AES-GCM. We still *decrypt* v2 on receipt to drain envelopes queued on the
+// signaling server before peers upgraded — see `unwrapPeerEnvelope`.
+export const PEER_ENVELOPE_VERSION = 3;
+export const PEER_ENVELOPE_VERSION_AES = 2;
 
 export const isPeerEnvelope = (value) => {
   return Boolean(value) && typeof value === "object" && value.type === PEER_ENVELOPE_TYPE;
 };
 
-const toPublicKeyHex = (userId) => {
-  if (typeof userId !== "string" || !userId) {
-    throw new Error("User id is required to resolve a public key.");
-  }
-  return userId.startsWith("npub1") ? decodeNpubToHex(userId) : userId.toLowerCase();
-};
-
-// Compute the Schnorr digest over an inner message. Excludes the `signature`
-// field so signing and verifying produce the same pre-image.
-export const digestForSigning = async (innerMessage) => {
-  const canonical = canonicalJsonForSigning(innerMessage);
-  return sha256HexOfString(canonical);
-};
-
-export const signInnerMessage = async (innerMessage, { keyProvider }) => {
-  if (!keyProvider) {
-    throw new Error("A key provider is required to sign a peer message.");
-  }
-  const digestHex = await digestForSigning(innerMessage);
-  return keyProvider.signCanonicalDigest(digestHex);
-};
-
-export const verifyInnerSignature = async (innerMessage) => {
-  if (!innerMessage || typeof innerMessage.signature !== "string" || !innerMessage.signature) {
-    return false;
-  }
-  let publicKeyHex;
-  try {
-    publicKeyHex = toPublicKeyHex(innerMessage.from_user_id);
-  } catch {
-    return false;
-  }
-  const { signature, ...withoutSignature } = innerMessage;
-  const digestHex = await digestForSigning(withoutSignature);
-  return schnorrVerifyHex(signature, digestHex, publicKeyHex);
-};
+// The semantic inner-message shape, minus transport-only adornments. The legacy
+// top-level `signature` field is never emitted by current code.
+const innerCoreFromMessage = (message) => ({
+  id: message.id,
+  type: message.type,
+  from_user_id: message.from_user_id,
+  to_user_id: message.to_user_id,
+  created_at: message.created_at,
+  payload: message.payload ?? {},
+});
 
 export const wrapPeerMessage = async (message, { keyProvider }) => {
   if (!message || typeof message !== "object") {
@@ -83,21 +67,20 @@ export const wrapPeerMessage = async (message, { keyProvider }) => {
     throw new Error("A key provider is required to encrypt a peer envelope.");
   }
 
-  // Sign the inner message (without an existing signature field) so the
-  // signature travels protected under AES-GCM alongside the content. If the
-  // caller already attached a signature at queue time, reuse it — signatures
-  // are deterministic for a given (message, key), but reusing also lets the
-  // ledger and outbox agree on the exact signature bytes.
-  const unsigned = { ...message };
-  delete unsigned.signature;
-  const signature = typeof message.signature === "string" && message.signature
-    ? message.signature
-    : await signInnerMessage(unsigned, { keyProvider });
-  const signedInner = { ...unsigned, signature };
+  const inner = innerCoreFromMessage(message);
 
-  const ciphertext = await keyProvider.encryptForPeer(
+  // Durable messages carry an authorship proof. Reuse the one attached at queue
+  // time if present (so the outbox and ledger agree on the exact proof bytes);
+  // otherwise produce one now via the key provider.
+  if (isDurablePeerMessageType(message.type)) {
+    inner.authorship = hasAuthorshipProof(message.authorship)
+      ? message.authorship
+      : await signTallyMessage(inner, keyProvider);
+  }
+
+  const ciphertext = await keyProvider.nip44Encrypt(
     message.to_user_id,
-    JSON.stringify(signedInner)
+    JSON.stringify(inner)
   );
 
   return {
@@ -124,10 +107,28 @@ export const unwrapPeerEnvelope = async (envelope, { keyProvider, expectedRecipi
     throw new Error("A key provider is required to decrypt a peer envelope.");
   }
 
-  const plaintext = await keyProvider.decryptFromPeer(
-    envelope.from_user_id,
-    envelope.ciphertext
-  );
+  // Decrypt by transport version. v3 is NIP-44 v2; v2 is the legacy AES-GCM
+  // path, kept only to drain envelopes that were already queued on the
+  // signaling server before the sender upgraded. Anything else is unknown.
+  // Treat a missing `envelope_version` as v2: pre-versioning envelopes had no
+  // field and were always AES-GCM.
+  const envelopeVersion = Number.isInteger(envelope.envelope_version)
+    ? envelope.envelope_version
+    : PEER_ENVELOPE_VERSION_AES;
+  let plaintext;
+  if (envelopeVersion === PEER_ENVELOPE_VERSION) {
+    plaintext = await keyProvider.nip44Decrypt(
+      envelope.from_user_id,
+      envelope.ciphertext
+    );
+  } else if (envelopeVersion === PEER_ENVELOPE_VERSION_AES) {
+    plaintext = await keyProvider.decryptFromPeer(
+      envelope.from_user_id,
+      envelope.ciphertext
+    );
+  } else {
+    throw new Error(`Unsupported peer envelope version: ${envelopeVersion}`);
+  }
 
   let inner;
   try {
@@ -140,7 +141,7 @@ export const unwrapPeerEnvelope = async (envelope, { keyProvider, expectedRecipi
   }
 
   // Cross-check the plaintext envelope claims against the authenticated inner
-  // fields. AES-GCM already guarantees the inner fields were not tampered
+  // fields. The encrypted channel guarantees the inner fields were not tampered
   // with, so any mismatch means the plaintext envelope was modified in transit.
   if (inner.id !== envelope.id) {
     throw new Error("Peer envelope id does not match its inner message.");
@@ -152,12 +153,15 @@ export const unwrapPeerEnvelope = async (envelope, { keyProvider, expectedRecipi
     throw new Error("Peer envelope to_user_id does not match its inner message.");
   }
 
-  // Verify the Schnorr signature. This is what lets us trust forwarded
-  // messages later — AES-GCM alone only proves the ECDH peer produced the
-  // ciphertext; Schnorr proves the original author signed the content.
-  const signatureValid = await verifyInnerSignature(inner);
-  if (!signatureValid) {
-    throw new Error("Peer envelope inner signature is invalid.");
+  // Verify authorship for durable messages. This is what lets us trust
+  // forwarded messages later — transport encryption alone only proves the ECDH
+  // peer produced the ciphertext; the authorship proof binds the content to its
+  // original author. Transport-only messages skip this.
+  if (isDurablePeerMessageType(inner.type)) {
+    const authorshipValid = await verifyTallyAuthorship(inner);
+    if (!authorshipValid) {
+      throw new Error("Peer envelope inner authorship is invalid.");
+    }
   }
 
   return inner;
