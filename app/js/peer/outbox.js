@@ -14,6 +14,7 @@ ledger — so recovering peers can verify authorship offline.
 import { createPeerMessageModel } from "../models/data-model.js";
 import { PEER_MESSAGE_TYPE_TRUST_LIMIT_SUGGESTION } from "./messages.js";
 import { signInnerMessage } from "./envelope.js";
+import { createKeyProviderFromState } from "../crypto/key-provider.js";
 import { asTrimmedString, createId, hasUser } from "../state-utils.js";
 
 const PROCESSED_MESSAGE_ID_LIMIT = 500;
@@ -50,11 +51,11 @@ export const queuePeerMessage = async (state, { toUserId, type, payload = {} } =
     payload,
   });
 
-  const privateKeyHex = state.user.private_key_hex || "";
+  const keyProvider = createKeyProviderFromState(state);
   let signature = "";
-  if (privateKeyHex) {
+  if (keyProvider) {
     try {
-      signature = await signInnerMessage(unsigned, { privateKeyHex });
+      signature = await signInnerMessage(unsigned, { keyProvider });
     } catch {
       // Signing should not fail, but if it does we still queue the message
       // unsigned so delivery can proceed; recipients enforcing signatures

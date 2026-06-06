@@ -57,7 +57,6 @@ import {
   wrapPeerMessage,
 } from "./envelope.js";
 import { buildOsNotificationHint } from "../notify/notification-policy.js";
-import { encryptForPeer } from "../crypto/peer-crypto.js";
 import {
   getAllLedgerEntries,
   getLedgerEntriesForPeer,
@@ -120,7 +119,7 @@ const createRealtimeClient = () => {
   const broadcastedLedgerIds = new Set();
 
   const sendSyncMessage = async (peerKey, { scope }, type, payload, peerUserId) => {
-    if (!currentSnapshot?.userPrivateKeyHex || !currentSnapshot?.userId) return;
+    if (!currentSnapshot?.keyProvider || !currentSnapshot?.userId) return;
     const mesh = scope === SCOPE_SELF ? selfMesh : peerMesh;
     if (!mesh.canSend(peerKey)) return;
 
@@ -137,7 +136,7 @@ const createRealtimeClient = () => {
     };
     try {
       const envelope = await wrapPeerMessage(message, {
-        privateKeyHex: currentSnapshot.userPrivateKeyHex,
+        keyProvider: currentSnapshot.keyProvider,
       });
       mesh.sendPeerMessage(peerKey, envelope);
     } catch (error) {
@@ -523,8 +522,8 @@ const createRealtimeClient = () => {
       return;
     }
 
-    const privateKeyHex = currentSnapshot.userPrivateKeyHex;
-    if (!privateKeyHex) {
+    const keyProvider = currentSnapshot.keyProvider;
+    if (!keyProvider) {
       return;
     }
 
@@ -543,7 +542,7 @@ const createRealtimeClient = () => {
 
       let envelope;
       try {
-        envelope = await wrapPeerMessage(message, { privateKeyHex });
+        envelope = await wrapPeerMessage(message, { keyProvider });
       } catch (error) {
         logRealtimeEvent(
           `Failed to wrap outgoing message ${message.id?.slice(0, 10)}…: ${String(error?.message || error)}`
@@ -564,10 +563,10 @@ const createRealtimeClient = () => {
       });
       if (hint) {
         try {
-          envelope.push_hint = await encryptForPeer(JSON.stringify(hint), {
-            privateKeyHex,
-            peerPublicKey: message.to_user_id,
-          });
+          envelope.push_hint = await keyProvider.encryptForPeer(
+            message.to_user_id,
+            JSON.stringify(hint)
+          );
         } catch (error) {
           logRealtimeEvent(
             `Failed to encrypt push hint for ${message.to_user_id?.slice(0, 10)}…: ${String(error?.message || error)}`
@@ -706,13 +705,13 @@ const createRealtimeClient = () => {
 
     // No live data channel — wrap the receipt as an envelope and let the
     // signaling server hold it until the original sender comes back online.
-    if (!currentSnapshot.userPrivateKeyHex) {
+    if (!currentSnapshot.keyProvider) {
       return;
     }
 
     try {
       const envelope = await wrapPeerMessage(receipt, {
-        privateKeyHex: currentSnapshot.userPrivateKeyHex,
+        keyProvider: currentSnapshot.keyProvider,
       });
       const queued = signalingClient.queuePeerEnvelopeOnServer(envelope);
       logRealtimeEvent(queued ? "Queued peer receipt on server" : "Peer receipt queue rejected by server");
@@ -809,14 +808,14 @@ const createRealtimeClient = () => {
   };
 
   const unwrapEnvelopeOrLog = async (envelope, sourcePeerKey) => {
-    const privateKeyHex = currentSnapshot?.userPrivateKeyHex;
-    if (!privateKeyHex || !currentSnapshot?.userId) {
+    const keyProvider = currentSnapshot?.keyProvider;
+    if (!keyProvider || !currentSnapshot?.userId) {
       return null;
     }
 
     try {
       return await unwrapPeerEnvelope(envelope, {
-        privateKeyHex,
+        keyProvider,
         expectedRecipientId: currentSnapshot.userId,
       });
     } catch (error) {

@@ -21,10 +21,8 @@ After decryption, callers must trust the returned `inner` only after:
      `from_user_id` as an x-only public key.
 */
 
-import { decryptFromPeer, encryptForPeer } from "../crypto/peer-crypto.js";
 import { canonicalJsonForSigning } from "../crypto/canonical.js";
 import {
-  schnorrSignHex,
   schnorrVerifyHex,
   sha256HexOfString,
 } from "../crypto/secp256k1.js";
@@ -51,12 +49,12 @@ export const digestForSigning = async (innerMessage) => {
   return sha256HexOfString(canonical);
 };
 
-export const signInnerMessage = async (innerMessage, { privateKeyHex }) => {
-  if (!privateKeyHex) {
-    throw new Error("A private key is required to sign a peer message.");
+export const signInnerMessage = async (innerMessage, { keyProvider }) => {
+  if (!keyProvider) {
+    throw new Error("A key provider is required to sign a peer message.");
   }
   const digestHex = await digestForSigning(innerMessage);
-  return schnorrSignHex(digestHex, privateKeyHex);
+  return keyProvider.signCanonicalDigest(digestHex);
 };
 
 export const verifyInnerSignature = async (innerMessage) => {
@@ -74,15 +72,15 @@ export const verifyInnerSignature = async (innerMessage) => {
   return schnorrVerifyHex(signature, digestHex, publicKeyHex);
 };
 
-export const wrapPeerMessage = async (message, { privateKeyHex }) => {
+export const wrapPeerMessage = async (message, { keyProvider }) => {
   if (!message || typeof message !== "object") {
     throw new Error("Cannot wrap an empty peer message.");
   }
   if (!message.id || !message.from_user_id || !message.to_user_id) {
     throw new Error("Peer message is missing routing fields required for the envelope.");
   }
-  if (!privateKeyHex) {
-    throw new Error("A private key is required to encrypt a peer envelope.");
+  if (!keyProvider) {
+    throw new Error("A key provider is required to encrypt a peer envelope.");
   }
 
   // Sign the inner message (without an existing signature field) so the
@@ -94,13 +92,13 @@ export const wrapPeerMessage = async (message, { privateKeyHex }) => {
   delete unsigned.signature;
   const signature = typeof message.signature === "string" && message.signature
     ? message.signature
-    : await signInnerMessage(unsigned, { privateKeyHex });
+    : await signInnerMessage(unsigned, { keyProvider });
   const signedInner = { ...unsigned, signature };
 
-  const ciphertext = await encryptForPeer(JSON.stringify(signedInner), {
-    privateKeyHex,
-    peerPublicKey: message.to_user_id,
-  });
+  const ciphertext = await keyProvider.encryptForPeer(
+    message.to_user_id,
+    JSON.stringify(signedInner)
+  );
 
   return {
     type: PEER_ENVELOPE_TYPE,
@@ -112,7 +110,7 @@ export const wrapPeerMessage = async (message, { privateKeyHex }) => {
   };
 };
 
-export const unwrapPeerEnvelope = async (envelope, { privateKeyHex, expectedRecipientId }) => {
+export const unwrapPeerEnvelope = async (envelope, { keyProvider, expectedRecipientId }) => {
   if (!isPeerEnvelope(envelope)) {
     throw new Error("Value is not a peer envelope.");
   }
@@ -122,14 +120,14 @@ export const unwrapPeerEnvelope = async (envelope, { privateKeyHex, expectedReci
   if (expectedRecipientId && envelope.to_user_id !== expectedRecipientId) {
     throw new Error("Peer envelope is addressed to a different recipient.");
   }
-  if (!privateKeyHex) {
-    throw new Error("A private key is required to decrypt a peer envelope.");
+  if (!keyProvider) {
+    throw new Error("A key provider is required to decrypt a peer envelope.");
   }
 
-  const plaintext = await decryptFromPeer(envelope.ciphertext, {
-    privateKeyHex,
-    peerPublicKey: envelope.from_user_id,
-  });
+  const plaintext = await keyProvider.decryptFromPeer(
+    envelope.from_user_id,
+    envelope.ciphertext
+  );
 
   let inner;
   try {

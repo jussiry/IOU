@@ -31,6 +31,7 @@ import {
   removeQueuedPeerMessage,
 } from "./outbox.js";
 import { findFriend, getFriend, syncUserNameAcrossContacts } from "../friends-helpers.js";
+import { createKeyProviderFromState } from "../crypto/key-provider.js";
 import { getMainRelayUrl } from "../utils/relay-url.js";
 import {
   createInboundProcessingResult,
@@ -81,7 +82,10 @@ export const getRealtimeSnapshot = async () => {
     userId: state.user.id,
     deviceId: state.device_id || "",
     userName: state.user.name,
-    userPrivateKeyHex: state.user.private_key_hex || "",
+    // The signing/encryption seam for the transport layer. Held in memory only
+    // (never persisted) — client.js routes every wrap/unwrap through it instead
+    // of touching raw key material.
+    keyProvider: createKeyProviderFromState(state),
     peerIds: Array.from(new Set([...relationshipPeerIds, ...queuedPeerIds])),
     peerNames,
     outbox: Array.isArray(state.outbox) ? state.outbox.map((entry) => createPeerMessageModel(entry)) : [],

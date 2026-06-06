@@ -37,6 +37,7 @@ import { asTrimmedString, createId, hasUser } from "./state-utils.js";
 import { buildView } from "./ui/view-model.js";
 import { appendLedgerEntryFromMessage } from "./ledger.js";
 import { signInnerMessage } from "./peer/envelope.js";
+import { createLocalKeyProvider } from "./crypto/key-provider.js";
 import { createPeerMessageModel } from "./models/data-model.js";
 import { PEER_MESSAGE_TYPE_NAME_CHANGED } from "./peer/messages.js";
 import { subscribeToRelayStatusChanges } from "./signaling/relay-status-registry.js";
@@ -222,7 +223,8 @@ export const createUser = async (name, { existingNsec, ncryptsec, passphrase } =
       payload: { name: userName },
     });
     try {
-      const signature = await signInnerMessage(initMsg, { privateKeyHex });
+      const keyProvider = createLocalKeyProvider({ privateKeyHex, publicKeyHex });
+      const signature = await signInnerMessage(initMsg, { keyProvider });
       appendLedgerEntryFromMessage(state, { ...initMsg, signature });
     } catch {
       // Non-fatal: name entry will be missing until the user renames themselves.
