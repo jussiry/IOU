@@ -4,9 +4,17 @@
 |---------|-------|
 | Number  | TIP-006 |
 | Title   | External Nostr Key Storage |
-| Status  | Draft |
+| Status  | Implemented (layers 1–5) |
 | Author  | Jussi Rytkönen |
 | Created | 2026-06-05 |
+
+> **Context:** The KeyProvider abstraction, `authorship` proofs and legacy
+> signature migration, NIP-44 v2 transport (envelope v3 with v2 decrypt drain),
+> and **NIP-07** browser-extension support are implemented and verified —
+> including a successful real-signer test against nos2x. This document is the
+> record of that implemented design. The remaining layer — **NIP-46 remote
+> signers and NIP-55 Android signers** — is not implemented; its design
+> continues in `../TIP-006-remote-signers.md`.
 
 ---
 
@@ -536,15 +544,8 @@ There is **no Tally-drawn signing dialog** for NIP-07 — the extension is the t
 
 ### NIP-46 remote signer / NIP-55 native signer
 
-**Not automatic.** Each `sign_event` / `nip44_*` is an async round-trip to a remote or separate app, often with a push/approval on another device. The UI must:
-
-- show an explicit pending state ("Approve this in your signer app"),
-- tolerate multi-second latency and offline signers,
-- batch where possible (see below) to minimize approvals.
-
-### Approval batching
-
-A single user action can produce several durable entries (e.g. accepting a payment request that also creates a transaction, or onboarding's self-name entry). For external signers, each durable entry is a separate `sign_event`. The direction (Open Q#3): group the entries of one user action and request their signatures together / sequentially behind one "Approve in your signer" affordance, rather than firing isolated prompts. Sync transport messages and receipts are never signed, so they never prompt.
+Not implemented. These signers and their pending-state / approval-batching UX
+are covered in the continuation doc `../TIP-006-remote-signers.md`.
 
 ### Onboarding / welcome page
 
@@ -562,13 +563,13 @@ The copy is intentionally vague at first and tightened as NIP-07 (then NIP-46/NI
 
 ## Recommendation
 
-Implement external keys in layers:
+External keys were implemented in layers:
 
-1. Add the `KeyProvider` abstraction (local provider only) while keeping behavior unchanged; route all signing/encryption through it.
-2. Add `authorship` as the single ledger/peer-message proof field; migrate legacy `signature` → `authorship{scheme:"tally-canonical-schnorr-v1"}` (verify-only); add Tally-specific Nostr signing events (`tally-nostr-event-v1`) as the path for all new durable messages.
-3. Stop requiring durable signatures for sync transport messages and receipts.
-4. Add NIP-44 v2 to the local provider and the SW bundle; introduce envelope v3 (NIP-44 send-only, v2 decrypt as drain). Verify against NIP-44 official test vectors.
-5. Add NIP-07 support (detect `window.nostr`, key-option in onboarding, pending-state UX) and the general welcome-page mention of external key storage. Test against nos2x.
-6. Add NIP-46/NIP-55 where the app environment supports them, with explicit approval/pending UX and signature batching.
+1. ✅ Add the `KeyProvider` abstraction (local provider only) while keeping behavior unchanged; route all signing/encryption through it.
+2. ✅ Add `authorship` as the single ledger/peer-message proof field; migrate legacy `signature` → `authorship{scheme:"tally-canonical-schnorr-v1"}` (verify-only); add Tally-specific Nostr signing events (`tally-nostr-event-v1`) as the path for all new durable messages.
+3. ✅ Stop requiring durable signatures for sync transport messages and receipts.
+4. ✅ Add NIP-44 v2 to the local provider and the SW bundle; introduce envelope v3 (NIP-44 send-only, v2 decrypt as drain). Verify against NIP-44 official test vectors.
+5. ✅ Add NIP-07 support (detect `window.nostr`, key-option in onboarding, pending-state UX) and the general welcome-page mention of external key storage. Test against nos2x.
+6. ⬜ Add NIP-46/NIP-55 where the app environment supports them, with explicit approval/pending UX and signature batching. **Not implemented — see `../TIP-006-remote-signers.md`.**
 
 This keeps Tally's ledger clean, preserves minimal transport metadata, uses one encryption scheme and one new-entry signing scheme, and makes external Nostr key storage an additive capability rather than a rewrite of the app around public Nostr event transport.
