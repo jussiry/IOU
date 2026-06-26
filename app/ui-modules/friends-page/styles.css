@@ -37,6 +37,24 @@
   height: 26px;
 }
 
+/* Legend explaining the friend-icon colours. Reuses the .friend-icon colour
+   classes so the swatches always match the real row icons. */
+.friends-legend {
+  list-style: none;
+  margin: 28px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.friends-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
 .friends-add-button--floating {
   position: fixed;
   right: 20px;

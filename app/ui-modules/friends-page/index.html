@@ -8,6 +8,26 @@
       </svg>
     </button>
   </div>
+  <ul class="friends-legend" aria-label="What the friend icon colours mean">
+    <li class="friends-legend-item">
+      <svg class="friend-icon friend-icon--online" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <use href="#icon-person" />
+      </svg>
+      <span>Connected directly (peer-to-peer)</span>
+    </li>
+    <li class="friends-legend-item">
+      <svg class="friend-icon friend-icon--relay" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <use href="#icon-person" />
+      </svg>
+      <span>Connected via relay server</span>
+    </li>
+    <li class="friends-legend-item">
+      <svg class="friend-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <use href="#icon-person" />
+      </svg>
+      <span>Offline</span>
+    </li>
+  </ul>
 </div>
 
 <template data-template="friend-item">
