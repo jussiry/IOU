@@ -17,7 +17,18 @@ import { createOverviewNode } from './ui/overview-node.js';
 import { setupZoom } from './graph/zoom.js';
 import { CATEGORIES, FALLBACK } from './graph/categories.js';
 
-const DATA_URL = './data/graph.sample.json';
+// Prefer the analyser output; fall back to the hand-written dummy.
+const DATA_URLS = ['./data/graph.json', './data/graph.sample.json'];
+
+async function loadGraph() {
+  for (const url of DATA_URLS) {
+    try {
+      const res = await fetch(url);
+      if (res.ok) return res.json();
+    } catch { /* try next */ }
+  }
+  throw new Error('No graph data found (run `npm run analyse`).');
+}
 
 async function main() {
   const viewport = document.getElementById('viewport');
@@ -26,7 +37,7 @@ async function main() {
   const width = viewport.clientWidth;
   const height = viewport.clientHeight;
 
-  const raw = await fetch(DATA_URL).then((r) => r.json());
+  const raw = await loadGraph();
   const graph = buildGraph(raw);
 
   renderLegend(graph);
@@ -49,18 +60,24 @@ async function main() {
     node.h = el.offsetHeight;
   }
 
-  createSimulation({
-    nodes: graph.nodes,
-    edges: graph.edges,
-    width,
-    height,
-    onTick: () => {
-      updateEdges();
-      for (const { update } of nodeUpdaters) update();
-    },
-  });
+  const zoom = setupZoom({ viewport, edgesGroup, nodeLayer });
 
-  setupZoom({ viewport, edgesGroup, nodeLayer });
+  const render = () => {
+    updateEdges();
+    for (const { update } of nodeUpdaters) update();
+  };
+
+  const sim = createSimulation({ nodes: graph.nodes, edges: graph.edges, width, height });
+
+  // Compute the initial layout synchronously: tick the simulation to settle
+  // (no animation), then render once and fit. This produces a good static
+  // layout instantly and is robust to background rAF throttling. The sim is
+  // left stopped; drag/relayout will restart it at low alpha in a later step.
+  sim.stop();
+  const ticks = Math.ceil(Math.log(sim.alphaMin()) / Math.log(1 - sim.alphaDecay()));
+  for (let i = 0; i < ticks; i++) sim.tick();
+  render();
+  zoom.fit(graph.nodes);
 }
 
 function renderLegend(graph) {

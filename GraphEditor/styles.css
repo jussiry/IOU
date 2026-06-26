@@ -14,6 +14,7 @@
   --text: #e6e9ee;
   --muted: #8a93a0;
   --edge: #38414d;
+  --edge-arrow: #5a6675;
   --node-bg: #1d242d;
 }
 
@@ -63,6 +64,7 @@ html, body {
   height: 100%;
 }
 .edge { stroke: var(--edge); stroke-width: 1; }
+#edges marker path { fill: var(--edge-arrow); }
 
 #node-layer {
   position: absolute;

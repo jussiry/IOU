@@ -25,8 +25,29 @@ export function setupZoom({ viewport, edgesGroup, nodeLayer, onScale }) {
 
   select(viewport).call(behavior);
 
+  // Fit all nodes into the viewport with padding (called once the sim settles).
+  function fit(nodes, padding = 40) {
+    if (!nodes.length) return;
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const n of nodes) {
+      minX = Math.min(minX, n.x - n.w / 2);
+      minY = Math.min(minY, n.y - n.h / 2);
+      maxX = Math.max(maxX, n.x + n.w / 2);
+      maxY = Math.max(maxY, n.y + n.h / 2);
+    }
+    const gw = maxX - minX;
+    const gh = maxY - minY;
+    const vw = viewport.clientWidth;
+    const vh = viewport.clientHeight;
+    const k = Math.max(0.15, Math.min(4, 0.95 * Math.min((vw - padding) / gw, (vh - padding) / gh)));
+    const tx = (vw - k * (minX + maxX)) / 2;
+    const ty = (vh - k * (minY + maxY)) / 2;
+    select(viewport).call(behavior.transform, zoomIdentity.translate(tx, ty).scale(k));
+  }
+
   return {
     behavior,
+    fit,
     reset: () => select(viewport).call(behavior.transform, zoomIdentity),
   };
 }

@@ -377,10 +377,13 @@ The contract between analyser and UI (and the shape of the dummy file):
 - [x] Overview mode — all nodes, minimal name-only visuals, box physics
 - [x] Category styling (colours/symbols) with neutral fallback + legend
 - [x] Vendor d3 locally (offline, no CDN)
+- [x] Node analyser (scan → imports → @category/describe) → `graph.json`
+- [x] Stamp `@category` into all 74 `app/` source files (scripts/add-categories.mjs)
+- [x] Render real analyser output (74 files, 231 deps) with directed arrows
+- [x] Synchronous initial layout + fit-to-view (robust to rAF throttling)
 - [ ] Focus mode — click a node → show it + 1-hop neighbors as rich boxes
 - [ ] Overview ↔ Focus transition (circle→box morph, content cross-fade)
 - [ ] Editable node content (in place; groundwork for full HTML editor)
-- [ ] Build the Node analyser (scan → imports → @category/describe) → `graph.json`
 - [ ] Grouping (convex hulls / d3-hierarchy)
 - [ ] Filtering / search
 - [ ] (Optional) Overview perf knobs — canvas circles / circle-collision force
@@ -404,3 +407,19 @@ page. Any static server works (`npm run dev`, `npx serve`, etc.).
 `vendor/d3.js`; the import map maps the bare `d3-*` specifiers to it. Nothing is
 fetched from the network at runtime. (When extracted and bundled with Vite, the
 same `d3-*` imports resolve from `node_modules` instead.)
+
+## Analysing a codebase
+
+```bash
+node src/analyser/cli.js <root> [--out data/graph.json]   # default root: ../app
+```
+
+The analyser walks the root (skipping `dist`/`vendor`/`node_modules`), extracts
+each file's in-project imports and its leading description comment + `@category`,
+and writes `data/graph.json` (gitignored; the UI loads it, falling back to the
+committed `data/graph.sample.json`). Import resolution handles the `.js`-import →
+`.ts`-file case and `index.*` directories.
+
+`scripts/add-categories.mjs <root>` is the one-off (idempotent) migration that
+stamped an `@category` tag into every `app/` source file's leading comment,
+seeded from a directory→category map. Re-running skips already-tagged files.

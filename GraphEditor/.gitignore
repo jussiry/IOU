@@ -2,3 +2,7 @@ node_modules/
 dist/
 *.log
 .DS_Store
+
+# Generated analyser output (regenerate with `npm run analyse`).
+# The committed data/graph.sample.json is the checked-in demo dataset.
+data/graph.json

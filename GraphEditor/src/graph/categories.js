@@ -14,6 +14,7 @@ export const CATEGORIES = {
   ui:       { color: '#4F86C6', symbol: '▢', label: 'UI' },
   data:     { color: '#9B6BD6', symbol: '◆', label: 'Data' },
   network:  { color: '#16A6A6', symbol: '⇄', label: 'Network' },
+  crypto:   { color: '#C2473D', symbol: '⚿', label: 'Crypto' },
   util:     { color: '#6B7280', symbol: '⚙', label: 'Util' },
   command:  { color: '#D6557F', symbol: '▶', label: 'Command' },
   entry:    { color: '#2FA84F', symbol: '★', label: 'Entry' },
