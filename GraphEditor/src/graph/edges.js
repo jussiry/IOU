@@ -3,13 +3,14 @@
  *
  * One <line> per edge, source → target (the arrow points at the dependency:
  * "source depends on target"). After d3-force resolves each link's
- * `source`/`target` to node objects, `update()` (called every tick) recomputes
- * the endpoints, trimming each to the node's box boundary so lines start/stop
- * at the pill edge and the arrowhead sits just outside the target node rather
- * than hidden beneath it.
+ * `source`/`target` to node objects, `update()` (called every tick / on drag)
+ * recomputes the endpoints, trimming each to the node's box boundary so lines
+ * start/stop at the pill edge and the arrowhead sits just outside the target
+ * node rather than hidden beneath it.
  *
- * Richer direction styling (depends-on vs depended-on-by colouring) is a
- * Focus-mode concern; Overview keeps edges neutral with a single arrow style.
+ * Each line element is stored on its edge object (`edge._line`) so the
+ * interactions layer can restyle individual edges on hover (direction-coloured
+ * highlight). Overview's resting state keeps edges neutral with one arrow style.
  */
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -29,22 +30,22 @@ function boundaryPoint(node, from) {
 }
 
 export function renderEdges(group, edges) {
-  const lines = edges.map((e) => {
+  for (const e of edges) {
     const line = document.createElementNS(SVG_NS, 'line');
     line.setAttribute('class', 'edge');
     line.setAttribute('marker-end', 'url(#arrow)');
     group.appendChild(line);
-    return { e, line };
-  });
+    e._line = line;
+  }
 
   return function update() {
-    for (const { e, line } of lines) {
+    for (const e of edges) {
       const a = boundaryPoint(e.source, e.target); // start at source border
       const b = boundaryPoint(e.target, e.source); // end at target border
-      line.setAttribute('x1', a.x);
-      line.setAttribute('y1', a.y);
-      line.setAttribute('x2', b.x);
-      line.setAttribute('y2', b.y);
+      e._line.setAttribute('x1', a.x);
+      e._line.setAttribute('y1', a.y);
+      e._line.setAttribute('x2', b.x);
+      e._line.setAttribute('y2', b.y);
     }
   };
 }

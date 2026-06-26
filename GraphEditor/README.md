@@ -381,6 +381,14 @@ The contract between analyser and UI (and the shape of the dummy file):
 - [x] Stamp `@category` into all 74 `app/` source files (scripts/add-categories.mjs)
 - [x] Render real analyser output (74 files, 231 deps) with directed arrows
 - [x] Synchronous initial layout + fit-to-view (robust to rAF throttling)
+- [x] `index.*` nodes use their folder name (e.g. friends-page/index.js → "friends-page")
+- [x] Hover highlight — dim others (softened + animated); ring the node + 1-hop
+      neighbours; colour edges by direction (blue = depends-on, orange =
+      depended-on-by); floating description card (screen space) placed by an
+      outward search — nearest position that overlaps no highlighted node,
+      preferring the side away from the cluster, drifting farther only when it
+      must, then clamped to the viewport
+- [x] Draggable nodes (pin where dropped, reheats sim) + background pan
 - [ ] Focus mode — click a node → show it + 1-hop neighbors as rich boxes
 - [ ] Overview ↔ Focus transition (circle→box morph, content cross-fade)
 - [ ] Editable node content (in place; groundwork for full HTML editor)

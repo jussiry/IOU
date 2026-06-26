@@ -7,6 +7,11 @@
  * attribute and the node div gets the equivalent CSS transform, so lines and
  * node cards always share one coordinate space.
  *
+ * The current transform is tracked so the interactions layer can convert
+ * screen-space drag deltas into layout coordinates (divide by the scale `k`).
+ * A filter keeps pointer-downs on a node from also starting a background pan,
+ * so node-drag and background-pan don't fight.
+ *
  * Later, semantic zoom will read the current scale `k` to pick a detail tier.
  */
 
@@ -14,9 +19,13 @@ import { select } from 'd3-selection';
 import { zoom as d3zoom, zoomIdentity } from 'd3-zoom';
 
 export function setupZoom({ viewport, edgesGroup, nodeLayer, onScale }) {
+  let current = zoomIdentity;
+
   const behavior = d3zoom()
-    .scaleExtent([0.15, 4])
+    .scaleExtent([0.05, 4])
+    .filter((event) => !event.button && !(event.target.closest && event.target.closest('.node')))
     .on('zoom', (event) => {
+      current = event.transform;
       const { x, y, k } = event.transform;
       edgesGroup.setAttribute('transform', `translate(${x},${y}) scale(${k})`);
       nodeLayer.style.transform = `translate(${x}px, ${y}px) scale(${k})`;
@@ -48,6 +57,8 @@ export function setupZoom({ viewport, edgesGroup, nodeLayer, onScale }) {
   return {
     behavior,
     fit,
+    scale: () => current.k,
+    transform: () => current,
     reset: () => select(viewport).call(behavior.transform, zoomIdentity),
   };
 }

@@ -15,6 +15,7 @@ import { createSimulation } from './graph/simulation.js';
 import { renderEdges } from './graph/edges.js';
 import { createOverviewNode } from './ui/overview-node.js';
 import { setupZoom } from './graph/zoom.js';
+import { setupInteractions } from './graph/interactions.js';
 import { CATEGORIES, FALLBACK } from './graph/categories.js';
 
 // Prefer the analyser output; fall back to the hand-written dummy.
@@ -68,16 +69,19 @@ async function main() {
   };
 
   const sim = createSimulation({ nodes: graph.nodes, edges: graph.edges, width, height });
+  sim.on('tick', render); // drives live updates while dragging reheats the sim
 
   // Compute the initial layout synchronously: tick the simulation to settle
   // (no animation), then render once and fit. This produces a good static
   // layout instantly and is robust to background rAF throttling. The sim is
-  // left stopped; drag/relayout will restart it at low alpha in a later step.
+  // left stopped; dragging restarts it at low alpha (see interactions).
   sim.stop();
   const ticks = Math.ceil(Math.log(sim.alphaMin()) / Math.log(1 - sim.alphaDecay()));
   for (let i = 0; i < ticks; i++) sim.tick();
   render();
   zoom.fit(graph.nodes);
+
+  setupInteractions({ nodes: graph.nodes, edges: graph.edges, sim, zoom, viewport, render });
 }
 
 function renderLegend(graph) {
