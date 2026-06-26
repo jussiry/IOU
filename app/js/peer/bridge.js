@@ -91,6 +91,9 @@ export const getRealtimeSnapshot = async () => {
     outbox: Array.isArray(state.outbox) ? state.outbox.map((entry) => createPeerMessageModel(entry)) : [],
     ledger: Array.isArray(state.ledger) ? state.ledger.map((entry) => createLedgerEntryModel(entry)) : [],
     relays,
+    // STUN servers for WebRTC ICE gathering. normalizeAppState seeds the
+    // default when absent, so this is already a clean list.
+    stunServers: Array.isArray(state.stun_servers) ? state.stun_servers : [],
   };
 };
 

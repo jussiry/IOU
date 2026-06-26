@@ -110,6 +110,51 @@
     </li>
   </template>
 
+  <h3 class="settings-subtitle settings-subtitle--muted">STUN servers</h3>
+  <div class="settings-relays settings-stun surface-box">
+    <p class="settings-stun-hint">
+      Used to set up direct connections between devices across networks. The
+      default works for almost everyone — change it only if you run your own.
+    </p>
+    <ul class="relay-list" data-list="stun-list"></ul>
+    <div class="relay-add">
+      <button class="relay-add-open" type="button" data-action="open-add-stun" aria-label="Add STUN server">
+        <span class="relay-add-plus" data-bind="stun-add-sign" aria-hidden="true">+</span>
+        <span class="relay-add-label">Add STUN server</span>
+      </button>
+      <form class="relay-add-form" data-form="add-stun" hidden>
+        <div class="relay-add-row">
+          <input
+            class="relay-add-input"
+            type="text"
+            inputmode="url"
+            autocomplete="off"
+            autocapitalize="off"
+            spellcheck="false"
+            placeholder="stun:stun.example.com:3478"
+            data-action="stun-url-input"
+          />
+          <div class="relay-add-actions">
+            <button class="relay-add-confirm" type="submit">Add</button>
+            <button class="relay-add-cancel" type="button" data-action="cancel-add-stun">Cancel</button>
+          </div>
+        </div>
+        <div class="relay-add-error" data-bind="add-stun-error" hidden></div>
+      </form>
+    </div>
+  </div>
+
+  <template data-template="stun-item">
+    <li class="relay-item">
+      <span class="relay-url" data-bind="url"></span>
+      <button class="relay-remove" type="button" data-action="remove-stun" aria-label="Remove STUN server">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <use href="#icon-delete" />
+        </svg>
+      </button>
+    </li>
+  </template>
+
   <button class="settings-big-button surface-box" type="button" data-action="transfer-user">
     <svg class="settings-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
       <path

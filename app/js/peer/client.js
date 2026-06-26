@@ -345,6 +345,7 @@ const createRealtimeClient = () => {
     // our own (userId, deviceId), so leaving this empty is safe. We keep
     // the function so future per-device guards can be added cheaply.
     getLocalKey: () => "",
+    getStunServers: () => currentSnapshot?.stunServers || [],
     sendSignal: (peerKey, signal, ctx) => {
       // Friend mesh: peerKey is composite (userId|deviceId). Routing only
       // needs the userId+deviceId pair, which we read from ctx.
@@ -400,6 +401,7 @@ const createRealtimeClient = () => {
     // Self-check is a no-op for the self-mesh: the server never emits
     // peer_connect for our own device id, so we leave the local key empty.
     getLocalKey: () => "",
+    getStunServers: () => currentSnapshot?.stunServers || [],
     alwaysAllow: true,
     sendSignal: (peerKey, signal, ctx) => {
       // Self-mesh: peerKey is the peer's device id; peerUserId is our own

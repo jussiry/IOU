@@ -10,6 +10,7 @@ or network payloads hand over and coerce it into a known good structure. The
 */
 
 import { FRIENDSHIP_STATUS_ACCEPTED } from "../utils/friendships.js";
+import { DEFAULT_STUN_SERVERS, normalizeStunList } from "../utils/stun-url.js";
 
 export const DATA_MODEL_VERSION = 4;
 
@@ -163,6 +164,14 @@ export interface RootState {
    * own add-relay flow. See TIP-003 §10 for drawbacks and rationale.
    */
   share_my_relays: boolean;
+  /**
+   * STUN server URLs used during WebRTC ICE gathering to discover each peer's
+   * public (reflexive) address. User-editable in settings; defaults to
+   * `DEFAULT_STUN_SERVERS` when absent. Unlike relays these hold no persistent
+   * connection. See `utils/stun-url.js`. (Tally ships no TURN server — the
+   * encrypted-envelope relay covers the fallback when P2P can't form.)
+   */
+  stun_servers: string[];
   user: PersonModel;
   contacts: ContactsMap;
   ledger: LedgerEntryModel[];
@@ -400,6 +409,7 @@ export const createEmptyAppState = (userPerson: any): RootState => {
     device_id: "",
     relays: [],
     share_my_relays: true,
+    stun_servers: [...DEFAULT_STUN_SERVERS],
     user: createPersonModel(userPerson),
     contacts: {},
     ledger: [],
@@ -436,6 +446,13 @@ export const normalizeAppState = (state: any): RootState | null => {
     relays: normalizeStringList(state.relays),
     // Default-on for new state; preserved when explicitly stored as boolean.
     share_my_relays: typeof state.share_my_relays === "boolean" ? state.share_my_relays : true,
+    // Seed the Cloudflare default only when the field is entirely absent
+    // (pre-existing users); an explicit empty array is the user's choice and
+    // is preserved.
+    stun_servers:
+      state.stun_servers === undefined
+        ? [...DEFAULT_STUN_SERVERS]
+        : normalizeStunList(state.stun_servers),
     user: createPersonModel(state.user),
     contacts: normalizeContactsMap(state.contacts),
     ledger: Array.isArray(state.ledger)

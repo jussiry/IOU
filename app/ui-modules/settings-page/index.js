@@ -7,6 +7,7 @@ By centralizing settings behavior here, the app shell only needs to pass data an
 import { resetState } from "../../js/app-state.js";
 import { updateUserName } from "../../js/commands/user.js";
 import { addRelay, removeRelay, setShareMyRelays } from "../../js/commands/relays.js";
+import { addStunServer, removeStunServer } from "../../js/commands/stun.js";
 import { isAcceptedFriendshipStatus } from "../../js/utils/friendships.js";
 import { formatCurrency } from "../../js/ui/format.js";
 import { initCheckToggle } from "../components/check-toggle.js";
@@ -223,6 +224,92 @@ const bindRelaySection = (root, data) => {
   }
 };
 
+// STUN servers are a flat, user-owned list with no live status and no friend
+// suggestions — simpler than relays. Each row clones <template
+// data-template="stun-item">.
+const STUN_ERROR_MESSAGES = {
+  invalid: "Enter a valid stun: URL, e.g. stun:host:3478.",
+  duplicate: "This STUN server is already in your list.",
+  limit: "You've reached the maximum number of STUN servers.",
+};
+
+const renderStunList = (root, stunServers, { onRemove }) => {
+  const listEl = root.querySelector('[data-list="stun-list"]');
+  const template = root.querySelector('[data-template="stun-item"]');
+  if (!listEl || !template) return;
+
+  listEl.innerHTML = "";
+  (Array.isArray(stunServers) ? stunServers : []).forEach((url) => {
+    const fragment = template.content.cloneNode(true);
+    const itemEl = fragment.querySelector(".relay-item");
+    const urlEl = fragment.querySelector('[data-bind="url"]');
+    const removeEl = fragment.querySelector('[data-action="remove-stun"]');
+
+    if (itemEl) itemEl.dataset.stunUrl = url;
+    if (urlEl) urlEl.textContent = url;
+    if (removeEl) removeEl.addEventListener("click", () => onRemove(url));
+
+    listEl.appendChild(fragment);
+  });
+};
+
+const bindStunSection = (root, data) => {
+  const formEl = root.querySelector('[data-form="add-stun"]');
+  const openButtonEl = root.querySelector('[data-action="open-add-stun"]');
+  const cancelButtonEl = root.querySelector('[data-action="cancel-add-stun"]');
+  const inputEl = root.querySelector('[data-action="stun-url-input"]');
+  const errorEl = root.querySelector('[data-bind="add-stun-error"]');
+  const signEl = root.querySelector('[data-bind="stun-add-sign"]');
+
+  const showError = (reason) => {
+    if (!errorEl) return;
+    errorEl.textContent = STUN_ERROR_MESSAGES[reason] || "Couldn't add this STUN server.";
+    errorEl.hidden = false;
+  };
+  const clearError = () => {
+    if (!errorEl) return;
+    errorEl.hidden = true;
+    errorEl.textContent = "";
+  };
+
+  const openForm = () => {
+    if (!formEl) return;
+    clearError();
+    if (inputEl) inputEl.value = "";
+    formEl.hidden = false;
+    if (signEl) signEl.textContent = "−";
+    inputEl?.focus();
+  };
+  const closeForm = () => {
+    if (!formEl) return;
+    clearError();
+    formEl.hidden = true;
+    if (signEl) signEl.textContent = "+";
+  };
+
+  const submitStun = async (value) => {
+    const result = await addStunServer(value);
+    if (result?.ok) closeForm();
+    else showError(result?.reason || "invalid");
+  };
+
+  openButtonEl?.addEventListener("click", () => {
+    formEl?.hidden ? openForm() : closeForm();
+  });
+  cancelButtonEl?.addEventListener("click", closeForm);
+  inputEl?.addEventListener("input", clearError);
+  formEl?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    await submitStun(inputEl?.value || "");
+  });
+
+  renderStunList(root, data?.stunServers, {
+    onRemove: (url) => {
+      void removeStunServer(url);
+    },
+  });
+};
+
 // Bind the "Notify me on this device" toggle. Push permission and subscription
 // are device-local, so the toggle reflects the *current browser's* live state
 // (queried via getPushState) rather than anything in the synced app state.
@@ -319,6 +406,7 @@ export const bindSettings = (root, data, appVersion) => {
 
   void bindNotifySection(root);
   bindRelaySection(root, data);
+  bindStunSection(root, data);
 
   // Update banner — only shown once the service worker has a new version
   // waiting. Clicking applies it (the worker activates and the page reloads).

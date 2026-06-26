@@ -26,15 +26,17 @@ picked from peer device ids — both sides always agree on who yields
 without any extra coordination.
 */
 
-const RTC_CONFIGURATION = {
-  iceServers: [
-    { urls: "stun:junction.proxy.rlwy.net:20947" },
-    {
-      urls: "turn:junction.proxy.rlwy.net:20947?transport=tcp",
-      username: "iou",
-      credential: "not-so-secret",
-    },
-  ],
+// Build the RTCPeerConnection config from the user's configured STUN servers.
+// STUN lets each peer discover its server-reflexive (`srflx`) address, which is
+// what gets the majority of cross-NAT connections to connect directly.
+//
+// There is intentionally NO TURN server: when a direct P2P connection can't be
+// formed (e.g. symmetric NAT / CGNAT on cellular), the encrypted-envelope relay
+// server already carries messages between peers, covering the same need without
+// a separate TURN relay to host and maintain.
+const buildRtcConfiguration = (stunServers) => {
+  const urls = (Array.isArray(stunServers) ? stunServers : []).filter(Boolean);
+  return urls.length > 0 ? { iceServers: [{ urls }] } : { iceServers: [] };
 };
 
 const DATA_CHANNEL_LABEL = "iou-json";
@@ -84,6 +86,9 @@ const createPeerMesh = (
     // server already guarantees we never get a peer_connect for our own
     // device.
     getLocalKey = () => "",
+    // Returns the current STUN server URL list (from the realtime snapshot, so
+    // settings edits take effect on the next connection without a reload).
+    getStunServers = () => [],
     sendSignal = () => {},
     onPeerMessage = null,
     onPeerReady = null,
@@ -241,7 +246,11 @@ const createPeerMesh = (
       }
     }
 
-    const connection = new RTCPeerConnection(RTC_CONFIGURATION);
+    const connection = new RTCPeerConnection(
+      buildRtcConfiguration(
+        typeof getStunServers === "function" ? getStunServers() : []
+      )
+    );
     // Perfect negotiation: the non-initiator yields during offer collisions
     // (e.g. on ICE restart). The server deterministically picks exactly one
     // initiator per connection, so both sides always disagree on isPolite.

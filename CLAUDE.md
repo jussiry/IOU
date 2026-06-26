@@ -121,7 +121,6 @@ port 3001 — independent of the dev server and preview browser.
 ```bash
 npm run test:e2e:friend-request-online
 npm run test:e2e:reload-reconnect
-node tests/two-client-e2e/run.cjs --scenario turn-relay
 node tests/two-client-e2e/run.cjs --scenario server-queue-delivery
 ```
 

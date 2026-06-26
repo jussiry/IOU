@@ -26,11 +26,6 @@ const BUILT_IN_SCENARIOS = {
     "scenarios",
     "server-queue-delivery.cjs"
   ),
-  "turn-relay": path.join(
-    __dirname,
-    "scenarios",
-    "turn-relay.cjs"
-  ),
   "trio-recovery": path.join(
     __dirname,
     "scenarios",

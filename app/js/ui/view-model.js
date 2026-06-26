@@ -74,5 +74,8 @@ export const buildView = (state) => {
     ledger: Array.isArray(state.ledger) ? state.ledger : [],
     relays,
     shareMyRelays: state.share_my_relays !== false,
+    // STUN servers hold no persistent connection, so (unlike relays) there is
+    // no live status to surface — just the configured URL list.
+    stunServers: Array.isArray(state.stun_servers) ? state.stun_servers : [],
   };
 };
