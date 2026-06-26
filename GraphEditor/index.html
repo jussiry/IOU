@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>GraphEditor — Code Dependency Graph</title>
+  <link rel="stylesheet" href="./styles.css" />
+
+  <!--
+    Import map resolves the bare `d3-*` specifiers to a single self-contained,
+    vendored d3 bundle (vendor/d3.js) — no CDN, works offline. The full d3
+    bundle re-exports every submodule's names, so each `import { x } from
+    'd3-force'` etc. picks the names it needs from the one module instance.
+    A bundler (Vite) would instead resolve these from node_modules; source is
+    unchanged either way.
+
+    NOTE: must be served over HTTP (ES modules + fetch don't work on file://).
+    Run `npm run dev` then open http://localhost:8088/
+  -->
+  <script type="importmap">
+  {
+    "imports": {
+      "d3-selection": "./vendor/d3.js",
+      "d3-force": "./vendor/d3.js",
+      "d3-zoom": "./vendor/d3.js",
+      "d3-drag": "./vendor/d3.js"
+    }
+  }
+  </script>
+</head>
+<body>
+  <header id="topbar">
+    <div class="brand">GraphEditor</div>
+    <div id="stats" class="stats"></div>
+    <div id="legend" class="legend"></div>
+  </header>
+
+  <main id="viewport">
+    <svg id="edges" xmlns="http://www.w3.org/2000/svg">
+      <g id="edges-group"></g>
+    </svg>
+    <div id="node-layer"></div>
+  </main>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>

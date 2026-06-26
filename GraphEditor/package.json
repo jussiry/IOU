@@ -1,0 +1,22 @@
+{
+  "name": "graph-editor",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Interactive code dependency graph visualiser — renders each source file as a node and its imports/dependents as edges, auto-arranged with a force-directed layout.",
+  "type": "module",
+  "scripts": {
+    "dev": "python3 -m http.server 8088 --directory .",
+    "build": "vite build",
+    "preview": "vite preview",
+    "analyse": "node src/analyser/cli.js"
+  },
+  "dependencies": {
+    "d3-selection": "^3.0.0",
+    "d3-force": "^3.0.0",
+    "d3-zoom": "^3.0.0",
+    "d3-drag": "^3.0.0"
+  },
+  "devDependencies": {
+    "vite": "^5.4.0"
+  }
+}

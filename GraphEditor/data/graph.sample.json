@@ -1,0 +1,99 @@
+{
+  "root": "app",
+  "_note": "Hand-written dummy graph for building the UI before the analyser exists. Loosely modelled on IOU's own files. Categories are taken verbatim from each file's @category tag; 'utils/stun-url.js' intentionally has none, to exercise the neutral fallback.",
+  "nodes": [
+    {
+      "id": "app/js/main.js",
+      "name": "main.js",
+      "path": "app/js/main.js",
+      "category": "entry",
+      "description": "Application entry point. Boots the data model, wires the peer mesh to the view model, and mounts the UI.",
+      "loc": 90
+    },
+    {
+      "id": "app/js/models/data-model.js",
+      "name": "data-model.js",
+      "path": "app/js/models/data-model.js",
+      "category": "data",
+      "description": "Core application state. Defines the connection model and normalises friend/payment records into a single observable store.",
+      "loc": 320
+    },
+    {
+      "id": "app/js/ui/view-model.js",
+      "name": "view-model.js",
+      "path": "app/js/ui/view-model.js",
+      "category": "ui",
+      "description": "Derives renderable view state from the data model and exposes it to the UI modules. The seam between data and presentation.",
+      "loc": 260
+    },
+    {
+      "id": "app/js/peer/mesh.js",
+      "name": "mesh.js",
+      "path": "app/js/peer/mesh.js",
+      "category": "network",
+      "description": "Maintains the WebRTC peer mesh: tracks connected peers, handles reconnection, and routes signalling messages between clients.",
+      "loc": 240
+    },
+    {
+      "id": "app/js/peer/client.js",
+      "name": "client.js",
+      "path": "app/js/peer/client.js",
+      "category": "network",
+      "description": "A single peer connection. Wraps the RTCPeerConnection lifecycle and exposes send/receive over a data channel.",
+      "loc": 180
+    },
+    {
+      "id": "app/js/peer/bridge.js",
+      "name": "bridge.js",
+      "path": "app/js/peer/bridge.js",
+      "category": "network",
+      "description": "Bridges peer messages into model mutations and back, translating wire payloads to and from the data model.",
+      "loc": 140
+    },
+    {
+      "id": "app/js/commands/stun.js",
+      "name": "stun.js",
+      "path": "app/js/commands/stun.js",
+      "category": "command",
+      "description": "Command to configure STUN/TURN servers used for ICE negotiation.",
+      "loc": 60
+    },
+    {
+      "id": "app/js/utils/stun-url.js",
+      "name": "stun-url.js",
+      "path": "app/js/utils/stun-url.js",
+      "description": "Parses and validates STUN/TURN URLs into a normalised form. (No @category tag — exercises the neutral fallback.)",
+      "loc": 45
+    },
+    {
+      "id": "app/ui-modules/settings-page/index.js",
+      "name": "settings-page",
+      "path": "app/ui-modules/settings-page/index.js",
+      "category": "ui",
+      "description": "Settings page UI module. Lets the user manage identity, STUN configuration, and connection preferences.",
+      "loc": 210
+    },
+    {
+      "id": "tests/two-client-e2e/run.cjs",
+      "name": "run.cjs",
+      "path": "tests/two-client-e2e/run.cjs",
+      "category": "test",
+      "description": "Two-client E2E harness. Boots two browser instances against a dedicated test server and runs scenario modules.",
+      "loc": 130
+    }
+  ],
+  "edges": [
+    { "source": "app/js/main.js", "target": "app/js/models/data-model.js" },
+    { "source": "app/js/main.js", "target": "app/js/ui/view-model.js" },
+    { "source": "app/js/main.js", "target": "app/js/peer/mesh.js" },
+    { "source": "app/js/ui/view-model.js", "target": "app/js/models/data-model.js" },
+    { "source": "app/js/peer/mesh.js", "target": "app/js/peer/client.js" },
+    { "source": "app/js/peer/mesh.js", "target": "app/js/peer/bridge.js" },
+    { "source": "app/js/peer/bridge.js", "target": "app/js/models/data-model.js" },
+    { "source": "app/js/commands/stun.js", "target": "app/js/utils/stun-url.js" },
+    { "source": "app/js/commands/stun.js", "target": "app/js/peer/mesh.js" },
+    { "source": "app/ui-modules/settings-page/index.js", "target": "app/js/ui/view-model.js" },
+    { "source": "app/ui-modules/settings-page/index.js", "target": "app/js/commands/stun.js" },
+    { "source": "tests/two-client-e2e/run.cjs", "target": "app/js/main.js" }
+  ]
+}
