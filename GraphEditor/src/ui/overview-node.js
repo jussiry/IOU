@@ -18,9 +18,12 @@ export function createOverviewNode(node, { onClick } = {}) {
   const el = document.createElement('div');
   el.className = 'node';
   el.style.setProperty('--cat-color', color);
-  el.title = node.path;
-  // Width/height come from the rendered box (measured in main.js after append),
-  // so the pill sizes to its content and the collision force matches exactly.
+  // Bigger files → bigger pills. Scaling the font scales the whole pill (its
+  // padding/radius are em-based in CSS); width/height are then measured in
+  // main.js after append so the collision force matches exactly. The tier
+  // drives the topbar size filter.
+  el.style.fontSize = `${(12 * (node.sizeScale || 1)).toFixed(2)}px`;
+  el.dataset.tier = node.sizeTier || 'small';
 
   const sym = document.createElement('span');
   sym.className = 'node-symbol';

@@ -20,11 +20,13 @@ import { zoom as d3zoom, zoomIdentity } from 'd3-zoom';
 
 export function setupZoom({ viewport, edgesGroup, nodeLayer, onScale }) {
   let current = zoomIdentity;
+  let userMoved = false; // set once the user pans/zooms (not by programmatic fit)
 
   const behavior = d3zoom()
     .scaleExtent([0.05, 4])
     .filter((event) => !event.button && !(event.target.closest && event.target.closest('.node')))
     .on('zoom', (event) => {
+      if (event.sourceEvent) userMoved = true; // a real gesture, not fit()
       current = event.transform;
       const { x, y, k } = event.transform;
       edgesGroup.setAttribute('transform', `translate(${x},${y}) scale(${k})`);
@@ -59,6 +61,7 @@ export function setupZoom({ viewport, edgesGroup, nodeLayer, onScale }) {
     fit,
     scale: () => current.k,
     transform: () => current,
+    userMoved: () => userMoved,
     reset: () => select(viewport).call(behavior.transform, zoomIdentity),
   };
 }

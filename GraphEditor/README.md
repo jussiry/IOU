@@ -75,9 +75,16 @@ comment*: the comment is the contract between human and AI.
   start of every JS file). This becomes the node's body text.
 - **Outgoing edges** — files this node depends on (its imports).
 - **Incoming edges** — files that depend on this node (its dependents).
-- **Visual cues** — colour, icon/symbol, size, or badges encode file kind
-  (UI module, model, util, test, entry point, etc.), so the type of a file is
-  readable without reading the text.
+- **Visual cues** — colour and icon/symbol encode file kind (UI module, model,
+  util, test, entry point, etc.); **node size encodes file size** (character
+  count, sqrt-scaled), so big modules stand out at a glance. Bigger nodes also
+  carry stronger charge repulsion, pushing neighbours further away. The hover
+  card shows badges for exported function count, exported constant count, and
+  file size (K for ≥1000 chars).
+- **Size filter** — a top-bar segmented control (All / Medium & large / Large
+  only) hides smaller files (and any edges touching them) so the structurally
+  important modules can be read in isolation. Tiers come from char count
+  (`small <3000 ≤ medium <8000 ≤ large`); positions are kept (no relayout).
 
 ## Core requirements
 
@@ -402,14 +409,19 @@ The contract between analyser and UI (and the shape of the dummy file):
 The app is plain static files — no build step, no `npm install` needed.
 
 ```bash
-npm run dev          # python3 -m http.server 8088 (serves this folder)
+npm run dev          # node scripts/serve.mjs 8088 (serves this folder)
 # then open:
 open http://localhost:8088/
 ```
 
+`scripts/serve.mjs` is a tiny static server that sends `Cache-Control:
+no-store`, so edited ES modules always reload (browsers otherwise cache modules
+and keep running stale code after edits).
+
 **Must be served over HTTP — do not open `index.html` as a `file://`.** ES
 modules and `fetch()` are blocked on the `file://` origin, which shows a blank
-page. Any static server works (`npm run dev`, `npx serve`, etc.).
+page. Any static server works (`npm run dev`, `npx serve`, etc.), though
+non-`no-store` servers may serve stale modules during iterative editing.
 
 **Offline / no CDN.** `d3` is vendored as a single self-contained bundle at
 `vendor/d3.js`; the import map maps the bare `d3-*` specifiers to it. Nothing is

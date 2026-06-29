@@ -5,7 +5,7 @@
   "description": "Interactive code dependency graph visualiser — renders each source file as a node and its imports/dependents as edges, auto-arranged with a force-directed layout.",
   "type": "module",
   "scripts": {
-    "dev": "python3 -m http.server 8088 --directory .",
+    "dev": "node scripts/serve.mjs 8088",
     "build": "vite build",
     "preview": "vite preview",
     "analyse": "node src/analyser/cli.js"

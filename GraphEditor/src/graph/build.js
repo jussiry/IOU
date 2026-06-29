@@ -8,14 +8,39 @@
  *  - clone edges into d3 links keyed by node id;
  *  - precompute each node's in/out degree (for sizing and, later, Focus mode).
  *
- * Node size in Overview is driven by name length (a small pill) nudged up by
- * how connected the file is, so hubs read as larger.
+ * Node size in Overview is driven by file size (character count): bigger files
+ * render as bigger pills. We attach a `sizeScale` (font multiplier) and a
+ * coarse `sizeTier` (small/medium/large) used for the topbar size filter. The
+ * pill's real pixel w/h is measured from the DOM in main.js once styled.
  */
 
 const CHAR_W = 7.5;      // approx px per char at the overview font size
 const PAD_X = 48;        // fixed overhead: symbol + gaps + left/right padding
-const BASE_H = 26;       // pill height
-const HUB_BOOST = 1.6;   // extra px of width per connection
+const BASE_H = 26;       // pill height (initial estimate; remeasured in main.js)
+
+// File size → visual scale. Square-root mapping so the pill *area* tracks file
+// size without huge files dwarfing everything; clamped to a legible range.
+const SIZE_MIN = 500;    // ~smallest file
+const SIZE_MAX = 35000;  // ~largest file
+const SCALE_MIN = 0.85;
+const SCALE_MAX = 2.0;
+const ROOT_MIN = Math.sqrt(SIZE_MIN);
+const ROOT_SPAN = Math.sqrt(SIZE_MAX) - ROOT_MIN;
+
+// Tier thresholds (chars) for the size filter.
+const MEDIUM_MIN = 3000;
+const LARGE_MIN = 8000;
+
+function sizeScale(chars) {
+  const r = (Math.sqrt(Math.max(chars || SIZE_MIN, SIZE_MIN)) - ROOT_MIN) / ROOT_SPAN;
+  return SCALE_MIN + Math.max(0, Math.min(1, r)) * (SCALE_MAX - SCALE_MIN);
+}
+
+function sizeTier(chars) {
+  if ((chars || 0) >= LARGE_MIN) return 'large';
+  if ((chars || 0) >= MEDIUM_MIN) return 'medium';
+  return 'small';
+}
 
 export function buildGraph(raw) {
   const nodes = raw.nodes.map((n) => ({ ...n }));
@@ -29,9 +54,10 @@ export function buildGraph(raw) {
   }
 
   for (const n of nodes) {
-    const degree = n.inDegree + n.outDegree;
-    n.w = Math.round(n.name.length * CHAR_W + PAD_X + degree * HUB_BOOST);
-    n.h = BASE_H;
+    n.sizeScale = sizeScale(n.chars);
+    n.sizeTier = sizeTier(n.chars);
+    n.w = Math.round((n.name.length * CHAR_W + PAD_X) * n.sizeScale);
+    n.h = Math.round(BASE_H * n.sizeScale);
   }
 
   return { root: raw.root, nodes, edges, byId };

@@ -47,6 +47,29 @@ html, body {
 .brand { font-weight: 600; letter-spacing: 0.2px; }
 .stats { color: var(--muted); font-size: 12px; }
 
+/* Size filter — segmented control in the top bar. */
+.size-filter {
+  display: inline-flex;
+  border: 1px solid #2c3540;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.size-filter button {
+  appearance: none;
+  border: 0;
+  border-left: 1px solid #2c3540;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.size-filter button:first-child { border-left: 0; }
+.size-filter button:hover { color: var(--text); background: rgba(255,255,255,0.04); }
+.size-filter button.active { color: var(--text); background: rgba(255,255,255,0.1); }
+
 .legend { display: flex; gap: 14px; margin-left: auto; flex-wrap: wrap; }
 .legend-item { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--muted); }
 .legend-swatch { font-size: 13px; }
@@ -98,23 +121,26 @@ html, body {
   left: 0;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 0 10px;
-  border-radius: 14px;
+  gap: 0.5em;
+  padding: 0.28em 0.85em;
+  border-radius: 1.2em;
   background: var(--node-bg);
   border: 1px solid var(--cat-color);
-  border-left: 3px solid var(--cat-color);
+  border-left: 0.25em solid var(--cat-color);
   color: var(--text);
   white-space: nowrap;
-  font-size: 12px;
+  font-size: 12px; /* overridden inline per node, scaled by file size */
   pointer-events: auto;
   cursor: grab;
   user-select: none;
   transition: box-shadow 0.15s ease, opacity 0.18s ease;
 }
 .node.dragging { cursor: grabbing; }
-.node-symbol { color: var(--cat-color); font-size: 13px; }
+.node-symbol { color: var(--cat-color); font-size: 1.1em; }
 .node-name { overflow: hidden; text-overflow: ellipsis; }
+
+/* Size filter: hide pills below the chosen tier (and any edges touching them). */
+.node-hidden, .edge-hidden { display: none; }
 
 /* --- Hover description card (screen space, not zoom-scaled) ------------- */
 #hover-card {

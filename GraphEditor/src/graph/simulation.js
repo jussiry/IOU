@@ -3,7 +3,8 @@
  *
  * Forces:
  *  - link    : edges act as springs, pulling connected files together;
- *  - charge  : nodes repel so the graph spreads out;
+ *  - charge  : nodes repel so the graph spreads out — repulsion scales with a
+ *              node's size so bigger files push their neighbours further away;
  *  - center  : keeps the whole graph centred in the viewport;
  *  - collide : custom rectangular (box) collision so nodes don't overlap.
  *
@@ -19,7 +20,7 @@ import { boxCollision } from './box-collision.js';
 export function createSimulation({ nodes, edges, width, height }) {
   return forceSimulation(nodes)
     .force('link', forceLink(edges).id((d) => d.id).distance(70).strength(0.15))
-    .force('charge', forceManyBody().strength(-650).distanceMax(900))
+    .force('charge', forceManyBody().strength((d) => -550 * (d.sizeScale || 1)).distanceMax(900))
     .force('center', forceCenter(width / 2, height / 2))
     .force('collide', boxCollision(12, { strength: 1, iterations: 3 }));
 }
