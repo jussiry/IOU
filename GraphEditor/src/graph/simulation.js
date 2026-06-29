@@ -17,10 +17,17 @@
 import { forceSimulation, forceLink, forceManyBody, forceCenter } from 'd3-force';
 import { boxCollision } from './box-collision.js';
 
+// ── Tuning knob ──────────────────────────────────────────────────────────────
+// How strongly nodes repel each other. More negative = more spread (less
+// clumping); less negative = tighter. Scaled per node by its sizeScale, so big
+// files push harder. This is the main value to play with for overall spacing.
+const CHARGE_STRENGTH = -750;
+// ─────────────────────────────────────────────────────────────────────────────
+
 export function createSimulation({ nodes, edges, width, height }) {
   return forceSimulation(nodes)
     .force('link', forceLink(edges).id((d) => d.id).distance(70).strength(0.15))
-    .force('charge', forceManyBody().strength((d) => -550 * (d.sizeScale || 1)).distanceMax(900))
+    .force('charge', forceManyBody().strength((d) => CHARGE_STRENGTH * (d.sizeScale || 1)).distanceMax(1200))
     .force('center', forceCenter(width / 2, height / 2))
     .force('collide', boxCollision(12, { strength: 1, iterations: 3 }));
 }

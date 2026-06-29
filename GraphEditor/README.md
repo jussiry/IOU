@@ -85,6 +85,11 @@ comment*: the comment is the contract between human and AI.
   only) hides smaller files (and any edges touching them) so the structurally
   important modules can be read in isolation. Tiers come from char count
   (`small <3000 ≤ medium <8000 ≤ large`); positions are kept (no relayout).
+- **Category toggles** — the legend swatches double as on/off buttons: click a
+  category to hide all its nodes (the label dims); click again to restore. Size
+  filter and category toggles share one visibility pass (`graph/filters.js`).
+- **Spacing knob** — overall node spread is tuned by `CHARGE_STRENGTH` in
+  `graph/simulation.js` (more negative = more spread / less clumping).
 
 ## Core requirements
 

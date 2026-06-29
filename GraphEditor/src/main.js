@@ -16,7 +16,7 @@ import { renderEdges } from './graph/edges.js';
 import { createOverviewNode } from './ui/overview-node.js';
 import { setupZoom } from './graph/zoom.js';
 import { setupInteractions } from './graph/interactions.js';
-import { setupSizeFilter } from './graph/size-filter.js';
+import { setupFilters, UNCATEGORISED } from './graph/filters.js';
 import { CATEGORIES, FALLBACK } from './graph/categories.js';
 
 // Prefer the analyser output; fall back to the hand-written dummy.
@@ -102,10 +102,11 @@ async function main() {
 
   setupInteractions({ nodes: graph.nodes, edges: graph.edges, sim, zoom, viewport, render });
 
-  setupSizeFilter({
+  setupFilters({
     nodes: graph.nodes,
     edges: graph.edges,
-    container: document.getElementById('size-filter'),
+    sizeContainer: document.getElementById('size-filter'),
+    legendContainer: document.getElementById('legend'),
     onChange: setStats,
   });
 }
@@ -114,12 +115,24 @@ function renderLegend(graph) {
   const used = new Set(graph.nodes.map((n) => n.category).filter(Boolean));
   const legend = document.getElementById('legend');
   const entries = Object.entries(CATEGORIES).filter(([key]) => used.has(key));
-  if (used.size < graph.nodes.length) entries.push(['(uncategorised)', FALLBACK]);
+  if (used.size < graph.nodes.length) entries.push([UNCATEGORISED, FALLBACK]);
 
   legend.innerHTML = '';
+  // Toggle-all button comes first in the legend row.
+  const toggleAll = document.createElement('span');
+  toggleAll.id = 'legend-toggle-all';
+  toggleAll.className = 'legend-toggle-all';
+  toggleAll.textContent = '◎';
+  toggleAll.title = 'Hide all categories';
+  toggleAll.setAttribute('role', 'button');
+  legend.appendChild(toggleAll);
+
   for (const [key, { color, symbol, label }] of entries) {
     const item = document.createElement('span');
     item.className = 'legend-item';
+    item.dataset.category = key; // makes it a toggle (see filters.js)
+    item.setAttribute('role', 'button');
+    item.title = `Toggle ${label || key}`;
     item.innerHTML =
       `<span class="legend-swatch" style="color:${color}">${symbol}</span>` +
       `${label || key}`;
