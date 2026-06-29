@@ -2,6 +2,7 @@
 This module binds a reusable check-toggle control. It centralizes pressed-state handling so pages can react to on/off changes without duplicating toggle DOM logic.
 
 The component expects a button element that already contains the visual track and thumb markup. It updates `aria-pressed`, syncs the active class, and reports changes through a callback.
+@category ui
 */
 
 const setToggleState = (button, isChecked) => {

@@ -12,6 +12,7 @@ notifies app-state to re-emit the current view so the settings page rebuilds.
 The registry is the only mutable runtime store consulted by view construction
 — if more transport state needs to surface to the UI in the future, follow
 the same pattern (or fold all of them into a single transport-state module).
+@category network
 */
 
 import { normalizeRelayUrl } from "../utils/relay-url.js";

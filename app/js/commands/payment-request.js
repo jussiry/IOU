@@ -9,6 +9,7 @@ tallies stay consistent.
 
 State mutations go through routeOutboundEntry so the same logic runs
 whether the action happened on this device or synced from another device.
+@category command
 */
 
 import {

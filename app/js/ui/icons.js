@@ -2,6 +2,7 @@
 This module lazily injects the SVG icon sprite into the document once and reuses the same promise for concurrent callers.
 
 Keeping this logic centralized avoids duplicated network fetches and guarantees all icon-based components can resolve <use> references reliably.
+@category ui
 */
 
 const ICON_SPRITE_PATH = "ui-modules/components/icons.html";

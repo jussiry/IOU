@@ -10,6 +10,7 @@ for verified inbound peer messages (`applyInboundPeerMessage`).
 Keeping this surface in its own file makes the transport dependency on app
 state explicit — command modules don't reach for these functions, and
 transport code doesn't reach into command modules.
+@category network
 */
 
 import {

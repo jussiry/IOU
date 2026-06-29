@@ -13,6 +13,7 @@ waiting worker to appear, and exposes that as a single piece of global UI state:
 Keeping this separate from the data model lets the nav badge, the settings page
 banner, and the new-version toast all read one source of truth without threading
 update state through the per-page data payload.
+@category ui
 */
 
 let updateAvailable = false;

@@ -2,6 +2,7 @@
 This module centralizes friendship-state constants and small predicates that the IOU client reuses across data, UI, and realtime networking code.
 
 Keeping the status vocabulary in one place avoids stringly-typed conditionals spread across pages, and makes it easier to evolve pending or accepted friendship flows consistently.
+@category util
 */
 
 export const FRIENDSHIP_STATUS_ACCEPTED = "accepted";

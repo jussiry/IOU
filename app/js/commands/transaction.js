@@ -5,6 +5,7 @@ transaction to the peer so both sides agree on the tally.
 
 State is mutated via routeOutboundEntry so the same logic runs whether the
 transaction was created on this device or received via self-mesh sync.
+@category command
 */
 
 import {

@@ -2,6 +2,7 @@
 This module binds settings interactions for the app. It renders user/version metadata and wires actions for renaming the user and removing local app data.
 
 By centralizing settings behavior here, the app shell only needs to pass data and version context without owning button logic.
+@category ui
 */
 
 import { resetState } from "../../js/app-state.js";

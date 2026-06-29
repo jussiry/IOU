@@ -10,6 +10,7 @@ across many messages without IV reuse.
 In a two-party model, successful AES-GCM decryption with a key derived from
 ECDH(myPrivKey, theirPubKey) is sufficient to authenticate the sender — the
 only other entity that could have produced the ciphertext is the recipient.
+@category crypto
 */
 
 import { deriveSharedSecretXHex, normalizePublicKeyHex } from "../utils/nostr-keys.js";

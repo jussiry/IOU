@@ -2,6 +2,7 @@
 This module is the entry point for the client app. It parses hash routes, loads HTML templates, binds page-specific UI logic, and swaps pages with the transition controller.
 
 It also coordinates shared startup concerns such as icon sprite injection, version-gated local data resets, navigation state, and the realtime transport bootstrap so all page modules stay focused on rendering.
+@category entry
 */
 
 import {

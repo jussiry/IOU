@@ -2,6 +2,7 @@
 This module provides a minimal IndexedDB wrapper for the IOU app state. It centralizes database opening, object store setup, and basic get/put/delete operations under one stable API.
 
 By isolating IndexedDB transaction boilerplate here, data modules can focus on business logic and state shape instead of browser storage wiring details.
+@category data
 */
 
 import type { RootState } from "../models/data-model.js";

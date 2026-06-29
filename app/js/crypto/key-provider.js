@@ -25,6 +25,7 @@ All methods are async-friendly (return values may be promises) so remote
 providers that round-trip to an extension or signer fit the same shape. Layer 1
 keeps behaviour identical to the pre-abstraction code — this is a pure
 plumbing change.
+@category crypto
 */
 
 import {

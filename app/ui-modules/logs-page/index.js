@@ -5,6 +5,7 @@ Each ledger entry is a peer message that either the user sent or received;
 the formatter below turns it into a presentation string based on its type.
 Formatting lives here (not in the data layer) so the ledger stays transport-
 focused while this module owns display concerns.
+@category ui
 */
 
 import { formatMarkdownish } from "../../js/utils/markdownish.js";

@@ -13,6 +13,7 @@ Each apply*Entry function takes (state, entry) and returns null if the
 entry was inapplicable, or a notification object { text, hash, friendId }
 on success. The notification text is reused for both the toast and the
 log entry, keeping the two in sync without duplication.
+@category network
 */
 
 import {

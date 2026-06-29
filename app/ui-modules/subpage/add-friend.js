@@ -2,6 +2,7 @@
 This module binds the add-friend subpage. It manages the public-key form, the self-key copy field, the trust-limit toggle, and the dynamic visibility of the optional trust-limit input.
 
 It keeps the add-friend form state local to the page, validates the entered public key, and handles lightweight clipboard/select interactions so routing code can handle persistence and navigation without duplicating DOM queries.
+@category ui
 */
 
 import { initCheckToggle } from "../components/check-toggle.js";

@@ -11,6 +11,7 @@ needed.
 
 The module is intentionally byte/hex-focused and carries no state; callers pass
 key material explicitly so the crypto primitives stay easy to audit.
+@category crypto
 */
 
 import { secp256k1, schnorr } from "../vendor/noble-secp256k1.js";

@@ -9,6 +9,7 @@ stringifying. Arrays preserve order; scalars pass through untouched.
 Only the fields that define the message's semantic identity are included in
 the digest — the `signature` field itself is deliberately excluded so the
 signature can live alongside the signed content without self-referencing.
+@category crypto
 */
 
 const canonicalize = (value) => {

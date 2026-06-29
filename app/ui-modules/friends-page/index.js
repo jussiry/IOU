@@ -2,6 +2,7 @@
 This module renders the friends list page. It sorts friendship rows, formats tally and trust summaries, and binds navigation to each friend's detail view.
 
 It also owns the add-friend button behavior and keeps accepted, pending, and rejected friendships visually distinct so the list remains useful after realtime friend requests are introduced.
+@category ui
 */
 
 import { formatCurrency, formatSigned } from "../../js/ui/format.js";

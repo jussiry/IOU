@@ -2,6 +2,7 @@
 This module binds the trust-agreement subpage. It initializes form defaults from the selected friend connection and updates copy for create vs change flows.
 
 It returns key form elements to the caller so submit behavior can be handled by higher-level routing logic.
+@category ui
 */
 
 export const bindTrust = (root, data, friendId) => {

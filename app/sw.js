@@ -15,6 +15,7 @@ page keeps running the old version until the user accepts the update (the app
 posts a SKIP_WAITING message), so a refresh never happens mid-interaction. This
 is the worker's own content-hash versioning, separate from data/version.json
 (which gates data-model migrations).
+@category entry
 */
 
 importScripts("dist/precache-manifest.js");

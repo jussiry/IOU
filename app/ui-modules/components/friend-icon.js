@@ -6,6 +6,7 @@ a relay/server presence, and muted grey when offline.
 Two helpers are exported so the same display logic can be reused in both the
 friends-list rows and the friend detail page header without duplicating state
 derivation or class manipulation.
+@category ui
 */
 
 /**

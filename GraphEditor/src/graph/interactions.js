@@ -27,7 +27,17 @@ export function setupInteractions({ nodes, edges, sim, zoom, viewport, render })
   // Floating, screen-space description card (readable regardless of zoom).
   const card = document.createElement('div');
   card.id = 'hover-card';
-  card.innerHTML = '<div class="hc-title"></div><div class="hc-meta"></div><div class="hc-desc"></div>';
+  card.innerHTML = `
+    <div class="hc-header">
+      <div class="hc-title"></div>
+      <div class="hc-badges">
+        <span class="hc-badge" title="exported functions">ƒ <b class="hc-fns">0</b></span>
+        <span class="hc-badge" title="exported constants"># <b class="hc-consts">0</b></span>
+        <span class="hc-badge hc-size" title="file size"><b class="hc-chars"></b></span>
+      </div>
+    </div>
+    <div class="hc-meta"></div>
+    <div class="hc-desc"></div>`;
   viewport.appendChild(card);
 
   function highlight(node) {
@@ -63,11 +73,19 @@ export function setupInteractions({ nodes, edges, sim, zoom, viewport, render })
   // the neighbour cluster), and take the first spot with no overlap — falling
   // back to the least-overlapping one. Searching outward means the card sits
   // close when there's room and drifts farther away only when it must.
+  function formatChars(n) {
+    if (!n) return '?';
+    return n >= 1000 ? `${(n / 1000).toFixed(1)}K` : String(n);
+  }
+
   function showCard(node) {
     card.querySelector('.hc-title').textContent = node.name;
     card.querySelector('.hc-meta').textContent =
       [node.path, node.category].filter(Boolean).join('  ·  ');
     card.querySelector('.hc-desc').textContent = node.description || '(no description)';
+    card.querySelector('.hc-fns').textContent = node.exports?.fns ?? '?';
+    card.querySelector('.hc-consts').textContent = node.exports?.consts ?? '?';
+    card.querySelector('.hc-chars').textContent = formatChars(node.chars);
     card.style.transform = 'none';
     card.classList.add('show'); // make it laid out so we can measure it
 

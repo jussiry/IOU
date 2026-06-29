@@ -8,6 +8,7 @@ but is fully user-editable so the app stays self-hostable / decentralised.
 
 Like the relay commands, these mutate only local state and emit no peer
 messages — STUN choice is private and is never announced to friends.
+@category command
 */
 
 import { loadData, loadState, persistAndBuildView } from "../app-state.js";

@@ -53,7 +53,8 @@
       "Bash(GIT_TRACE=1 git commit --dry-run -m \"test\")",
       "Bash(gunzip)",
       "Bash(cp /tmp/tally-design/tally-earth/project/index.html /Users/jussi/code/IOU/web/index.html)",
-      "Bash(cp /tmp/tally-design/tally-earth/project/tweaks-panel.jsx /Users/jussi/code/IOU/web/tweaks-panel.jsx)"
+      "Bash(cp /tmp/tally-design/tally-earth/project/tweaks-panel.jsx /Users/jussi/code/IOU/web/tweaks-panel.jsx)",
+      "Bash(grep -A40 '\"recovered\"' /tmp/f2.json | grep ledgerCount; echo \"===server-queue===\"; node tests/two-client-e2e/run.cjs --scenario server-queue-delivery > /tmp/f3.json 2>&1; echo \"server-queue EXIT: $?\"; grep -iE \"rejected|invalid|error|fail|delivered|received|notification|hint\" /tmp/f3.json | head -20)"
     ]
   }
 }

@@ -2,6 +2,7 @@
 This module binds the friend detail subpage. It renders tally/trust summary cards, injects friend-specific labels, and lists recent transactions.
 
 It also exposes navigation triggers to related subpages by wiring the trust tile click target from the current friend context.
+@category ui
 */
 
 import {

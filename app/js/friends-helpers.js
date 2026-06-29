@@ -4,6 +4,7 @@ Manages the bidirectional friendship and contact graph.
 Provides helpers to find, create, and update friend relationships on both the
 user and their contacts. Also handles friend request cancellation and
 relationship cleanup.
+@category util
 */
 
 import {

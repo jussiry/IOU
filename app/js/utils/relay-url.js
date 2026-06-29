@@ -8,6 +8,7 @@ in state because it changes automatically with the deployment domain.
 Secondary relays are user-added and stored as plain string URLs in
 `state.relays`. They are validated to be `ws://` or `wss://` and normalised
 (trimmed, no trailing slash) so equality checks work reliably.
+@category util
 */
 
 const RELAY_PATH = "/ws";

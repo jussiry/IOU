@@ -24,6 +24,7 @@ offer collisions (e.g. during an ICE restart). Because the signaling
 server assigns exactly one initiator per connection — deterministically
 picked from peer device ids — both sides always agree on who yields
 without any extra coordination.
+@category network
 */
 
 // Build the RTCPeerConnection config from the user's configured STUN servers.

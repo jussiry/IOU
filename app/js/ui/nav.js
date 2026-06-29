@@ -2,6 +2,7 @@
 This module owns active-state handling for primary navigation buttons. It updates visual active styles, aria-current attributes, and actionable-item badge counts from a single place.
 
 Centralizing nav state changes prevents duplicated button toggling logic across route handlers.
+@category ui
 */
 
 import { hasActionableNotification } from "../utils/friendships.js";

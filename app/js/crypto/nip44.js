@@ -15,6 +15,7 @@ in the window context and in the classic service worker (no WebCrypto, no DOM).
 The unit of reuse is the per-peer *conversation key*: derive it once with
 `getConversationKey` and cache it, exactly as the legacy AES path cached its
 derived key, so steady-state cost matches the previous scheme.
+@category crypto
 */
 
 import { chacha20 } from "../vendor/noble-chacha.js";

@@ -19,6 +19,7 @@ sender's Nostr key. Two schemes are accepted:
 This module owns both *producing* the new proof (`signTallyMessage`) and
 *verifying* either scheme (`verifyTallyAuthorship`). The transport and ledger
 layers call these instead of touching signatures directly.
+@category network
 */
 
 import { canonicalJsonForSigning } from "../crypto/canonical.js";

@@ -11,6 +11,7 @@ Domain callers still decide *when* to append (a transaction, a friend
 accept, a trust-limit nudge) and supply the payload — this module only
 owns how entries are shaped, how they're filtered for sync, and how
 untrusted entries are vetted before they enter the local log.
+@category data
 */
 
 import {

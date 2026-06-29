@@ -7,6 +7,7 @@ This module binds the request subpage. It provides two tabs:
    optional amount and note so a sender can scan it.
 
 Tab state is local to this page visit; switching tabs shows/hides panels.
+@category ui
 */
 
 import { isAcceptedFriendshipStatus } from "../../js/utils/friendships.js";

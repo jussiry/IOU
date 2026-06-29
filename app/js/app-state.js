@@ -11,6 +11,7 @@ we keep a single source of truth for the state object.
 User creation is included because it *initializes* the state — there is no
 meaningful app state before `createUser` runs, and it doesn't belong in a
 domain command module that assumes a state already exists.
+@category data
 */
 
 import {

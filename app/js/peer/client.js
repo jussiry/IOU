@@ -30,6 +30,7 @@ here so the WebRTC channel and the signaling server's fallback queue see
 only ciphertext. Transport-only messages (ping/pong/receipts) keep flowing
 as plaintext over the data channel — they are local to a live WebRTC
 session and never need to be forwarded by the server.
+@category network
 */
 
 import {

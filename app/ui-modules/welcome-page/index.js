@@ -2,6 +2,7 @@
 This module binds the first-run welcome screen. It validates the initial username, optionally accepts an existing NIP-49 (ncryptsec + passphrase) login, handles submit state, and delegates user creation to the app shell callback.
 
 Login uses NIP-49 exclusively: the user pastes the encoded key (`ncryptsec1...`) produced by another device's "Transfer" flow (or any other Nostr client that exports the same format) together with the passphrase set during that export. The passphrase is never transmitted; it is combined with the encoded key locally to recover the private key via scrypt + XChaCha20-Poly1305.
+@category ui
 */
 
 import { initCheckToggle } from "../components/check-toggle.js";

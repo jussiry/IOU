@@ -2,6 +2,7 @@
 A small collection of example note texts shown as placeholder hints in the send
 and request forms. A random entry is picked each time the form loads so the UI
 feels alive and gives users a quick sense of what kinds of things Tally is for.
+@category util
 */
 
 const NOTE_PLACEHOLDERS = [

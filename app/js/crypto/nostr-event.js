@@ -11,6 +11,7 @@ The event id is the NIP-01 canonical hash: sha256 of the JSON array
 and the signature is BIP-340 Schnorr over that 32-byte id. The local provider
 signs here directly; external providers return an already-signed event that we
 verify with the same `verifyNostrEvent`.
+@category crypto
 */
 
 import {

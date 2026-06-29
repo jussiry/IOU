@@ -23,6 +23,7 @@ Encryption:
 
 Decryption reverses the above and relies on Poly1305 authentication: a wrong
 passphrase produces a tag mismatch and throws — no key material is returned.
+@category crypto
 */
 
 import { scrypt } from "../vendor/noble-scrypt.js";

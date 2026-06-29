@@ -15,6 +15,7 @@ version byte 0x02 once base64-decoded, while the old AES path prepended a random
 
 Exposes one global: self.__tallyPushCrypto.decryptHint(ciphertextB64,
 myPrivateKeyHex, senderPublicKey) -> Promise<string>.
+@category entry
 */
 
 import { decryptWithKey, getConversationKey } from "./js/crypto/nip44.js";

@@ -2,6 +2,7 @@
 This module adds horizontal swipe navigation to the app. Swiping left moves to the next main page in nav order, swiping right moves to the previous one. On subpages, swiping right triggers browser back navigation.
 
 Touch handling uses a minimum distance threshold and angle check to avoid interfering with vertical scrolling.
+@category ui
 */
 
 const SWIPE_THRESHOLD = 50;

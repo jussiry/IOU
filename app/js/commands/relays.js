@@ -10,6 +10,7 @@ These commands intentionally mutate only `state.relays` — no peer messages
 are emitted, because relay choice is private device-level configuration and
 should not be announced to friends. (A future TIP may add an opt-in
 `relay_hint` for friend discovery, but that is out of scope here.)
+@category command
 */
 
 import { loadData, loadState, persistAndBuildView } from "../app-state.js";

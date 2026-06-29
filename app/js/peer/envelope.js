@@ -25,6 +25,7 @@ After decryption, callers may trust the returned `inner` only after:
 Encryption itself is delegated to the caller's KeyProvider, so this module
 never touches raw key material. (Envelope version 2 uses the provider's
 AES-GCM path; NIP-44 / version 3 is introduced in a later layer.)
+@category network
 */
 
 import { isDurablePeerMessageType } from "./messages.js";

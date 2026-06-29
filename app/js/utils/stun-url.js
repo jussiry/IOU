@@ -17,6 +17,7 @@ Tally no longer ships a TURN server: when a direct P2P connection can't be
 formed (e.g. symmetric NAT on cellular), the encrypted-envelope relay server
 already carries messages between peers, covering the same need without a
 separate TURN relay.
+@category util
 */
 
 // Cloudflare's public STUN endpoint. Chosen over Google's for its lighter

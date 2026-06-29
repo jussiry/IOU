@@ -8,6 +8,7 @@ This module stores peer connection status in two separate tiers:
 Keeping these tiers here lets page binders read online state without coupling the
 persisted data model to transport details. Both data changes and peer status changes
 trigger the same subscriber callbacks so the UI always reflects the latest state.
+@category network
 */
 
 export type PeerStatusListener = (connectedPeerIds: string[]) => void;

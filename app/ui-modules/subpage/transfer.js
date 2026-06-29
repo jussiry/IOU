@@ -10,6 +10,7 @@ with a copy button. The passphrase + blob pair can be used on another device
 The blob alone is useless without the passphrase — the authentication tag
 fails to verify under any wrong key, so wrong-passphrase attempts on the
 importing side cleanly throw rather than yielding a garbage key.
+@category ui
 */
 
 import { encryptNcryptsec } from "../../js/crypto/nip49.js";

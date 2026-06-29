@@ -14,6 +14,7 @@ written to the synced app state, because a subscription is meaningless on a
 device that didn't create it and OS permission can't be granted remotely. The
 settings toggle therefore reflects the *current browser's* real state, queried
 live via getPushState().
+@category network
 */
 
 import { getRealtimeClient } from "../peer/client.js";

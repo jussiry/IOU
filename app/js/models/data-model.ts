@@ -7,6 +7,7 @@ Factory inputs are intentionally typed loosely (`any`) because these helpers
 are defensive normalizers — they accept whatever shape IndexedDB, seed data,
 or network payloads hand over and coerce it into a known good structure. The
 *output* types are the contract callers rely on.
+@category data
 */
 
 import { FRIENDSHIP_STATUS_ACCEPTED } from "../utils/friendships.js";

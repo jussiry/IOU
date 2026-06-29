@@ -2,6 +2,7 @@
 This module provides a lazy-rendering list that appends items in batches as the user scrolls near the bottom of the page. It keeps initial render fast by only creating DOM nodes for the first page of items.
 
 The caller provides items and a render function. This module handles batching, scroll observation, and cleanup.
+@category ui
 */
 
 const PAGE_SIZE = 20;

@@ -6,6 +6,7 @@ Key primitives (random scalar, public-key derivation, ECDH) live in
 only owns the surface-level Nostr identity concerns: NIP-19 bech32 encoding
 between raw hex and the `npub` / `nsec` formats, plus a small helper that ties
 generation + encoding together.
+@category util
 */
 
 import {

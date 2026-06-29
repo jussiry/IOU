@@ -4,6 +4,7 @@ Lazy-loads a vendor script (IIFE/UMD) and returns the global it exposes.
 Vendor libraries are not ES modules, so they must be loaded via script tags.
 This utility deduplicates requests and caches the result so each library is
 loaded at most once per page session.
+@category util
 */
 
 const loaded = new Map();

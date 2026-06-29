@@ -3,6 +3,7 @@ Derives a read-only view model from persisted app state.
 
 The view model aggregates balance totals, trust agreements, and connection
 data so that page binders never need to compute these values themselves.
+@category ui
 */
 
 import { createPublicPersonModel } from "../models/data-model.js";

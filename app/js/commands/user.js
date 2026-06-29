@@ -5,6 +5,7 @@ notification on a friend.
 
 Identity creation lives in `app-state.js` rather than here — it's part of
 initializing the state store, not a mutation of an already-running one.
+@category command
 */
 
 import { PEER_MESSAGE_TYPE_NAME_CHANGED } from "../peer/messages.js";

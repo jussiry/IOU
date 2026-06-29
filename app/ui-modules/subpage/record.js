@@ -4,6 +4,7 @@ This module binds the record-tally subpage form. It populates selectable friends
 Only accepted friendships can be used for transactions, so the binder also owns the empty states shown when the user has no friends yet or only pending friendships.
 
 The submit button label updates dynamically to "Send €[amount]" as the user types an amount, making clear that recording a tally is equivalent in effect to sending that value.
+@category ui
 */
 
 import { isAcceptedFriendshipStatus } from "../../js/utils/friendships.js";

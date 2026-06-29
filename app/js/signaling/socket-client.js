@@ -14,6 +14,7 @@ device, and the client threads remote device ids back on outgoing
 It keeps websocket lifecycle concerns isolated from the peer transport layer,
 so higher-level realtime code can focus on peer sessions and queued delivery
 instead of reconnect and JSON routing details.
+@category network
 */
 
 // First failure retries quickly (transient blip). Every failure after that

@@ -3,6 +3,7 @@ Versioned migrations for the single persisted RootState blob stored in
 IndexedDB. These migrations run before model normalization, so they can reshape
 old records while fields that newer factories do not yet know about are still
 available.
+@category data
 */
 
 import { DATA_MODEL_VERSION } from "../models/data-model.js";

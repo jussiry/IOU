@@ -15,6 +15,7 @@ normally.
 
 Alice is the default preview browser user. Bob and Carol are driven by the
 peer-helper (tests/peer-helper/) to test multi-user interactions.
+@category util
 */
 
 import { DATA_MODEL_VERSION } from "../models/data-model.js";

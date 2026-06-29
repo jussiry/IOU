@@ -13,6 +13,7 @@ Usage:
   if (ok) doDestructiveThing();
 
 The modal mounts to document.body, traps the focus on the cancel button by default, closes on Esc / backdrop click (treated as cancel), and resolves with a boolean indicating confirmation.
+@category ui
 */
 
 import { formatMarkdownish } from "../../js/utils/markdownish.js";

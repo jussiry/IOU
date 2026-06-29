@@ -2,6 +2,7 @@
 This module encapsulates page slide transitions for the app shell. It determines direction from route context and applies coordinated enter/exit transforms for stacked page views.
 
 It also guards against race conditions during rapid navigation by sequencing swaps and normalizing the container before each transition.
+@category ui
 */
 
 const PAGE_CLASS = "page-view";

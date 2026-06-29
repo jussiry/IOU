@@ -8,6 +8,7 @@ layout (visibility: hidden) so the form below never jumps.
 
 `bindOwesPreview` returns the update function so callers can re-run it after
 programmatic value changes (e.g. when a QR scan fills the form).
+@category ui
 */
 
 const formatAmount = (parsed) =>

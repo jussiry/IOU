@@ -2,6 +2,7 @@
 This module provides formatting helpers shared by UI modules. It normalizes currency, signed money values, and date labels so all screens present values consistently.
 
 It also includes a trust usage formatter for list rows that combine "used" and "limit" values into a display string.
+@category ui
 */
 
 export const formatCurrency = (value) => `€${Math.abs(value).toFixed(2)}`;

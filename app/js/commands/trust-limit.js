@@ -8,6 +8,7 @@ effect immediately (you can always reduce your own exposure), while raising
 requires the peer's agreement and sits in a pending state until they echo
 it back. routeOutboundEntry encodes this logic so both this command path and
 the self-mesh sync path apply the same state transition.
+@category command
 */
 
 import { normalizeCurrencyAmount } from "../models/data-model.js";

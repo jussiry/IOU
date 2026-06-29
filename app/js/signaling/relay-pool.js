@@ -33,6 +33,7 @@ The pool also writes per-relay status into `relay-status-registry` so the
 settings UI can render live state. Status transitions: pending → connected
 on WebSocket open; connected → disconnected on close; back to pending on
 the next reconnect attempt.
+@category network
 */
 
 import { createSignalingClient } from "./socket-client.js";

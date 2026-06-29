@@ -7,6 +7,7 @@ message, mirror it into the ledger, apply it via routeOutboundEntry, and
 persist. State mutations live exclusively in routeOutboundEntry so that
 the same logic runs whether the action originated on this device or arrived
 via self-mesh sync from another device.
+@category command
 */
 
 import { normalizeCurrencyAmount } from "../models/data-model.js";

@@ -2,6 +2,7 @@
 This module defines the peer-to-peer message types and small helpers used by the IOU realtime layer.
 
 By keeping transport message names and envelope helpers together, the data layer and WebRTC transport can share one message contract without duplicating literal strings in multiple modules.
+@category network
 */
 
 export const PEER_MESSAGE_TYPE_FRIEND_REQUEST = "friend_request";

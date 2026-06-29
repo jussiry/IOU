@@ -4,6 +4,7 @@ Lightweight toast notification system.
 Notifications appear above the nav bar, auto-dismiss after 4 seconds,
 and can be clicked to navigate somewhere. The module exposes a simple
 show() function — callers don't need to know about DOM or timers.
+@category ui
 */
 
 const NOTIFICATION_DURATION_MS = 9000;

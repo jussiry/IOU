@@ -9,6 +9,7 @@ signature in the outbox (rather than producing it only at wrap time) means
 the same signature travels with the message through retries, persists
 across reloads, and is available when we mirror the message into the local
 ledger — so recovering peers can verify authorship offline.
+@category network
 */
 
 import { createPeerMessageModel } from "../models/data-model.js";

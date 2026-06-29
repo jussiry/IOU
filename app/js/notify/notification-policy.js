@@ -33,6 +33,7 @@ the recipient is online. See TIPs/TIP-004-os-notifications.md.
 Keeping this mapping separate from the state-mutation handlers (peer/handlers.js)
 means the "what shows where" question has one answer, and adding a new
 OS-notifiable event is a single edit here rather than scattered string-building.
+@category ui
 */
 
 import { formatCurrency } from "../ui/format.js";
