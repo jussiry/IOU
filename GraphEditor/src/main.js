@@ -73,7 +73,7 @@ async function main() {
     for (const { update } of nodeUpdaters) update();
   };
 
-  const sim = createSimulation({ nodes: graph.nodes, edges: graph.edges, width, height });
+  const sim = createSimulation({ nodes: graph.nodes, edges: graph.edges, width, height, maxLevel: graph.maxLevel });
   sim.on('tick', render); // drives live updates while dragging reheats the sim
 
   // Compute the initial layout synchronously: tick the simulation to settle

@@ -12,7 +12,12 @@
  * render as bigger pills. We attach a `sizeScale` (font multiplier) and a
  * coarse `sizeTier` (small/medium/large) used for the topbar size filter. The
  * pill's real pixel w/h is measured from the DOM in main.js once styled.
+ *
+ * We also attach a dependency `level` (see hierarchy.js) used by the simulation
+ * to stack the graph vertically — entry points on top, leaf modules below.
  */
+
+import { computeLevels } from './hierarchy.js';
 
 const CHAR_W = 7.5;      // approx px per char at the overview font size
 const PAD_X = 48;        // fixed overhead: symbol + gaps + left/right padding
@@ -60,5 +65,7 @@ export function buildGraph(raw) {
     n.h = Math.round(BASE_H * n.sizeScale);
   }
 
-  return { root: raw.root, nodes, edges, byId };
+  const maxLevel = computeLevels(nodes, edges, byId);
+
+  return { root: raw.root, nodes, edges, byId, maxLevel };
 }

@@ -90,6 +90,13 @@ comment*: the comment is the contract between human and AI.
   filter and category toggles share one visibility pass (`graph/filters.js`).
 - **Spacing knob** — overall node spread is tuned by `CHARGE_STRENGTH` in
   `graph/simulation.js` (more negative = more spread / less clumping).
+- **Vertical hierarchy** — the layout stacks the codebase by dependency depth:
+  consumers / entry points float to the top, foundational modules that many
+  things depend on sink to the bottom. Each node's level is a longest-path
+  layering of the dependency DAG (`graph/hierarchy.js`, cycle-safe via
+  back-edge skipping); a `forceY` nudges nodes toward their level. Tune with
+  `LAYER_GAP` and `HIERARCHY_STRENGTH` in `graph/simulation.js`
+  (`HIERARCHY_STRENGTH = 0` disables it for a free layout).
 
 ## Core requirements
 
@@ -251,7 +258,8 @@ GraphEditor/
 │   │   └── describe.js  ← pull the leading description comment per file
 │   ├── graph/
 │   │   ├── build.js     ← turn analysis output into graph nodes/edges
-│   │   ├── simulation.js ← d3-force setup (link/charge/center + custom box-collision force)
+│   │   ├── simulation.js ← d3-force setup (link/charge/center/hierarchy + custom box-collision force)
+│   │   ├── hierarchy.js  ← longest-path dependency layering → per-node vertical level
 │   │   ├── modes.js     ← Overview ↔ Focus state; neighbor selection; transitions
 │   │   ├── zoom.js      ← d3-zoom + transform sync; detail tier per zoom
 │   │   ├── edges.js     ← edge rendering (SVG lines/arrows) under the node layer
