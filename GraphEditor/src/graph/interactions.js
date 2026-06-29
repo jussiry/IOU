@@ -31,6 +31,7 @@ export function setupInteractions({ nodes, edges, sim, zoom, viewport, render })
     <div class="hc-header">
       <div class="hc-title"></div>
       <div class="hc-badges">
+        <span class="hc-badge hc-ext" title="file type"></span>
         <span class="hc-badge" title="exported functions">ƒ <b class="hc-fns">0</b></span>
         <span class="hc-badge" title="exported constants"># <b class="hc-consts">0</b></span>
         <span class="hc-badge hc-size" title="file size"><b class="hc-chars"></b></span>
@@ -83,6 +84,8 @@ export function setupInteractions({ nodes, edges, sim, zoom, viewport, render })
     card.querySelector('.hc-meta').textContent =
       [node.path, node.category].filter(Boolean).join('  ·  ');
     card.querySelector('.hc-desc').textContent = node.description || '(no description)';
+    const ext = node.path ? (node.path.match(/(\.[^./]+)$/) || [])[1] || '' : '';
+    card.querySelector('.hc-ext').textContent = ext;
     card.querySelector('.hc-fns').textContent = node.exports?.fns ?? '?';
     card.querySelector('.hc-consts').textContent = node.exports?.consts ?? '?';
     card.querySelector('.hc-chars').textContent = formatChars(node.chars);

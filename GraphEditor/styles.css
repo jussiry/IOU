@@ -202,6 +202,7 @@ html, body {
   white-space: nowrap;
 }
 #hover-card .hc-badge b { color: var(--text); font-weight: 600; }
+#hover-card .hc-ext { color: var(--text); font-weight: 500; letter-spacing: 0.02em; }
 #hover-card .hc-meta { font-size: 10.5px; color: var(--muted); margin: 0 0 7px; }
 #hover-card .hc-desc {
   font-size: 11.5px;
