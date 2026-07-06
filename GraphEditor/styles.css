@@ -171,7 +171,7 @@ html, body {
   left: 0;
   top: 0;
   width: max-content;
-  max-width: 240px;
+  max-height: 70vh;
   padding: 10px 12px;
   background: rgba(23, 28, 35, 0.97);
   border: 1px solid #2c3540;
@@ -181,8 +181,22 @@ html, body {
   opacity: 0;
   transition: opacity 0.18s ease;
   z-index: 20;
+  /* Column so the body scrolls while the header/meta stay put. The user-drag
+     resize grip lives in the bottom-right corner (needs a clipped overflow). */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  resize: both;
+  min-width: 180px;
+  min-height: 46px;
+  cursor: default; /* not the viewport's grab cursor */
 }
-#hover-card.show { opacity: 1; }
+/* Interactive only while shown; a hidden card must not block the area beneath. */
+#hover-card.show { opacity: 1; pointer-events: auto; }
+/* Code view wants a roomier, stable width than the description's max-content. */
+#hover-card.hc-code-mode { width: 340px; }
+/* Scrollable content region (description or editor); header/meta stay fixed. */
+#hover-card .hc-body { flex: 1 1 auto; min-height: 0; overflow: auto; }
 #hover-card .hc-header {
   display: flex;
   align-items: flex-start;
@@ -203,12 +217,20 @@ html, body {
 }
 #hover-card .hc-badge b { color: var(--text); font-weight: 600; }
 #hover-card .hc-ext { color: var(--text); font-weight: 500; letter-spacing: 0.02em; }
+/* The ƒ / # badges are toggle buttons for the symbol code views. */
+#hover-card .hc-badge-fns, #hover-card .hc-badge-consts { cursor: pointer; }
+#hover-card .hc-badge-fns:hover, #hover-card .hc-badge-consts:hover { border-color: rgba(255,255,255,0.28); }
+#hover-card .hc-badge.active { background: rgba(70,179,255,0.18); border-color: var(--edge-out); }
+#hover-card .hc-editor {
+  margin-top: 2px;
+  border-top: 1px solid #2c3540;
+  padding-top: 6px;
+}
 #hover-card .hc-meta { font-size: 10.5px; color: var(--muted); margin: 0 0 7px; }
 #hover-card .hc-desc {
   font-size: 11.5px;
   line-height: 1.45;
   color: #c3cad3;
   white-space: pre-wrap;
-  max-height: 150px;
-  overflow: hidden;
+  max-width: 300px; /* wrap the description text (card itself has no max-width) */
 }

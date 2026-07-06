@@ -6,7 +6,10 @@
  * bold and are coloured by direction —
  *   - "depends on" (outgoing, this file → its imports)        → out colour
  *   - "depended on by" (incoming, importers → this file)      → in colour
- * Everything unrelated dims so the neighbourhood reads clearly.
+ * Everything unrelated dims so the neighbourhood reads clearly. The floating
+ * description card counts as part of the node: leaving the node keeps the hover
+ * alive for a short grace period so the pointer can reach the card (and its
+ * future click actions); the card itself cancels that timer while hovered.
  *
  * Drag: dragging a node moves it (pinning it where dropped) and gently reheats
  * the simulation so neighbours rearrange; dragging the background pans (handled
@@ -14,7 +17,15 @@
  * drag deltas are divided by the current zoom scale to stay in layout space, so
  * the node tracks the cursor at any zoom level. We use plain pointer events
  * (not d3-drag) so the gesture is fully under our control.
+ *
+ * Symbol view: the ƒ and # badges in the card are toggle buttons. Pressing one
+ * swaps the description for a read-only code editor listing the module's
+ * exported functions (signatures, bodies folded) or constants (values); pressing
+ * it again returns to the description. The mode is sticky across nodes so you can
+ * browse the same view while moving between modules.
  */
+
+import { createSymbolEditor } from '../ui/symbol-editor.js';
 
 export function setupInteractions({ nodes, edges, sim, zoom, viewport, render }) {
   // Adjacency: per node, the edges where it is the source (out) / target (in).
@@ -32,14 +43,73 @@ export function setupInteractions({ nodes, edges, sim, zoom, viewport, render })
       <div class="hc-title"></div>
       <div class="hc-badges">
         <span class="hc-badge hc-ext" title="file type"></span>
-        <span class="hc-badge" title="exported functions">ƒ <b class="hc-fns">0</b></span>
-        <span class="hc-badge" title="exported constants"># <b class="hc-consts">0</b></span>
+        <span class="hc-badge hc-badge-fns" role="button" title="show exported functions">ƒ <b class="hc-fns">0</b></span>
+        <span class="hc-badge hc-badge-consts" role="button" title="show exported constants"># <b class="hc-consts">0</b></span>
         <span class="hc-badge hc-size" title="file size"><b class="hc-chars"></b></span>
       </div>
     </div>
     <div class="hc-meta"></div>
-    <div class="hc-desc"></div>`;
+    <div class="hc-body">
+      <div class="hc-desc"></div>
+      <div class="hc-editor"></div>
+    </div>`;
   viewport.appendChild(card);
+
+  // Read-only code editor for the ƒ / # symbol views (lazily fed per node/mode).
+  const descEl = card.querySelector('.hc-desc');
+  const editorHost = card.querySelector('.hc-editor');
+  const editor = createSymbolEditor(editorHost);
+  editorHost.style.display = 'none';
+  let cardMode = 'desc'; // 'desc' | 'fns' | 'consts' (sticky across nodes)
+  let cardNode = null;
+
+  // Lock the card to an explicit size that only grows automatically, so closing
+  // the (larger) code view never contracts the box out from under the pointer
+  // (which would end the hover). The bottom-right grip still resizes it freely:
+  // the current explicit size is treated as a floor we never auto-shrink below.
+  function sizeCard() {
+    const floorW = parseFloat(card.style.width) || card.offsetWidth;
+    const floorH = parseFloat(card.style.height) || card.offsetHeight;
+    card.style.width = '';
+    card.style.height = '';
+    const w = Math.max(floorW, card.offsetWidth); // natural size honours per-mode CSS
+    const h = Math.max(floorH, card.offsetHeight);
+    card.style.width = `${w}px`;
+    card.style.height = `${h}px`;
+  }
+
+  function renderMode() {
+    card.querySelector('.hc-badge-fns').classList.toggle('active', cardMode === 'fns');
+    card.querySelector('.hc-badge-consts').classList.toggle('active', cardMode === 'consts');
+    const showEditor = cardMode !== 'desc';
+    card.classList.toggle('hc-code-mode', showEditor);
+    descEl.style.display = showEditor ? 'none' : 'block';
+    editorHost.style.display = showEditor ? 'block' : 'none';
+    if (showEditor) {
+      const list = (cardNode && cardNode.symbols && cardNode.symbols[cardMode]) || [];
+      editor.setDoc(list.length
+        ? list.map((s) => s.code).join('\n\n')
+        : `// no exported ${cardMode === 'fns' ? 'functions' : 'constants'}`);
+    }
+  }
+
+  function clampCardIntoView() {
+    const cw = card.offsetWidth, ch = card.offsetHeight;
+    const left = Math.min(parseFloat(card.style.left) || 8, viewport.clientWidth - cw - 8);
+    const top = Math.min(parseFloat(card.style.top) || 8, viewport.clientHeight - ch - 8);
+    card.style.left = `${Math.max(8, left)}px`;
+    card.style.top = `${Math.max(8, top)}px`;
+  }
+
+  function toggleMode(mode) {
+    cardMode = cardMode === mode ? 'desc' : mode;
+    renderMode();
+    sizeCard();
+    clampCardIntoView();
+  }
+
+  card.querySelector('.hc-badge-fns').addEventListener('click', () => toggleMode('fns'));
+  card.querySelector('.hc-badge-consts').addEventListener('click', () => toggleMode('consts'));
 
   function highlight(node) {
     viewport.classList.add('has-hover');
@@ -80,6 +150,10 @@ export function setupInteractions({ nodes, edges, sim, zoom, viewport, render })
   }
 
   function showCard(node) {
+    cardNode = node;
+    // A fresh appearance (card was hidden) starts sizing over from the mode's
+    // natural size; moving between nodes while shown keeps the current size.
+    const freshCard = !card.classList.contains('show');
     card.querySelector('.hc-title').textContent = node.name;
     card.querySelector('.hc-meta').textContent =
       [node.path, node.category].filter(Boolean).join('  ·  ');
@@ -91,6 +165,9 @@ export function setupInteractions({ nodes, edges, sim, zoom, viewport, render })
     card.querySelector('.hc-chars').textContent = formatChars(node.chars);
     card.style.transform = 'none';
     card.classList.add('show'); // make it laid out so we can measure it
+    renderMode(); // reflect the sticky mode (desc / functions / constants)
+    if (freshCard) { card.style.width = ''; card.style.height = ''; }
+    sizeCard(); // lock size before the placement search measures the card
 
     const t = zoom.transform();
     const project = (m) => ({ x: t.x + m.x * t.k, y: t.y + m.y * t.k });
@@ -145,10 +222,38 @@ export function setupInteractions({ nodes, edges, sim, zoom, viewport, render })
   }
 
   // --- Hover ---------------------------------------------------------------
-  for (const n of nodes) {
-    n._el.addEventListener('mouseenter', () => highlight(n));
-    n._el.addEventListener('mouseleave', clear);
+  // The description card is treated as part of the hovered node: leaving the
+  // node (or the card) starts a short grace period rather than clearing
+  // immediately, so the pointer can travel across the gap onto the card (and,
+  // later, click actions inside it). Entering another node switches focus at
+  // once. Moving back onto the node or card cancels the pending clear.
+  const GRACE_MS = 100;
+  let activeNode = null;
+  let clearTimer = null;
+
+  function cancelClear() {
+    if (clearTimer) { clearTimeout(clearTimer); clearTimer = null; }
   }
+  function scheduleClear() {
+    cancelClear();
+    clearTimer = setTimeout(() => { clearTimer = null; activeNode = null; clear(); }, GRACE_MS);
+  }
+  function clearNow() { cancelClear(); activeNode = null; clear(); }
+  function focus(node) {
+    cancelClear();
+    if (activeNode === node) return;
+    if (activeNode) clear();
+    activeNode = node;
+    highlight(node);
+  }
+
+  for (const n of nodes) {
+    n._el.addEventListener('mouseenter', () => focus(n));
+    n._el.addEventListener('mouseleave', scheduleClear);
+  }
+  // Hovering the card keeps the node's focus alive; leaving it re-arms the grace.
+  card.addEventListener('mouseenter', cancelClear);
+  card.addEventListener('mouseleave', scheduleClear);
 
   // --- Drag ----------------------------------------------------------------
   for (const n of nodes) {
@@ -158,7 +263,7 @@ export function setupInteractions({ nodes, edges, sim, zoom, viewport, render })
       const sx = event.clientX, sy = event.clientY, nx = n.x, ny = n.y;
       n._el.classList.add('dragging');
       n._el.setPointerCapture?.(event.pointerId);
-      clear(); // drop hover highlight while dragging
+      clearNow(); // drop hover highlight while dragging
       sim.alphaTarget(0.3).restart(); // gently reheat so neighbours rearrange
 
       const move = (e) => {

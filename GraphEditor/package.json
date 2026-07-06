@@ -8,15 +8,22 @@
     "dev": "node scripts/serve.mjs 8088",
     "build": "vite build",
     "preview": "vite preview",
-    "analyse": "node src/analyser/cli.js"
+    "analyse": "node src/analyser/cli.js",
+    "vendor:cm": "esbuild scripts/cm-entry.mjs --bundle --format=esm --minify --outfile=vendor/codemirror.js"
   },
   "dependencies": {
-    "d3-selection": "^3.0.0",
+    "d3-drag": "^3.0.0",
     "d3-force": "^3.0.0",
-    "d3-zoom": "^3.0.0",
-    "d3-drag": "^3.0.0"
+    "d3-selection": "^3.0.0",
+    "d3-zoom": "^3.0.0"
   },
   "devDependencies": {
+    "@codemirror/lang-javascript": "^6.2.5",
+    "@codemirror/language": "^6.12.4",
+    "@codemirror/state": "^6.7.1",
+    "@codemirror/view": "^6.43.6",
+    "@lezer/highlight": "^1.2.3",
+    "esbuild": "^0.28.1",
     "vite": "^5.4.0"
   }
 }

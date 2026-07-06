@@ -24,7 +24,9 @@ export function setupZoom({ viewport, edgesGroup, nodeLayer, onScale }) {
 
   const behavior = d3zoom()
     .scaleExtent([0.05, 4])
-    .filter((event) => !event.button && !(event.target.closest && event.target.closest('.node')))
+    .filter((event) => !event.button
+      && !(event.target.closest && event.target.closest('.node'))
+      && !(event.target.closest && event.target.closest('#hover-card')))
     .on('zoom', (event) => {
       if (event.sourceEvent) userMoved = true; // a real gesture, not fit()
       current = event.transform;

@@ -80,7 +80,16 @@ comment*: the comment is the contract between human and AI.
   count, sqrt-scaled), so big modules stand out at a glance. Bigger nodes also
   carry stronger charge repulsion, pushing neighbours further away. The hover
   card shows badges for exported function count, exported constant count, and
-  file size (K for ≥1000 chars).
+  file size (K for ≥1000 chars). The card's file-extension badge shows the file
+  type; leaving a node keeps the card alive for a short grace period so you can
+  move onto it.
+- **Symbol views** — the ƒ and # badges are toggle buttons. Pressing ƒ swaps the
+  description for a read-only CodeMirror 6 editor listing the module's exported
+  functions (signatures, bodies folded to one line); pressing # lists the
+  exported constants (one-line values shown inline, multi-line values folded).
+  The analyser (`analyser/exports.js`) captures each export's source text; the
+  editor (`ui/symbol-editor.js`) folds every multi-line entry on load. Read-only
+  for now — editing will drive cross-file refactors of exported names (later).
 - **Size filter** — a top-bar segmented control (All / Medium & large / Large
   only) hides smaller files (and any edges touching them) so the structurally
   important modules can be read in isolation. Tiers come from char count
@@ -440,6 +449,17 @@ non-`no-store` servers may serve stale modules during iterative editing.
 `vendor/d3.js`; the import map maps the bare `d3-*` specifiers to it. Nothing is
 fetched from the network at runtime. (When extracted and bundled with Vite, the
 same `d3-*` imports resolve from `node_modules` instead.)
+
+**CodeMirror 6** (the hover card's read-only symbol editor) is vendored the same
+way: `vendor/codemirror.js` is a single esbuild bundle of `scripts/cm-entry.mjs`,
+which re-exports exactly the pieces the app uses. Bundling from one entry keeps
+CM's core (`@codemirror/state` etc.) a singleton — separately-bundled CM packages
+would duplicate it and break facet/StateField identity. Rebuild after changing
+the entry or upgrading CM:
+
+```bash
+npm run vendor:cm   # esbuild scripts/cm-entry.mjs → vendor/codemirror.js
+```
 
 ## Analysing a codebase
 
