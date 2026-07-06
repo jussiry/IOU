@@ -26,6 +26,7 @@
  */
 
 import { createSymbolEditor } from '../ui/symbol-editor.js';
+import { renderMarkdownish } from '../ui/markdownish.js';
 
 export function setupInteractions({ nodes, edges, sim, zoom, viewport, render }) {
   // Adjacency: per node, the edges where it is the source (out) / target (in).
@@ -157,7 +158,8 @@ export function setupInteractions({ nodes, edges, sim, zoom, viewport, render })
     card.querySelector('.hc-title').textContent = node.name;
     card.querySelector('.hc-meta').textContent =
       [node.path, node.category].filter(Boolean).join('  ·  ');
-    card.querySelector('.hc-desc').textContent = node.description || '(no description)';
+    card.querySelector('.hc-desc').innerHTML =
+      node.description ? renderMarkdownish(node.description) : '<p>(no description)</p>';
     const ext = node.path ? (node.path.match(/(\.[^./]+)$/) || [])[1] || '' : '';
     card.querySelector('.hc-ext').textContent = ext;
     card.querySelector('.hc-fns').textContent = node.exports?.fns ?? '?';
