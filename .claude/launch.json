@@ -25,9 +25,10 @@
     }
   ,{
       "name": "grapheditor",
-      "runtimeExecutable": "python3",
-      "runtimeArgs": ["-m", "http.server", "8088", "--directory", "/Users/jussi/code/IOU/GraphEditor"],
-      "port": 8088
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["/Users/jussi/code/IOU/GraphEditor/scripts/serve.mjs"],
+      "port": 8088,
+      "autoPort": true
     }
   ]
 }

@@ -8,6 +8,10 @@
  * during iterative UI work.
  *
  * Usage: node scripts/serve.mjs [port]   (default 8088, serves the repo root)
+ * The PORT env var wins over the CLI arg when set, so a launcher that assigns
+ * a free port per session (autoPort) doesn't collide with a hardcoded arg —
+ * lets multiple sessions each run their own instance instead of fighting over
+ * one port.
  */
 
 import { createServer } from 'node:http';
@@ -16,7 +20,7 @@ import { join, normalize, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(fileURLToPath(import.meta.url), '..', '..'); // GraphEditor/
-const PORT = Number(process.argv[2]) || 8088;
+const PORT = Number(process.env.PORT) || Number(process.argv[2]) || 8088;
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8',

@@ -4,8 +4,9 @@
     {
       "name": "grapheditor",
       "runtimeExecutable": "node",
-      "runtimeArgs": ["scripts/serve.mjs", "8088"],
-      "port": 8088
+      "runtimeArgs": ["scripts/serve.mjs"],
+      "port": 8088,
+      "autoPort": true
     }
   ]
 }
