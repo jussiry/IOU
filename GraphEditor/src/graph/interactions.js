@@ -229,7 +229,7 @@ export function setupInteractions({ nodes, edges, sim, zoom, viewport, render })
   // immediately, so the pointer can travel across the gap onto the card (and,
   // later, click actions inside it). Entering another node switches focus at
   // once. Moving back onto the node or card cancels the pending clear.
-  const GRACE_MS = 100;
+  const GRACE_MS = 150;
   let activeNode = null;
   let clearTimer = null;
 
