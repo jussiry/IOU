@@ -1,0 +1,698 @@
+<!--
+  readme.html — GraphEditor's canonical, human+AI-readable documentation.
+
+  This file is the SINGLE SOURCE OF TRUTH for the project's plan and status.
+  It is authored text-first: the content is plain prose in semantic tags so it
+  reads cleanly as raw HTML (for an AI or a human), while readme.css + readme.js
+  render it as a paged, navigable webpage. All content lives in the markup — the
+  JS only chooses which <section> ("page") is visible; with JS off, every
+  section simply shows in one scroll.
+
+  STATUS CONVENTION — every claim carries a data-status so its maturity is
+  explicit in the source text and colour-coded in the render:
+    implemented — exists and works in the code today          (green)
+    planned     — a decided, well-defined feature, not built  (blue)
+    proposal    — a suggestion / first draft / open question  (amber)
+    reference   — background, rationale, or a spec/contract   (neutral)
+
+  Status labels here were verified against the code on 2026-07-09, not copied
+  from the old README.md — see the "Roadmap" page for the corrections made.
+-->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>GraphEditor — Documentation</title>
+  <link rel="stylesheet" href="./readme.css" />
+</head>
+<body>
+
+<header id="topbar">
+  <div class="brand">GraphEditor</div>
+  <div class="tagline">Code Dependency Graph Visualiser</div>
+  <button id="nav-toggle" type="button" aria-label="Toggle navigation">☰</button>
+</header>
+
+<nav id="toc" aria-label="Sections">
+  <div class="toc-legend">
+    <span class="chip" data-status="implemented">Implemented</span>
+    <span class="chip" data-status="planned">Planned</span>
+    <span class="chip" data-status="proposal">Proposal</span>
+    <span class="chip" data-status="reference">Reference</span>
+  </div>
+  <!-- populated by readme.js from the sections below; also a plain fallback list -->
+  <ol class="toc-list">
+    <li><a href="#overview" data-status="reference">Overview &amp; vision</a></li>
+    <li><a href="#features" data-status="implemented">What's built</a></li>
+    <li><a href="#roadmap" data-status="planned">Roadmap &amp; status</a></li>
+    <li><a href="#requirements" data-status="reference">Core requirements</a></li>
+    <li><a href="#architecture" data-status="implemented">Architecture</a></li>
+    <li><a href="#decisions" data-status="reference">Design decisions</a></li>
+    <li><a href="#zoom-modes" data-status="planned">Zoom modes</a></li>
+    <li><a href="#categories" data-status="proposal">Categories &amp; colours</a></li>
+    <li><a href="#schema" data-status="reference">graph.json schema</a></li>
+    <li><a href="#prior-art" data-status="reference">Prior art</a></li>
+    <li><a href="#running" data-status="reference">Running &amp; analysing</a></li>
+  </ol>
+</nav>
+
+<main id="content">
+
+  <section class="page" id="overview" data-status="reference">
+    <h1>Overview &amp; vision</h1>
+    <p class="lede">
+      A standalone HTML/JS app that analyses a codebase and renders it as an
+      interactive dependency graph. Each <strong>file is a node</strong>; each
+      <strong>import/require relationship is an edge</strong>. The goal is to make
+      the shape of a codebase legible at a glance: what depends on what, which
+      files are hubs, and what a given file actually does.
+    </p>
+    <p class="note">
+      Currently lives inside the IOU repo for convenience, but is designed to be
+      extracted into its own repository. It has its own <code>package.json</code>
+      and no dependency on IOU's code.
+    </p>
+
+    <h2>Who it's for</h2>
+    <p>
+      This tool is aimed at <strong>codebases written mostly by AI</strong>, to
+      give humans easier access into them. The file's leading description comment
+      — authored by the AI — is the human-readable handle on each file, and the
+      dependency graph is how you navigate between them.
+    </p>
+    <ul>
+      <li>
+        <span class="tag" data-status="implemented">Now (v1)</span>
+        Read-only. Analyse a codebase, render description comments as nodes,
+        browse by dependency.
+      </li>
+      <li>
+        <span class="tag" data-status="planned">Later</span>
+        An <strong>iterative human↔AI loop</strong>: AI writes a file's
+        description comment → the user edits the comment as an <em>instruction</em>
+        for change → AI modifies the code accordingly → AI rewrites the
+        description comment to match. The graph becomes the editing surface for
+        this loop.
+      </li>
+    </ul>
+    <p>
+      This is why nodes are (destined to be) editable DOM and why
+      category/metadata lives <em>in the comment</em>: the comment is the contract
+      between human and AI.
+    </p>
+
+    <h2>What's novel here</h2>
+    <p>No tool found combines all three:</p>
+    <ol>
+      <li>
+        <strong>Nodes whose body is the human-written leading description
+        comment</strong> — the author's prose as first-class node content, not
+        just extracted structure.
+      </li>
+      <li>
+        <strong>Editable nodes / future in-node HTML editor</strong> — prior art
+        is almost all read-only viewers. The graph as an <em>editing workspace</em>
+        is the differentiator.
+      </li>
+      <li>
+        Overview (loose graph) ↔ Focus (neighbourhood of rich cards) as the
+        primary navigation — like Sourcetrail but at file granularity with rich
+        editable cards.
+      </li>
+    </ol>
+  </section>
+
+  <section class="page" id="features" data-status="implemented">
+    <h1>What's built</h1>
+    <p class="lede">
+      Everything on this page exists and works in the app today. It documents the
+      current, shipped behaviour — the forward-looking design lives under
+      <a href="#roadmap">Roadmap</a> and <a href="#zoom-modes">Zoom modes</a>.
+    </p>
+
+    <h2>The node graph</h2>
+    <ul>
+      <li>
+        <strong>Overview layout</strong> — the whole graph renders as minimal
+        name-only pills, coloured and iconed by category, positioned by a
+        d3-force simulation with a custom box-collision force (see
+        <a href="#architecture">Architecture</a>).
+      </li>
+      <li>
+        <strong>File purpose on hover</strong> — hovering a node shows a floating,
+        screen-space description card built from the file's leading description
+        comment, rendered as lightweight markdown
+        (<code>ui/markdownish.js</code>). The card is placed by an outward search
+        that avoids covering highlighted neighbours, then clamped to the viewport.
+        Leaving a node keeps the card alive for a short grace period so the
+        pointer can travel onto it.
+      </li>
+      <li>
+        <strong>Dependency highlight</strong> — hovering rings the node and its
+        1-hop neighbours and colours the connecting edges by direction:
+        <span class="swatch" style="--c:#46b3ff"></span> blue = depends-on
+        (outgoing), <span class="swatch" style="--c:#ffa23d"></span> orange =
+        depended-on-by (incoming). Everything unrelated dims.
+      </li>
+      <li>
+        <strong>Card badges</strong> — the hover card shows the file extension,
+        exported-function count (ƒ), exported-constant count (#), and file size
+        (K for ≥1000 chars).
+      </li>
+      <li>
+        <strong>Symbol views</strong> — the ƒ and # badges are toggle buttons.
+        ƒ swaps the description for a read-only CodeMirror 6 editor listing the
+        module's exported functions (signatures, bodies folded to one line); #
+        lists the exported constants (one-line values inline, multi-line folded).
+        The analyser (<code>analyser/exports.js</code>) captures each export's
+        source; the editor (<code>ui/symbol-editor.js</code>) folds multi-line
+        entries on load. Read-only for now.
+      </li>
+      <li>
+        <strong>Draggable nodes + pan/zoom</strong> — drag a node to pin it where
+        dropped (this gently reheats the simulation so neighbours rearrange);
+        drag the background to pan; wheel to zoom. Both layers share one
+        d3-zoom transform.
+      </li>
+    </ul>
+
+    <h2>Encoding &amp; layout</h2>
+    <ul>
+      <li>
+        <strong>Category → colour + symbol</strong> — read verbatim from each
+        file's <code>@category</code> tag; unknown/missing falls back to neutral
+        grey. See <a href="#categories">Categories &amp; colours</a>.
+      </li>
+      <li>
+        <strong>Size encodes file size</strong> — node size scales with character
+        count (sqrt-scaled), so big modules stand out; bigger nodes also carry
+        stronger charge repulsion, pushing neighbours further away.
+      </li>
+      <li>
+        <strong>Vertical hierarchy</strong> — the layout stacks the codebase by
+        dependency depth: consumers / entry points float to the top, foundational
+        modules sink to the bottom. Each node's level is a longest-path layering
+        of the dependency DAG (<code>graph/hierarchy.js</code>, cycle-safe via
+        back-edge skipping); a <code>forceY</code> nudges nodes toward their
+        level. Tune <code>LAYER_GAP</code> (default 130) and
+        <code>HIERARCHY_STRENGTH</code> (default 0.22) in
+        <code>graph/simulation.js</code> — <code>0</code> disables it.
+      </li>
+    </ul>
+
+    <h2>Filtering the view</h2>
+    <ul>
+      <li>
+        <strong>Size filter</strong> — a top-bar segmented control (All /
+        Medium &amp; large / Large only) hides smaller files and any edges
+        touching them. Tiers come from char count
+        (<code>small &lt;3000 ≤ medium &lt;8000 ≤ large</code>); positions are
+        kept (no relayout).
+      </li>
+      <li>
+        <strong>Category toggles</strong> — the legend swatches double as on/off
+        buttons: click a category to hide all its nodes; click again to restore.
+        A "toggle all" control flips every category at once. When the legend
+        doesn't fit the header it collapses into a "Categories" dropdown. Size
+        filter and category toggles share one visibility pass
+        (<code>graph/filters.js</code>).
+      </li>
+    </ul>
+    <p class="note">
+      <span class="tag" data-status="planned">Not yet</span>
+      Text <strong>search</strong> is not implemented — only the size and
+      category filters above exist.
+    </p>
+  </section>
+
+  <section class="page" id="roadmap" data-status="planned">
+    <h1>Roadmap &amp; status</h1>
+    <p class="lede">
+      Verified against the code on 2026-07-09. The status here supersedes the
+      old README checklist, which had drifted — see
+      <a href="#corrections">what changed</a> at the bottom.
+    </p>
+
+    <h2 data-status="implemented">Implemented</h2>
+    <ul class="status-list">
+      <li data-status="implemented">Library choice — D3 (modular <code>d3-*</code>) with HTML-<code>div</code> nodes</li>
+      <li data-status="implemented">Standalone <code>package.json</code> (no IOU dependency)</li>
+      <li data-status="implemented">Vendored d3 locally for offline use (<code>vendor/d3.js</code> + import map)</li>
+      <li data-status="implemented">Vendored CodeMirror 6 for offline use (<code>vendor/codemirror.js</code>)</li>
+      <li data-status="implemented"><code>graph.json</code> schema + starter category palette</li>
+      <li data-status="implemented">Hand-written dummy <code>graph.sample.json</code> to build the UI against</li>
+      <li data-status="implemented">Node analyser: scan → imports → description/<code>@category</code> → exports → <code>graph.json</code></li>
+      <li data-status="implemented">Stamped <code>@category</code> into all 74 <code>app/</code> source files (<code>scripts/add-categories.mjs</code>)</li>
+      <li data-status="implemented">Renders real analyser output (74 files, 231 deps) with directed arrows</li>
+      <li data-status="implemented"><code>index.*</code> nodes use their folder name (e.g. <code>friends-page/index.js</code> → "friends-page")</li>
+      <li data-status="implemented">Overview mode — all nodes, name-only pills, box physics</li>
+      <li data-status="implemented">Custom rectangular (AABB) box-collision force (<code>graph/box-collision.js</code>)</li>
+      <li data-status="implemented">Vertical dependency hierarchy layering (<code>graph/hierarchy.js</code> + <code>forceY</code>)</li>
+      <li data-status="implemented">Synchronous initial layout + fit-to-view (robust to rAF throttling)</li>
+      <li data-status="implemented">Category styling (colours/symbols) + legend with neutral fallback</li>
+      <li data-status="implemented">Category toggles + "toggle all" + responsive "Categories" dropdown</li>
+      <li data-status="implemented">Size filter (All / Medium &amp; large / Large only)</li>
+      <li data-status="implemented">Hover highlight — dim others, ring the 1-hop neighbourhood, colour edges by direction</li>
+      <li data-status="implemented">Floating description card with markdown rendering + placement search + grace period</li>
+      <li data-status="implemented">Hover-card badges: extension, ƒ count, # count, file size</li>
+      <li data-status="implemented">Symbol views — read-only CodeMirror 6 lists of exported functions / constants</li>
+      <li data-status="implemented">Draggable nodes (pin where dropped, reheats sim) + background pan/zoom</li>
+    </ul>
+
+    <h2 data-status="planned">Planned</h2>
+    <ul class="status-list">
+      <li data-status="planned">Focus mode — click a node → show it + its 1-hop neighbours as rich boxes (<code>graph/modes.js</code>, <code>ui/node-card.js</code> not yet created)</li>
+      <li data-status="planned">Overview ↔ Focus transition (circle→box morph, content cross-fade)</li>
+      <li data-status="planned">Editable node content in place (groundwork for the full in-node HTML editor)</li>
+      <li data-status="planned">Semantic zoom / level-of-detail — zoom picks a detail tier (<code>zoom.js</code> exposes the scale hook, but nothing consumes it yet)</li>
+      <li data-status="planned">Grouping — convex hulls or <code>d3-hierarchy</code> for folder/module clusters</li>
+      <li data-status="planned">Text search / filter by name</li>
+      <li data-status="planned">(Optional) Overview perf knobs — canvas circles / circle-collision force, only if Overview feels heavy</li>
+    </ul>
+
+    <h2 data-status="proposal">Proposals &amp; open questions</h2>
+    <ul class="status-list">
+      <li data-status="proposal">Starter category vocabulary is a <em>first draft to react to</em>, expected to evolve against real codebases</li>
+      <li data-status="proposal">Move from a single <code>category</code> to an ordered <code>tags[]</code> list (first tag = primary colour; groundwork already in <code>categories.js</code>)</li>
+      <li data-status="proposal">Language scope beyond JS/TS import resolution</li>
+      <li data-status="proposal">Bridge client↔backend graphs by mapping API endpoints to handlers — only if a clean mapping exists; not v1</li>
+      <li data-status="proposal">Browser folder-picking instead of a Node analyser step</li>
+      <li data-status="proposal">The full human↔AI comment-edit loop (see <a href="#overview">Vision</a>)</li>
+    </ul>
+
+    <h2 id="corrections">What changed vs the old checklist</h2>
+    <p>Corrections made after auditing the code:</p>
+    <ul class="note-list">
+      <li>Added shipped features the checklist never listed: box-collision force, vertical hierarchy, size filter, category toggles/dropdown, symbol views (ƒ/#), markdown descriptions, and hover-card badges.</li>
+      <li>Split the old "Filtering / search" item — <strong>filtering is done</strong>; only search is outstanding.</li>
+      <li>Marked <strong>semantic zoom</strong> as planned, not present: <code>zoom.js</code> exposes a scale hook but nothing consumes it, so there is no level-of-detail yet.</li>
+      <li>Marked <strong>editable nodes</strong> as planned: the symbol editor is explicitly read-only and Overview pills aren't editable.</li>
+    </ul>
+  </section>
+
+  <section class="page" id="requirements" data-status="reference">
+    <h1>Core requirements</h1>
+    <p class="lede">The original design constraints, each tagged with its current state.</p>
+    <ol class="req-list">
+      <li data-status="implemented">
+        <strong>Automatic layout is the priority.</strong> With potentially
+        hundreds of varying-size, varying-degree nodes, the initial arrangement
+        is computed by a force-directed layout. Connectedness drives proximity;
+        clusters emerge naturally.
+      </li>
+      <li data-status="implemented">
+        <strong>Varying node sizes.</strong> Node dimensions depend on content
+        and importance, so the layout avoids overlaps between unequal boxes (the
+        custom AABB collision force).
+      </li>
+      <li data-status="implemented">
+        <strong>Draggable nodes.</strong> Users can nudge nodes; the layout is a
+        starting point, not a cage.
+      </li>
+      <li data-status="planned">
+        <strong>Visually editable nodes.</strong> Colours and symbols convey file
+        kind today, but node <em>content</em> is not yet editable — that (and the
+        eventual in-node HTML editor) is planned.
+      </li>
+      <li data-status="planned">
+        <strong>Semantic zoom (level-of-detail).</strong> Content should adapt to
+        zoom level — minimal zoomed out, richer zoomed in. Not yet active; see
+        <a href="#zoom-modes">Zoom modes</a>.
+      </li>
+      <li data-status="implemented">
+        <strong>Scale.</strong> Must stay usable for a whole codebase (hundreds of
+        files, thousands of edges). The current 74-file / 231-edge graph settles
+        instantly; scaling knobs are noted under Zoom modes.
+      </li>
+    </ol>
+  </section>
+
+  <section class="page" id="architecture" data-status="implemented">
+    <h1>Architecture</h1>
+
+    <h2>File layout</h2>
+    <p>
+      Actual structure as of the audit. Files marked
+      <span class="tag" data-status="planned">planned</span> are referenced by the
+      design but not yet created.
+    </p>
+    <pre class="tree"><code>GraphEditor/
+├── package.json
+├── readme.html            ← this document (canonical plan &amp; status)
+├── readme.css, readme.js  ← rendering for this document
+├── index.html             ← app shell: SVG edge layer + HTML node layer
+├── styles.css
+├── src/
+│   ├── main.js            ← bootstraps: load graph.json → build → simulate → wire
+│   ├── analyser/
+│   │   ├── cli.js         ← analyser entry point (root → graph.json)
+│   │   ├── scan.js        ← walk a directory, collect source files
+│   │   ├── imports.js     ← extract + resolve import/require dependencies
+│   │   ├── describe.js    ← pull the leading description comment + @category
+│   │   └── exports.js     ← capture exported functions/constants for symbol views
+│   ├── graph/
+│   │   ├── build.js       ← analysis output → graph nodes/edges (+ size tiers)
+│   │   ├── simulation.js  ← d3-force setup (link/charge/center/hierarchy + box-collision)
+│   │   ├── box-collision.js ← custom rectangular (AABB) collision force
+│   │   ├── hierarchy.js   ← longest-path dependency layering → per-node level
+│   │   ├── zoom.js        ← d3-zoom + transform sync (scale hook for future LOD)
+│   │   ├── edges.js       ← edge rendering (SVG lines/arrows) under the node layer
+│   │   ├── filters.js     ← size filter + category toggles (shared visibility pass)
+│   │   ├── interactions.js ← drag, hover highlight, description card, symbol views
+│   │   └── modes.js       ← Overview ↔ Focus state + transitions        [planned]
+│   └── ui/
+│       ├── overview-node.js ← minimal pill (name + category glyph)
+│       ├── markdownish.js  ← lightweight markdown for the description card
+│       ├── symbol-editor.js ← read-only CodeMirror 6 view of exported symbols
+│       └── node-card.js    ← rich, editable Focus-mode card             [planned]
+├── scripts/
+│   ├── serve.mjs          ← tiny no-store static server (npm run dev)
+│   ├── add-categories.mjs ← one-off @category stamper for app/ sources
+│   └── cm-entry.mjs       ← CodeMirror bundle entry (npm run vendor:cm)
+├── data/
+│   ├── graph.json         ← analyser output (gitignored; the UI loads this)
+│   └── graph.sample.json  ← committed fallback dummy
+└── vendor/
+    ├── d3.js              ← self-contained d3 bundle
+    └── codemirror.js      ← self-contained CodeMirror 6 bundle</code></pre>
+
+    <h2>Rendering model</h2>
+    <p>
+      Edges are SVG lines/arrows in a back layer;
+      <strong>nodes are absolutely-positioned HTML <code>&lt;div&gt;</code>s</strong>
+      in a front layer. Both layers share the <code>d3-zoom</code> transform so
+      they pan/zoom together while node content stays editable DOM.
+    </p>
+
+    <h2>Pipeline</h2>
+    <ol>
+      <li><strong>Scan</strong> — discover source files (configurable root + glob).</li>
+      <li>
+        <strong>Analyse</strong> — per file, extract (a) dependency edges from
+        <code>import</code>/<code>require</code>, resolving to in-project files
+        (handling the <code>.js</code>-import → <code>.ts</code>-file case and
+        <code>index.*</code> directories), and (b) the leading description comment
+        including any <code>@category</code> tag (read verbatim, not inferred),
+        plus exported symbols.
+      </li>
+      <li><strong>Build</strong> — produce <code>nodes</code> and <code>edges</code> per the <a href="#schema">schema</a>, attaching size tiers/scales.</li>
+      <li><strong>Layout</strong> — run the <code>d3-force</code> simulation; connected files cluster; the box-collision force keeps varying-size boxes apart.</li>
+      <li><strong>Render</strong> — HTML node pills styled by category; edges in the back layer.</li>
+      <li><strong>Interact</strong> — drag to rearrange; hover to highlight the 1-hop neighbourhood; filter by size/category.</li>
+    </ol>
+  </section>
+
+  <section class="page" id="decisions" data-status="reference">
+    <h1>Design decisions</h1>
+
+    <h2>Library: D3 (modular) with HTML-<code>div</code> nodes</h2>
+    <p>
+      The deciding factors are <strong>editable HTML node content</strong>,
+      <strong>easy content swapping</strong>, and <strong>semantic zoom</strong> —
+      all of which favour nodes that are <em>real DOM elements</em> rather than
+      canvas-rendered overlays.
+    </p>
+    <ul>
+      <li><strong>Nodes are live DOM.</strong> Each node is an absolutely-positioned <code>&lt;div&gt;</code> synced to the zoom transform. Content is plain HTML we own, so "change content easily" and a future in-node editor are natural. (Cytoscape renders to canvas and can only <em>overlay</em> HTML — awkward for in-node editing.)</li>
+      <li><strong>Connection-driven auto-layout</strong> via <code>d3-force</code>: <code>forceLink</code> (springs), <code>forceManyBody</code> (repulsion), <code>forceCenter</code>.</li>
+      <li><strong>Modular</strong> — import only <code>d3-selection</code>, <code>d3-force</code>, <code>d3-zoom</code>, <code>d3-drag</code> (~50–70 KB); never the full ~270 KB bundle.</li>
+      <li><strong>Zero framework</strong>, full control over rendering and interaction.</li>
+    </ul>
+
+    <h3>Overlap removal — nodes are boxes, not circles</h3>
+    <p>
+      D3's built-in <code>forceCollide</code> is circle-based and would reserve a
+      circle big enough to hold each rectangular card, leaving wasteful gaps
+      around wide/tall nodes. Instead we use a <strong>custom rectangular (AABB)
+      collision force</strong>: each node is a <code>width × height</code> box,
+      and overlapping boxes are pushed apart along their minimum-overlap axis.
+      This packs tightly, is ~30 lines, and is the standard approach when node
+      shape matters.
+    </p>
+
+    <h3>Compound nodes / grouping</h3>
+    <p>
+      D3 has no built-in compound-node primitive.
+      <span class="tag" data-status="planned">Planned</span> approaches when
+      grouping is needed: <strong>hierarchical</strong> (<code>d3-hierarchy</code>
+      <code>pack</code>/<code>treemap</code> for true nesting by folder/module),
+      or <strong>force-layout grouping</strong> (draw a convex hull around each
+      cluster and add an attraction force).
+    </p>
+
+    <h3>Alternatives considered</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Library</th><th>Verdict</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Cytoscape.js + <code>fcose</code></strong></td><td>Documented fallback. Wins on compound nodes and polished overlap-removal for varying-size nodes. Loses on node content: canvas-rendered, HTML only as overlay → awkward in-node editing. Revisit if folder-as-container grouping becomes central.</td></tr>
+          <tr><td><strong>AntV G6</strong></td><td>Many layouts + rich native nodes, but bigger API churn and content less DOM-native than D3.</td></tr>
+          <tr><td><strong>React Flow / Svelte Flow</strong></td><td>Best HTML-node editing UX, but weak auto-layout (needs ELK/dagre) and requires a framework.</td></tr>
+          <tr><td><strong>Sigma.js / Cosmograph</strong></td><td>Excellent for 10k+ nodes via WebGL, but weak at text-rich, editable nodes. Overkill here.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2>Other decisions made</h2>
+    <ul>
+      <li><strong>Analysis runtime.</strong> A Node analyser → <code>graph.json</code> step; the UI loads the JSON. Browser folder-picking is a possible later enhancement.</li>
+      <li><strong>Categories come from the comment, not inference.</strong> The analyser does not classify files. Each file declares its own <code>@category</code>; the visualiser just maps it to a colour/symbol. No fragile heuristics.</li>
+      <li><strong>Separate graphs are separate.</strong> Backend / tests / client app are disjoint dependency graphs and aren't shown together. Which graph (or folder root) to view is a top-level choice.</li>
+    </ul>
+  </section>
+
+  <section class="page" id="zoom-modes" data-status="planned">
+    <h1>Zoom modes (overview vs focus)</h1>
+    <p class="lede">
+      Two viewing modes, each with its own scope, node visual, and physics.
+      <strong>Mode A (Overview) is implemented; Mode B (Focus) and the transition
+      between them are planned.</strong>
+    </p>
+
+    <h2 data-status="implemented">Mode A — Overview (bird's-eye)</h2>
+    <ul>
+      <li><strong>Scope:</strong> the whole graph — all nodes and edges.</li>
+      <li><strong>Node visual:</strong> minimal pill showing the file name only, coloured/iconed by category.</li>
+      <li><strong>Edges:</strong> thin lines; direction de-emphasised until hover.</li>
+      <li><strong>Goal:</strong> see the structure of the whole codebase at a glance — hubs, clusters, isolated files.</li>
+    </ul>
+
+    <h2 data-status="planned">Mode B — Focus (neighbourhood)</h2>
+    <ul>
+      <li><strong>Scope:</strong> the focused node + its 1-hop neighbours only — <em>depends on</em> (outgoing) and <em>depended on by</em> (incoming).</li>
+      <li><strong>Node visual:</strong> rich text boxes — title + description + badges. Focused node centred and largest.</li>
+      <li><strong>Edges:</strong> directional arrows that clearly separate the two groups.</li>
+      <li><strong>Re-focus:</strong> click a neighbour to recentre. <strong>Exit:</strong> Esc / back returns to Overview, restoring prior pan/zoom.</li>
+    </ul>
+
+    <h2 data-status="planned">Transition</h2>
+    <p>
+      A node morphs <strong>circle → box</strong> entering Focus; content
+      cross-fades from name-only to the full card; non-neighbour nodes fade out.
+      Reverse on exit. Positions animate rather than jump.
+    </p>
+
+    <h2 data-status="reference">Physics &amp; performance note</h2>
+    <p>
+      The original idea was circle physics in Overview, box physics in Focus, on
+      the assumption box physics for hundreds of nodes would lag. It won't — with
+      a quadtree, both run ~O(n log n) and a few hundred nodes settle at 60fps.
+      The real cost at scale is the <strong>DOM</strong>: hundreds of rich cards
+      repositioned every tick. Therefore:
+    </p>
+    <ul>
+      <li><strong>Box physics in both modes</strong> (already the case) — physics is not the bottleneck.</li>
+      <li>The Overview/Focus split is justified by DOM cost + legibility: Overview renders little per node; Focus renders rich boxes for only a handful of neighbours.</li>
+      <li>Settle the simulation (<code>alphaMin</code>) and stop ticking when idle; re-run only on interaction.</li>
+      <li><strong>Optimisation knobs, only if Overview feels heavy</strong> (in order): render overview nodes as canvas/SVG circles; then switch Overview to the cheaper circle-collision force.</li>
+    </ul>
+  </section>
+
+  <section class="page" id="categories" data-status="proposal">
+    <h1>Categories &amp; colours</h1>
+    <p class="lede">
+      A file's category is declared <strong>inside its leading description
+      comment</strong> via a tag the analyser reads verbatim. The
+      <em>mechanism</em> is implemented; the <em>vocabulary</em> below is a first
+      draft to react to.
+    </p>
+
+    <pre><code>/**
+ * mesh.js — maintains the WebRTC peer mesh: tracks connected peers,
+ * handles reconnection, and routes signalling messages.
+ *
+ * @category network
+ */</code></pre>
+
+    <p>
+      The visualiser maps the tag to a colour + symbol. This keeps classification
+      out of the analyser (no fragile heuristics) and in the hands of whoever
+      writes the comment (AI, then user).
+    </p>
+
+    <h2>Starter palette</h2>
+    <p class="note">
+      <span class="tag" data-status="implemented">In code</span>
+      This table matches <code>graph/categories.js</code> exactly (the old README
+      table was missing <code>crypto</code>).
+      <span class="tag" data-status="proposal">Draft vocabulary</span>
+      categories are free-form strings; unknown values fall back to neutral grey.
+    </p>
+    <div class="table-wrap">
+      <table class="cat-table">
+        <thead><tr><th>Category</th><th>Meaning</th><th>Colour</th><th>Symbol</th></tr></thead>
+        <tbody>
+          <tr><td><code>ui</code></td><td>UI components / views / pages</td><td><span class="swatch" style="--c:#4F86C6"></span> #4F86C6 blue</td><td>▢</td></tr>
+          <tr><td><code>data</code></td><td>models, schemas, state, persistence</td><td><span class="swatch" style="--c:#9B6BD6"></span> #9B6BD6 purple</td><td>◆</td></tr>
+          <tr><td><code>network</code></td><td>transport, peer, API, signalling</td><td><span class="swatch" style="--c:#16A6A6"></span> #16A6A6 teal</td><td>⇄</td></tr>
+          <tr><td><code>crypto</code></td><td>keys, encryption, signatures</td><td><span class="swatch" style="--c:#C2473D"></span> #C2473D red</td><td>⚿</td></tr>
+          <tr><td><code>util</code></td><td>pure helpers / shared utilities</td><td><span class="swatch" style="--c:#6B7280"></span> #6B7280 slate</td><td>⚙</td></tr>
+          <tr><td><code>command</code></td><td>actions / commands / handlers</td><td><span class="swatch" style="--c:#D6557F"></span> #D6557F pink</td><td>▶</td></tr>
+          <tr><td><code>entry</code></td><td>entry points / bootstrap / app shell</td><td><span class="swatch" style="--c:#2FA84F"></span> #2FA84F green</td><td>★</td></tr>
+          <tr><td><code>test</code></td><td>tests / fixtures</td><td><span class="swatch" style="--c:#D9A521"></span> #D9A521 amber</td><td>✓</td></tr>
+          <tr><td><code>external</code></td><td>vendored / third-party</td><td><span class="swatch" style="--c:#E0772B"></span> #E0772B orange</td><td>◇</td></tr>
+          <tr><td><em>(unknown)</em></td><td>no/unrecognised <code>@category</code></td><td><span class="swatch" style="--c:#94A3B8"></span> #94A3B8 grey</td><td>•</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2 data-status="proposal">Single category now, tags later</h2>
+    <p>
+      v1 uses one <code>category</code> string per file. Category boundaries
+      aren't always clean, so we may move to an <strong>ordered tag list</strong>
+      where the first tag is primary (→ colour) and secondary tags get a lighter
+      treatment. To keep that shift cheap, the colour lookup already accepts
+      either <code>category</code> <em>or</em> a <code>tags[]</code> array (first
+      element = primary), so adding tags is additive, not a rewrite.
+    </p>
+  </section>
+
+  <section class="page" id="schema" data-status="reference">
+    <h1><code>graph.json</code> schema</h1>
+    <p class="lede">
+      The contract between analyser and UI (and the shape of the dummy file).
+      Updated to include the fields the analyser actually emits — the old README
+      schema listed only <code>id/name/path/category/description/loc</code> and
+      omitted <code>chars</code>, <code>exports</code>, and <code>symbols</code>.
+    </p>
+    <pre><code>{
+  "root": "app",                          // analysed root (relative label)
+  "nodes": [
+    {
+      "id": "app/js/peer/mesh.js",        // unique; repo-relative path
+      "name": "mesh",                     // short label (folder name for index.*)
+      "path": "app/js/peer/mesh.js",
+      "category": "network",              // from @category; may be absent
+      "description": "Maintains the WebRTC peer mesh...", // full comment text
+      "loc": 240,                         // non-blank lines
+      "chars": 6120,                      // file length → size tier + node size
+      "exports": { "fns": 4, "consts": 2 },        // counts for the ƒ / # badges
+      "symbols": {                                  // full source per symbol
+        "fns":    [ { "name": "connect", "code": "export function connect(...) {...}" } ],
+        "consts": [ { "name": "MAX_PEERS", "code": "export const MAX_PEERS = 8;" } ]
+      }
+    }
+  ],
+  "edges": [
+    // source depends on target (source imports target).
+    // "depends on" = outgoing; "depended on by" = incoming.
+    { "source": "app/js/peer/mesh.js", "target": "app/js/peer/client.js" }
+  ]
+}</code></pre>
+  </section>
+
+  <section class="page" id="prior-art" data-status="reference">
+    <h1>Prior art</h1>
+    <p class="lede">
+      Web research, June 2026. The core concept — browsing code by
+      <strong>dependency structure</strong> rather than the file tree — is proven,
+      but our specific angle (editable, file-level, description-comment nodes) is
+      largely unexplored.
+    </p>
+
+    <h2>Closest concept match — Sourcetrail</h2>
+    <p>
+      <a href="https://github.com/CoatiSoftware/Sourcetrail">Sourcetrail</a> (FOSS,
+      discontinued 2021). Select a symbol and the graph focuses on it, showing all
+      incoming and outgoing dependencies — essentially our Focus mode, at
+      <em>symbol</em> granularity. It proved the graph-as-navigation model; its
+      abandonment is an opportunity. Study its UX.
+    </p>
+
+    <h2>Closest pipeline match — CodeAtlas</h2>
+    <p>
+      <a href="https://github.com/Picrew/CodeAtlas">CodeAtlas</a> (open source).
+      Turns a repo into a self-contained <code>codeatlas.html</code> interactive
+      <em>file</em> dependency graph plus <code>module-map.json</code> +
+      <code>summary.md</code> — almost exactly our "Node analyser → JSON → HTML
+      viewer" pipeline.
+    </p>
+
+    <h2>Adjacent — read-only viewers / onboarding maps</h2>
+    <ul>
+      <li><a href="https://www.codesee.io/">CodeSee</a> — code maps of services/dirs/file deps, upstream+downstream, onboarding focus.</li>
+      <li><a href="https://www.gitkraken.com/features/code-dependency-mapping">GitKraken Codemaps</a>, NDepend (dependency matrix + graph), Emerge (browser-based, multi-language).</li>
+      <li>A shared <a href="https://gist.github.com/aessam/963beecba29660a532b11f03b27e1b92">Claude Code D3.js prompt</a> generates dependency graphs with 3 zoom levels (system / module / full) — independent convergence on our semantic-zoom idea.</li>
+    </ul>
+  </section>
+
+  <section class="page" id="running" data-status="reference">
+    <h1>Running &amp; analysing</h1>
+
+    <h2>Run the app</h2>
+    <p>Plain static files — no build step, no <code>npm install</code> needed.</p>
+    <pre><code>npm run dev          # node scripts/serve.mjs 8088 (serves this folder)
+# then open:
+open http://localhost:8088/</code></pre>
+    <p>
+      <code>scripts/serve.mjs</code> is a tiny static server that sends
+      <code>Cache-Control: no-store</code>, so edited ES modules always reload
+      (browsers otherwise cache modules and keep running stale code after edits).
+    </p>
+    <p class="warn">
+      <strong>Must be served over HTTP</strong> — do not open
+      <code>index.html</code> as a <code>file://</code>. ES modules and
+      <code>fetch()</code> are blocked on the <code>file://</code> origin, which
+      shows a blank page.
+    </p>
+    <p class="note">
+      <strong>Offline / no CDN.</strong> <code>d3</code> is vendored as a single
+      self-contained bundle at <code>vendor/d3.js</code>; the import map maps the
+      bare <code>d3-*</code> specifiers to it. Nothing is fetched at runtime.
+    </p>
+
+    <h2>Rebuild the CodeMirror bundle</h2>
+    <p>
+      CodeMirror 6 (the hover card's read-only symbol editor) is vendored the same
+      way: <code>vendor/codemirror.js</code> is a single esbuild bundle of
+      <code>scripts/cm-entry.mjs</code>. Bundling from one entry keeps CM's core a
+      singleton (separately-bundled CM packages would duplicate it and break
+      facet/StateField identity). Rebuild after changing the entry or upgrading CM:
+    </p>
+    <pre><code>npm run vendor:cm   # esbuild scripts/cm-entry.mjs → vendor/codemirror.js</code></pre>
+
+    <h2>Analyse a codebase</h2>
+    <pre><code>node src/analyser/cli.js &lt;root&gt; [--out data/graph.json]   # default root: ../app</code></pre>
+    <p>
+      The analyser walks the root (skipping <code>dist</code>/<code>vendor</code>/<code>node_modules</code>),
+      extracts each file's in-project imports and its leading description comment +
+      <code>@category</code>, and writes <code>data/graph.json</code> (gitignored;
+      the UI loads it, falling back to the committed
+      <code>data/graph.sample.json</code>). Import resolution handles the
+      <code>.js</code>-import → <code>.ts</code>-file case and <code>index.*</code>
+      directories.
+    </p>
+    <p>
+      <code>scripts/add-categories.mjs &lt;root&gt;</code> is the one-off
+      (idempotent) migration that stamped an <code>@category</code> tag into every
+      <code>app/</code> source file's leading comment, seeded from a
+      directory→category map. Re-running skips already-tagged files.
+    </p>
+  </section>
+
+</main>
+
+<script src="./readme.js"></script>
+</body>
+</html>
