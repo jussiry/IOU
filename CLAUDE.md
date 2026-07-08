@@ -21,6 +21,21 @@ npm run dev   # starts server at http://localhost:3000 with auto-reload
 
 ---
 
+## Glossary
+
+[`GLOSSARY.md`](GLOSSARY.md) defines the project-specific vocabulary.
+
+**Keeping it current:**
+- Add a term only when a genuinely new, load-bearing concept is introduced — be
+  **conservative**; a bloated glossary is worse than a short one. Most changes
+  need no glossary edit.
+- If you notice the glossary no longer matches reality (a term was renamed,
+  removed, or its meaning drifted), **flag it and offer a full pass** over all
+  terms.
+- Scope excludes `GraphEditor/` and `web/` (separate projects).
+
+---
+
 ## Browser tools — which to use
 
 **Preview browser (`preview_*` tools) is the only tool for testing this app's UI.**
