@@ -173,6 +173,19 @@ const server = http.createServer(async (request, response) => {
   const isWebPrefix = requestUrl.pathname === WEB_PREFIX || requestUrl.pathname.startsWith(WEB_PREFIX + "/");
 
   if (isWebDomain || (isWebPrefix && isLocalhost)) {
+    // Directory-style mount points (a served index.html standing in for a
+    // folder) need a trailing slash, or the browser resolves that page's own
+    // *relative* links (e.g. design/'s "assets/design.css") against the
+    // parent path instead of the mount itself — silently 404ing every asset.
+    // Redirect the bare form once rather than serving content at the wrong
+    // apparent base.
+    const directoryMountPath = isWebDomain ? DESIGN_SUBPATH : `${WEB_PREFIX}${DESIGN_SUBPATH}`;
+    if (requestUrl.pathname === directoryMountPath || (isWebPrefix && !isWebDomain && requestUrl.pathname === WEB_PREFIX)) {
+      response.writeHead(301, { Location: `${requestUrl.pathname}/${requestUrl.search}` });
+      response.end();
+      return;
+    }
+
     const webPath = isWebPrefix
       ? requestUrl.pathname.slice(WEB_PREFIX.length) || "/"
       : requestUrl.pathname;
