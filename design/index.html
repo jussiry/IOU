@@ -1,0 +1,90 @@
+<!--
+  index.html — the Design site's landing page.
+
+  Design is Tally's single place to understand and (eventually) shape the
+  system: overview, architecture, specs, glossary, and the TIP design docs,
+  cross-linked and status-tagged. Authored text-first — this file reads cleanly
+  as raw HTML; assets/design.js renders the shared shell.
+-->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Design — Tally</title>
+  <link rel="stylesheet" href="assets/design.css" />
+</head>
+<body>
+  <main class="page" data-status="reference">
+    <h1>Design</h1>
+
+    <p class="lede">
+      One place to understand — and, in time, to shape — how Tally works.
+      Overview, architecture, specs, glossary, and design proposals (TIPs),
+      cross-linked and honest about what is built versus merely planned.
+    </p>
+
+    <p>
+      "Design" here means <em>system</em> design (how the app is built), not
+      visual design. Everything is authored <strong>text-first as plain
+      HTML</strong>: each page reads cleanly as raw source for a human or an AI,
+      and with JavaScript off it is just a readable page. The shared sidebar and
+      topbar are progressive enhancement — they add navigation, never content,
+      so the markup of each page stays the single source of truth.
+    </p>
+
+    <h2>Status convention</h2>
+    <p>
+      Every page — and, where useful, individual claims — carries a status so
+      its maturity is explicit in the source and colour-coded in the render:
+    </p>
+    <ul class="legend">
+      <li class="chip" data-status="implemented">implemented — exists and works in the code today</li>
+      <li class="chip" data-status="planned">planned — decided and well-defined, not built yet</li>
+      <li class="chip" data-status="proposal">proposal — a suggestion, draft, or open question</li>
+      <li class="chip" data-status="reference">reference — background, rationale, or a spec/contract</li>
+    </ul>
+    <p>
+      When a page makes claims about the code, it should say when they were last
+      verified against it (e.g. "verified 2026-07-09"), not assume they stay true
+      forever.
+    </p>
+
+    <h2>How this is organised</h2>
+    <ul>
+      <li><strong>Standalone pages.</strong> Each topic is its own
+        <code>.html</code> file in <code>design/</code>; the sidebar (from
+        <code>assets/pages.js</code>) ties them together. CSS/JS live under
+        <code>assets/</code>, out of the way.</li>
+      <li><strong>Migrated incrementally.</strong> Existing docs
+        (<code>TIPs/</code>, <code>specs/</code>, <code>plan/</code>,
+        <code>GLOSSARY.md</code>) move in over time. They may <em>conflict</em>
+        with each other or with the code at first — that is expected. The plan
+        is to bring them in, tag their status, and reconcile in place rather
+        than block on a perfect merge. The hand-written <code>plan/</code> notes
+        in particular hold original rationale worth preserving even where parts
+        have aged.</li>
+      <li><strong>Scope.</strong> For now this covers the Tally app. GraphEditor
+        (the dependency-graph tool) is a candidate to fold in later, at which
+        point Design spans documenting <em>and</em> editing/visualising.</li>
+    </ul>
+
+    <h2>Pages</h2>
+    <p>
+      Use the sidebar to navigate. Available so far:
+    </p>
+    <ul>
+      <li><a href="glossary.html">Glossary</a> — project-specific vocabulary
+        (<span class="tag" data-status="reference">reference</span>).</li>
+    </ul>
+    <p>
+      More to come as documents migrate in: overview/vision, architecture,
+      data model, the ledger and peer-communication specs, and the TIP design
+      proposals.
+    </p>
+  </main>
+
+  <script src="assets/pages.js"></script>
+  <script src="assets/design.js"></script>
+</body>
+</html>
