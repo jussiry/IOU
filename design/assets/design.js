@@ -39,30 +39,57 @@
     '<button class="nav-toggle" type="button" aria-label="Toggle navigation">☰</button>';
 
   // ---- Sidebar table of contents ---------------------------------------
+  // Groups fold to just their header, except the group containing the current
+  // page (open by default) and any group the user has manually expanded — so
+  // the sidebar stays scannable on a site with many pages while always
+  // surfacing where you are.
   var toc = document.createElement("nav");
   toc.id = "toc";
   toc.setAttribute("aria-label", "Pages");
 
+  var currentGroup = current ? current.group : null;
   var lastGroup = null;
   var list = null;
+  var groupButton = null;
   pages.forEach(function (p) {
     if (p.group && p.group !== lastGroup) {
-      var h = document.createElement("div");
+      var isOpen = p.group === currentGroup;
+      var h = document.createElement("button");
+      h.type = "button";
       h.className = "toc-group";
-      h.textContent = p.group;
+      h.setAttribute("aria-expanded", String(isOpen));
+      h.innerHTML =
+        '<span class="toc-group-label">' + escapeHtml(p.group) + "</span>" +
+        '<span class="toc-group-caret" aria-hidden="true"></span>';
       toc.appendChild(h);
       list = document.createElement("ul");
+      list.hidden = !isOpen;
       toc.appendChild(list);
       lastGroup = p.group;
+      groupButton = h;
     }
     var li = document.createElement("li");
     var a = document.createElement("a");
     a.href = p.href;
     if (p.status) a.setAttribute("data-status", p.status);
-    if (current && p.href === current.href) a.classList.add("active");
+    if (current && p.href === current.href) {
+      a.classList.add("active");
+      if (groupButton) groupButton.classList.add("has-active");
+    }
     a.innerHTML = '<span class="dot" aria-hidden="true"></span>' + escapeHtml(p.title || p.href);
     li.appendChild(a);
     (list || toc).appendChild(li);
+  });
+
+  toc.addEventListener("click", function (e) {
+    var groupBtn = e.target.closest(".toc-group");
+    if (groupBtn) {
+      var isExpanded = groupBtn.getAttribute("aria-expanded") === "true";
+      groupBtn.setAttribute("aria-expanded", String(!isExpanded));
+      groupBtn.nextElementSibling.hidden = isExpanded;
+      return;
+    }
+    if (e.target.closest("a")) document.body.classList.remove("nav-open");
   });
 
   document.body.insertBefore(toc, main);
@@ -71,9 +98,6 @@
   // Mobile drawer toggle
   topbar.querySelector(".nav-toggle").addEventListener("click", function () {
     document.body.classList.toggle("nav-open");
-  });
-  toc.addEventListener("click", function (e) {
-    if (e.target.closest("a")) document.body.classList.remove("nav-open");
   });
 
   // Reflect the current page's status in the tab title prefix, cheap wayfinding.

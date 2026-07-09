@@ -106,14 +106,38 @@ body.enhanced > main.page { grid-area: content; overflow-y: auto; min-width: 0; 
   padding: 16px 12px;
   overflow: auto;
 }
+/* Group headers are buttons that fold/unfold their <ul>. Only the group
+   containing the current page (or one the user opened) shows its links. */
 #toc .toc-group {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
   color: var(--muted);
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  margin: 16px 8px 6px;
+  margin: 16px 0 6px;
+  padding: 4px 8px;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: inherit;
 }
-#toc .toc-group:first-child { margin-top: 4px; }
+#toc .toc-group:hover { color: var(--text); }
+#toc .toc-group:first-of-type { margin-top: 4px; }
+#toc .toc-group.has-active { color: var(--text); }
+#toc .toc-group-caret {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform 0.15s ease;
+}
+#toc .toc-group[aria-expanded="true"] .toc-group-caret { transform: rotate(45deg); }
 #toc ul { list-style: none; margin: 0; padding: 0; }
 #toc a {
   display: flex;
