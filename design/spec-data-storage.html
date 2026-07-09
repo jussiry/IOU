@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Spec: Data storage — Design</title>
+  <link rel="stylesheet" href="assets/design.css" />
+</head>
+<body>
+  <main class="page" data-status="reference">
+<div class="import-note">Imported as-is from <code>specs/data-storage.md</code>. It may conflict with current code or other pages — kept verbatim, pending reconciliation.</div>
+<h1>IOU Data Storage Specification</h1>
+<p><strong>Version:</strong> 1   <strong>Last updated:</strong> 2026-04-18</p>
+<hr />
+<h2>1. Overview</h2>
+<p>The IOU client stores all application state in a single IndexedDB record. There is no remote database; every piece of user data — identity, friends, transactions, and the peer-message ledger — lives exclusively in the browser. Peers synchronise directly with each other over WebRTC; the signalling server is stateless beyond a short delivery queue.</p>
+<p>A single user MAY be logged in on several devices at the same time — each browser tab / install gets its own IndexedDB record. Convergence between those records is not a storage concern; it is handled at the peer layer (see <code>specs/peer-communication.md §13</code> and <code>specs/ledger.md §8</code>). Each device is assigned an ephemeral <code>device_id</code> by the relay server on every WebSocket connection; this id is <strong>not</strong> persisted in IndexedDB.</p>
+<p>This document describes:</p>
+<ul><li>the IndexedDB layout,</li><li>every field in the root state object,</li><li>the data model types and their invariants, and</li><li>how state is loaded, saved, and cleared.</li></ul>
+<hr />
+<h2>2. IndexedDB Layout</h2>
+<div class="table-scroll"><table><thead><tr><th>Parameter</th><th>Value</th></tr></thead><tbody><tr><td>Database name</td><td><code>iou_client_db</code></td></tr><tr><td>Database version</td><td><code>1</code></td></tr><tr><td>Object store</td><td><code>app_state</code></td></tr><tr><td>Record key</td><td><code>root_state</code></td></tr></tbody></table></div>
+<p>There is exactly one record. The store has no index; all access goes through the well-known key.</p>
+<pre><code>iou_client_db (v1)
+└── app_state (object store)
+    └── "root_state"  →  RootState</code></pre>
+<h3>2.1 Opening and timeouts</h3>
+<p>Reads time out after <strong>2 seconds</strong> and return <code>null</code> on timeout. Writes time out after <strong>4 seconds</strong> and throw. If the database connection stalls (version-change event from another tab, open request blocked), the cached promise is reset so the next call reopens cleanly.</p>
+<p><code>window.clearAppState</code> is exposed on the global object as a convenience for developer console use.</p>
+<h3>2.2 Multi-tab safety for reset</h3>
+<p>When the user asks to be "removed" from the device, the implementation deletes the <strong>entire IndexedDB database</strong> (<code>deleteDatabase()</code>), not just the <code>root_state</code> record. A per-record <code>delete</code> is unsafe while other tabs of the same origin may still hold the previous <code>RootState</code> in their in-memory <code>cachedState</code>: any save from such a tab would resurrect a stale record immediately after the reset tab wipes it. Dropping the database forces every tab to go through <code>openDatabase</code> again, and the reset tab's subsequent reload then determines what (if anything) gets written back.</p>
+<p><code>deleteDatabase()</code> closes the local connection first so the deletion is not blocked by its own open handle. <code>onblocked</code> and <code>onerror</code> still resolve the promise — the caller is expected to reload the page immediately after, which drops any other open handle.</p>
+<hr />
+<h2>3. Root State (<code>RootState</code>)</h2>
+<pre><code>{
+  model_version: number,          // DATA_MODEL_VERSION constant (currently 3)
+  user: PersonModel,              // the local user (includes private keys)
+  contacts: ContactsMap,          // key → ContactModel (public info only)
+  ledger: LedgerEntryModel[],     // append-only signed message log
+  outbox: PeerMessageModel[],     // messages waiting for delivery
+  processed_peer_message_ids: string[], // deduplication set
+}</code></pre>
+<p><code>model_version</code> is checked on load by the app-state migration runner before normalization. Migrations are versioned by <code>DATA_MODEL_VERSION</code>; after migration, <code>normalizeAppState(state)</code> coerces the record into the current model shape and the migrated state is saved back to IndexedDB. The constant <code>DATA_MODEL_VERSION = 3</code> is exported from <code>client/js/models/data-model.js</code>.</p>
+<hr />
+<h2>4. Data Model Types</h2>
+<p>All factory functions (<code>createPersonModel</code>, <code>createConnectionModel</code>, etc.) normalise inputs defensively: unknown fields are dropped, wrong types coerce to safe defaults, and the model registry is the single source of truth for field shape. Callers must go through these factories rather than constructing shapes inline.</p>
+<h3>4.1 PersonModel</h3>
+<p>Represents the local user (stored under <code>user</code>). Contains private key material.</p>
+<div class="table-scroll"><table><thead><tr><th>Field</th><th>Type</th><th>Default</th><th>Notes</th></tr></thead><tbody><tr><td><code>id</code></td><td>string</td><td><code>""</code></td><td>Equals <code>public_key</code> (npub format)</td></tr><tr><td><code>name</code></td><td>string</td><td><code>"Anonymous"</code></td><td>Display name, trimmed</td></tr><tr><td><code>public_key</code></td><td>string</td><td><code>""</code></td><td>Nostr npub — used as the canonical peer identifier</td></tr><tr><td><code>public_key_hex</code></td><td>string</td><td><code>""</code></td><td>Same key in 32-byte hex (x-only secp256k1)</td></tr><tr><td><code>private_key</code></td><td>string</td><td><code>""</code></td><td>Nostr nsec — used for signing and ECDH</td></tr><tr><td><code>private_key_hex</code></td><td>string</td><td><code>""</code></td><td>Same key in 32-byte hex</td></tr><tr><td><code>connections</code></td><td>ConnectionModel[]</td><td><code>[]</code></td><td>Deduplicated by <code>person_id</code></td></tr></tbody></table></div>
+<p><code>createPublicPersonModel</code> returns the same shape with <code>private_key</code> and <code>private_key_hex</code> forced to <code>""</code>. Used for contact records.</p>
+<h3>4.2 ConnectionModel</h3>
+<p>Represents one bilateral friendship stored inside <code>user.connections</code>.</p>
+<div class="table-scroll"><table><thead><tr><th>Field</th><th>Type</th><th>Default</th><th>Notes</th></tr></thead><tbody><tr><td><code>person_id</code></td><td>string</td><td><code>""</code></td><td>Peer's npub; used as the unique key</td></tr><tr><td><code>person_name</code></td><td>string</td><td><code>""</code></td><td>Display name as last received from the peer</td></tr><tr><td><code>friendship_status</code></td><td>string</td><td><code>"accepted"</code></td><td>One of <code>pending_outgoing</code>, <code>pending_incoming</code>, <code>accepted</code>, <code>rejected</code></td></tr><tr><td><code>debt_eur</code></td><td>number</td><td><code>0</code></td><td>Positive = peer owes you; negative = you owe the peer</td></tr><tr><td><code>trust_credit_limit_eur</code></td><td>number</td><td><code>0</code></td><td>Agreed maximum credit exposure</td></tr><tr><td><code>pending_credit_limit_eur</code></td><td>number \</td><td>null</td><td><code>null</code></td><td>Proposed new limit awaiting acceptance; <code>null</code> when none</td></tr><tr><td><code>pending_credit_limit_is_incoming</code></td><td>bool \</td><td><code>"lowered"</code> \</td><td>null</td><td><code>null</code></td><td>Direction/kind of pending limit change: <code>true</code> = incoming proposal, <code>false</code> = outgoing proposal, <code>"lowered"</code> = auto-applied lower limit</td></tr><tr><td><code>recent_transactions</code></td><td>TransactionModel[]</td><td><code>[]</code></td><td>Short tail of recent transactions for display</td></tr><tr><td><code>last_synced_at</code></td><td>string</td><td><code>""</code></td><td>ISO-8601 timestamp of the last successful WebRTC sync with this peer</td></tr><tr><td><code>pending_payment_request</code></td><td>PaymentRequestModel \</td><td>null</td><td><code>null</code></td><td>At most one active payment request per connection</td></tr><tr><td><code>pending_name_change</code></td><td><code>{oldName, newName}</code> \</td><td>null</td><td><code>null</code></td><td>Displayed while waiting for user confirmation</td></tr></tbody></table></div>
+<h4>PaymentRequestModel (inline in ConnectionModel)</h4>
+<div class="table-scroll"><table><thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead><tbody><tr><td><code>id</code></td><td>string</td><td></td></tr><tr><td><code>amount_eur</code></td><td>number</td><td></td></tr><tr><td><code>note</code></td><td>string</td><td></td></tr><tr><td><code>is_incoming</code></td><td>boolean</td><td><code>true</code> = the peer sent it to you</td></tr><tr><td><code>created_at</code></td><td>string</td><td>ISO-8601</td></tr></tbody></table></div>
+<h3>4.3 TransactionModel</h3>
+<p>Stored inside <code>ConnectionModel.recent_transactions</code>.</p>
+<div class="table-scroll"><table><thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead><tbody><tr><td><code>id</code></td><td>string</td><td></td></tr><tr><td><code>date</code></td><td>string</td><td>YYYY-MM-DD</td></tr><tr><td><code>amount_eur</code></td><td>number</td><td>Positive = received, negative = paid</td></tr><tr><td><code>note</code></td><td>string</td><td></td></tr></tbody></table></div>
+<h3>4.4 LedgerEntryModel</h3>
+<p>One entry in the append-only local ledger. See the Ledger spec for full semantics.</p>
+<div class="table-scroll"><table><thead><tr><th>Field</th><th>Type</th><th>Default</th><th>Notes</th></tr></thead><tbody><tr><td><code>id</code></td><td>string</td><td><code>""</code></td><td>Matches the originating peer message <code>id</code></td></tr><tr><td><code>timestamp</code></td><td>string</td><td><code>""</code></td><td>ISO-8601; set locally when the entry is appended</td></tr><tr><td><code>type</code></td><td>string</td><td><code>""</code></td><td>Peer message type (e.g. <code>friend_request</code>, <code>tx_created</code>)</td></tr><tr><td><code>from_user_id</code></td><td>string</td><td><code>""</code></td><td>Sender's npub</td></tr><tr><td><code>to_user_id</code></td><td>string</td><td><code>""</code></td><td>Recipient's npub</td></tr><tr><td><code>originated_at</code></td><td>string</td><td><code>""</code></td><td>Sender's <code>created_at</code> from the original peer message; needed to reconstruct the Schnorr digest</td></tr><tr><td><code>signature</code></td><td>string</td><td><code>""</code></td><td>Schnorr (BIP-340) signature hex over the canonical inner-message digest</td></tr><tr><td><code>payload</code></td><td>object</td><td><code>{}</code></td><td>Message-type-specific data (deep-cloned plain object)</td></tr></tbody></table></div>
+<p><code>timestamp</code> is set by the local machine at append time; it is not covered by the signature. <code>originated_at</code> is the sender-asserted timestamp that <em>is</em> covered by the signature; it must be preserved to allow post-hoc verification.</p>
+<h3>4.5 PeerMessageModel</h3>
+<p>Entries in the outbox — messages queued for delivery that have not yet been acknowledged.</p>
+<div class="table-scroll"><table><thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead><tbody><tr><td><code>id</code></td><td>string</td><td>Unique identifier</td></tr><tr><td><code>type</code></td><td>string</td><td>Peer message type</td></tr><tr><td><code>from_user_id</code></td><td>string</td><td>Local user's npub</td></tr><tr><td><code>to_user_id</code></td><td>string</td><td>Recipient's npub</td></tr><tr><td><code>created_at</code></td><td>string</td><td>ISO-8601 timestamp at creation</td></tr><tr><td><code>signature</code></td><td>string</td><td>Schnorr signature (may be empty for legacy outbox items)</td></tr><tr><td><code>payload</code></td><td>object</td><td>Deep-cloned</td></tr></tbody></table></div>
+<h3>4.6 ContactsMap</h3>
+<p>A plain object keyed by npub. Values are <code>ContactModel</code> (= <code>createPublicPersonModel</code> output, no private keys).</p>
+<pre><code>{
+  [npub: string]: {
+    id: string,
+    name: string,
+    public_key: string,       // npub
+    public_key_hex: string,   // hex
+    private_key: "",          // always empty
+    private_key_hex: "",      // always empty
+    connections: [],          // always empty for contacts
+  }
+}</code></pre>
+<p>Contacts are created when a peer message is first received from someone not yet in the map. They provide the public key material needed for ECDH and signature verification before the friendship is fully established.</p>
+<h3>4.7 processed_peer_message_ids</h3>
+<p>A <code>string[]</code> acting as a deduplication set. When an inbound peer message is successfully applied, its <code>id</code> is added here. On subsequent receives the message is silently dropped before processing. The array is normalised (deduplicated, empty strings removed) on every <code>normalizeAppState</code> call.</p>
+<hr />
+<h2>5. Storage API</h2>
+<p>All storage access goes through <code>client/js/storage/indexeddb.js</code>.</p>
+<div class="table-scroll"><table><thead><tr><th>Export</th><th>Signature</th><th>Behaviour</th></tr></thead><tbody><tr><td><code>loadAppState</code></td><td>`() → RootState \</td><td>null`</td><td>Reads the record; returns <code>null</code> on miss or 2 s timeout</td></tr><tr><td><code>saveAppState</code></td><td><code>(state) → state</code></td><td>Overwrites the record; throws on 4 s timeout</td></tr><tr><td><code>clearAppState</code></td><td><code>() → void</code></td><td>Deletes the <code>root_state</code> record from the object store (single-tab scenarios only)</td></tr><tr><td><code>deleteDatabase</code></td><td><code>() → void</code></td><td>Drops the entire <code>iou_client_db</code> database; used by the "remove user" flow for the multi-tab-safe reset described in §2.2</td></tr></tbody></table></div>
+<p>There is no partial-update API; the entire root state is always written atomically as a single IndexedDB <code>put</code>. Callers load state, mutate in memory, then call <code>saveAppState</code>.</p>
+<hr />
+<h2>6. State Normalisation</h2>
+<p><code>normalizeAppState(state)</code> runs every model field through the corresponding factory function, producing a clean <code>RootState</code> from whatever is loaded from disk. This is the point where unknown fields are stripped and defaults are applied. App-state migrations run before normalization so they can still see old fields that the current factories might otherwise discard. Normalization then re-applies <code>DATA_MODEL_VERSION</code>.</p>
+<p><code>createEmptyAppState(userPerson)</code> builds a minimal valid state for a brand-new user: empty connections, contacts, ledger, outbox, and processed-IDs list.</p>
+<hr />
+<h2>7. Dev Seed System</h2>
+<p>During development the app accepts a <code>__IOU_SEED_STATE</code> property on <code>window</code> (injected by the Playwright harness or manually). On startup, if this property is present, the app clears IndexedDB and writes the seed state, then removes the property. This allows E2E tests to inject any fixture state without going through the UI flows.</p>
+<p>The URL parameter <code>?seed=&lt;name&gt;</code> triggers one of the built-in seed builders (alice, bob, carol) but only if no user state already exists. <code>?removeUser</code> clears IndexedDB so a subsequent seed can apply.</p>
+  </main>
+  <script src="assets/pages.js"></script>
+  <script src="assets/design.js"></script>
+</body>
+</html>

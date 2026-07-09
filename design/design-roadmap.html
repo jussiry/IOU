@@ -1,0 +1,114 @@
+<!--
+  design-roadmap.html — the plan for the Design site itself ("the design of
+  Design"). Kept inside Design so the site documents its own direction. Status:
+  proposal — decisions are made, but most of the build is still ahead.
+-->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Design roadmap — Design</title>
+  <link rel="stylesheet" href="assets/design.css" />
+</head>
+<body>
+  <main class="page" data-status="proposal">
+    <h1>Design roadmap</h1>
+
+    <p class="lede">
+      The plan for this site itself: what Design is, the decisions behind it, and
+      what's built versus still ahead. Kept here so Design documents its own
+      direction.
+    </p>
+
+    <h2>What it is</h2>
+    <p>
+      One place to understand — and eventually to shape — how Tally works,
+      unifying what is today scattered across <code>TIPs/</code>,
+      <code>specs/</code>, <code>plan/</code>, and <code>GLOSSARY.md</code> into a
+      cross-linked, text-first HTML site. Each page reads cleanly as raw source
+      (for a human or an AI) and renders as a paged, navigable doc site — the
+      GraphEditor <code>readme.html</code> pattern, generalised to a whole
+      multi-document project.
+    </p>
+
+    <h2>Decisions made</h2>
+    <ul>
+      <li><strong>Name: Design.</strong> Covers <em>system</em> design (what the
+        docs are) and the authoring/tooling future, without a later rename.</li>
+      <li><strong>Many standalone HTML pages</strong> at <code>design/*.html</code>,
+        tied together by a shared shell; CSS/JS/manifest tucked under
+        <code>design/assets/</code>.</li>
+      <li><strong>HTML is the source</strong> — no Markdown+render step. Chosen
+        for flexibility while the shape of the whole system is still emerging,
+        and to keep the eventual in-browser editor simple (one format).</li>
+      <li><strong>Text-first + progressive enhancement.</strong> Content lives in
+        the markup; JS only adds the topbar + sidebar. JS off = a plain readable
+        page.</li>
+      <li><strong>Status convention</strong> carried over from GraphEditor:
+        <span class="tag" data-status="implemented">implemented</span>
+        <span class="tag" data-status="planned">planned</span>
+        <span class="tag" data-status="proposal">proposal</span>
+        <span class="tag" data-status="reference">reference</span>.</li>
+      <li><strong>Migrate incrementally, don't block on merges.</strong> Bring
+        existing docs in as-is, tag their status, cross-link, and reconcile
+        conflicts in place. Hand-written <code>plan/</code> notes are preserved
+        for their original rationale even where parts have aged.</li>
+    </ul>
+
+    <h2>Status</h2>
+    <table>
+      <thead><tr><th>Piece</th><th>State</th></tr></thead>
+      <tbody>
+        <tr><td>Shell (topbar, sticky sidebar TOC, status system)</td><td><span class="tag" data-status="implemented">implemented</span></td></tr>
+        <tr><td>Overview + Glossary pages</td><td><span class="tag" data-status="implemented">implemented</span></td></tr>
+        <tr><td>Glossary terms linkable (stable anchors)</td><td><span class="tag" data-status="implemented">implemented</span></td></tr>
+        <tr><td>TIPs migrated in</td><td><span class="tag" data-status="planned">planned</span></td></tr>
+        <tr><td>Plan &amp; specs imported as-is (to reconcile)</td><td><span class="tag" data-status="planned">planned</span></td></tr>
+        <tr><td>Cross-linking prose → glossary terms, sitewide</td><td><span class="tag" data-status="proposal">proposal</span></td></tr>
+        <tr><td>In-browser editing</td><td><span class="tag" data-status="proposal">proposal</span></td></tr>
+        <tr><td>Absorb GraphEditor under <code>design/graph/</code></td><td><span class="tag" data-status="proposal">proposal</span></td></tr>
+      </tbody>
+    </table>
+
+    <h2>Phasing</h2>
+    <ol>
+      <li><strong>Static site.</strong> Build the shell, migrate + reconcile the
+        docs, cross-link, serve at a <code>/design</code> route, point
+        <code>CLAUDE.md</code> at it.</li>
+      <li><strong>In-browser editor.</strong> Edit a page's prose and save. The
+        hard part is <em>persistence</em>: File System Access API for a local
+        author, or an authenticated write endpoint when deployed. The editing UI
+        (contenteditable on the semantic blocks) is the easy part. Deferred.</li>
+      <li><strong>Absorb GraphEditor</strong> under <code>design/graph/</code>,
+        sharing the shell, so a spec page can deep-link to the live dependency
+        graph and back.</li>
+    </ol>
+
+    <h2>Known drift to reconcile</h2>
+    <p>
+      Consolidation surfaces existing inconsistencies — that's a feature. Flagged
+      for when each area becomes canonical here:
+    </p>
+    <ul>
+      <li>Two glossaries: root <code>GLOSSARY.md</code> and
+        <code>specs/glossary.md</code> hold different content.</li>
+      <li><code>plan/idea.md</code> overlaps <code>README.md</code>.</li>
+      <li>Several specs may be stale versus current code; each imported page
+        should get a status and a "verified against code on &lt;date&gt;" line.</li>
+    </ul>
+
+    <h2>Open questions</h2>
+    <ul>
+      <li>Do specs/plan/TIPs keep their own identities as sections, or dissolve
+        into one flat topic list?</li>
+      <li>When does Design become AI's canonical source, so <code>CLAUDE.md</code>
+        and the scattered docs point <em>into</em> it?</li>
+      <li>Editor persistence model for the deployed case (auth + conflict).</li>
+    </ul>
+  </main>
+
+  <script src="assets/pages.js"></script>
+  <script src="assets/design.js"></script>
+</body>
+</html>

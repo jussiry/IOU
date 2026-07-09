@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Plan: Performance — Design</title>
+  <link rel="stylesheet" href="assets/design.css" />
+</head>
+<body>
+  <main class="page" data-status="reference">
+<div class="import-note">Imported as-is from <code>plan/performance.md</code>. It may conflict with current code or other pages — kept verbatim, pending reconciliation.</div>
+<h2>Encryptio / decryption</h2>
+<p>Public key cryptography uses secp256k1 curve to be compatible with Nostr. It is not WebCrypto supported, and current JS implementation is 50–100x slower than native implementation. If encryption starts to slow app down, the fix is to (1.) move en/decoding to WebWorkers and (2.) use WASM compiled library:</p>
+<p>  A well-optimized WASM secp256k1 implementation would be within 1.5–3x of native Web Crypto speed — so the gap shrinks from 50–100x to nearly negligible.</p>
+<p>  libsecp256k1 compiled to WASM is the go-to choice — it's the same C library Bitcoin Core uses, with constant-time field arithmetic and hand-tuned assembly-level optimizations. The WASM overhead is mostly just the indirect function call boundary and slightly less aggressive SIMD usage compared to native.</p>
+<p>  Combined with a Web Worker, you'd get both benefits: near-native speed and off the main thread.</p>
+  </main>
+  <script src="assets/pages.js"></script>
+  <script src="assets/design.js"></script>
+</body>
+</html>

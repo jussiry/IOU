@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TIP-003 Multiple relay servers — Design</title>
+  <link rel="stylesheet" href="assets/design.css" />
+</head>
+<body>
+  <main class="page" data-status="implemented">
+<h1>TIP-003: Multiple Relay Servers</h1>
+<div class="table-scroll"><table><thead><tr><th>Field</th><th>Value</th></tr></thead><tbody><tr><td>Number</td><td>TIP-003</td></tr><tr><td>Title</td><td>Multiple Relay Servers</td></tr><tr><td>Status</td><td>Implemented</td></tr><tr><td>Author</td><td>Jussi Rytkönen</td></tr><tr><td>Created</td><td>2026-05-21</td></tr></tbody></table></div>
+<blockquote><p><strong>Note:</strong> Phase 2 (my_relays peer message exchange) and Phase 3 refinements are tracked in the root TIPs folder as TIP-003-relay-sharing.md.</p></blockquote>
+<hr />
+<h2>Summary</h2>
+<p>Tally clients today connect to a single hardcoded relay (<code>/ws</code> on the server that also serves the app). This TIP describes how a client maintains simultaneous WebSocket connections to <strong>1–5 user-chosen relays</strong>, treats them as interchangeable transports for presence, WebRTC signalling, and offline envelope queueing, and falls back gracefully when one is down. Other Tally clients are not aware of which relays a given user is on — relays are picked locally and overlap with friends' relays opportunistically.</p>
+<p>The goal is decentralisation: no single operator can take the network offline, and any party can run a relay that conforms to the Tally signalling protocol.</p>
+<hr />
+<h2>Motivation</h2>
+<p>A single relay is a single point of failure. The operator can:</p>
+<ul><li>Take the network offline (intentionally or otherwise).</li><li>Censor specific users by refusing their registrations.</li><li>Drop specific envelope routes silently.</li><li>Be subpoenaed for connection metadata covering every user.</li></ul>
+<p>End-to-end signature and ciphertext protect message <strong>contents</strong>, but not <strong>availability</strong> and not <strong>metadata</strong>. Multiple independent relays mitigate availability and dilute metadata exposure across operators the user has individually chosen to trust at the metadata level.</p>
+<p>The current server still hosts the app bundle. Secondary relays serve only <code>/ws</code> — they need none of the static asset or build pipeline. A relay is therefore very small: a single Node process running <code>server/signaling/websocket-server.js</code> (or any other server that speaks the same protocol).</p>
+<hr />
+<h2>Trust Model</h2>
+<p>Each relay is <strong>semi-trusted by the user who added it</strong>:</p>
+<ul><li><strong>What a relay can see</strong>: which <code>(userId, deviceId)</code> pairs are online, which <code>peer_candidates</code> a user has declared, the SDP / ICE blobs of every WebRTC handshake passing through it, and the ciphertext + addressing of any queued envelope.</li><li><strong>What a relay cannot do</strong>: forge a signed envelope (signature check at recipient), read envelope plaintext (E2E encryption), or invent a friendship — a <code>peer_connect</code> it manufactures will be ignored by the receiving client if the peer is not in its own candidate list.</li><li><strong>What multiple relays mitigate</strong>: dropped messages (other relays still deliver), forced offline (other relays still register the user), single-operator metadata aggregation.</li><li><strong>What multiple relays do not mitigate</strong>: each individual relay still sees what it always saw. Adding a malicious relay does not weaken the others, but it does hand a new copy of metadata to a new operator. The user is responsible for choosing which operators to trust.</li></ul>
+<p>A relay cannot MITM the WebRTC data channel for free: the DTLS fingerprint travels inside the signed SDP, and once the data channel is up the ciphertext inside it is also signed and encrypted at the application layer. A malicious relay would need to break the application-layer signatures to inject content, which the friend's public key prevents.</p>
+<hr />
+<h2>Protocol Property This Builds On</h2>
+<p>The server's existing routing keys remain unchanged:</p>
+<ul><li><code>register</code> carries <code>(user_id, device_id)</code>. Same <code>device_id</code> on different relays is the design — no cross-relay coordination is required.</li><li><code>peer_candidates</code> is per-user opt-in eligibility; sent identically to every relay.</li><li><code>webrtc_signal</code> routes by <code>(peer_user_id, peer_device_id)</code>. Two relays both routing for the same <code>(userId, deviceId)</code> pair converge on the same WebRTC state because the keys are identical.</li><li><code>queue_peer_envelope</code> deduplicates by <code>envelope.id</code> per recipient (PER_RECIPIENT_ENVELOPE_LIMIT keeps it bounded), and the receiver's <code>processed_peer_message_ids</code> deduplicates again at the app layer.</li></ul>
+<p>In short: the server protocol is already <strong>idempotent on <code>(userId, deviceId, envelopeId)</code> triples</strong>, so any operation is safe to run through multiple relays simultaneously. This is what makes the design tractable.</p>
+<hr />
+<h2>Design</h2>
+<h3>1. Relay pool, not single client</h3>
+<p><code>signaling/socket-client.js</code> exports <code>createSignalingClient(callbacks)</code>. A new module — <code>signaling/relay-pool.js</code> — wraps N instances of it and exposes the same callback surface to <code>peer/client.js</code>. The pool:</p>
+<ul><li>Holds an array of <code>{ url, signalingClient, status, lastConnectedAt }</code>.</li><li>Multiplexes outbound calls (<code>setSession</code>, <code>requestPeerConnection</code>, <code>sendPeerSignal</code>, <code>queuePeerEnvelopeOnServer</code>) to every connected relay.</li><li>Funnels inbound callbacks (<code>onPeerConnect</code>, <code>onPeerDisconnect</code>, <code>onPeerSignal</code>, <code>onPeerEnvelopeFromServer</code>, <code>onSessionReady</code>, <code>onQueueDrained</code>) into a single callback per event after de-duplication.</li><li>Exposes a <code>getRelayStatuses()</code> accessor for the settings UI.</li></ul>
+<p><code>peer/client.js</code> continues to talk to a single object — the pool replaces the singleton client and otherwise no changes are needed there.</p>
+<h3>2. Connect to all relays in parallel at startup</h3>
+<p>Serial connection cascades (try A, then ask B for the gaps) sound bandwidth-efficient but create more problems than they solve:</p>
+<ul><li>Friend goes offline on A → client must now query B, C, D. The cascade becomes stateful and rebuilds on every disconnect.</li><li>WebRTC signalling is bidirectional. Cascade order on the sender does not match cascade order on the receiver. The two halves of the handshake can race over different relays.</li><li>Startup latency is <code>sum(connect_time)</code> instead of <code>max(connect_time)</code>.</li></ul>
+<p>Parallel is simpler and the bandwidth cost is trivial:</p>
+<ul><li>5 WebSockets × a few KB of <code>peer_candidates</code> + handshake = ~tens of KB at startup.</li><li>Once connected, ongoing traffic is dominated by application envelopes — and those go through one relay (offline) or zero (online via WebRTC), not all five.</li></ul>
+<p><strong>Recommendation: parallel connect, full registration on every relay.</strong></p>
+<h3>3. Ask all relays for all friends</h3>
+<p>Same reasoning as §2. Each relay independently fires <code>peer_connect</code> for whichever friends it sees online. The pool collapses duplicates via the friend mesh's composite key <code>(peerUserId, peerDeviceId)</code>, which already exists for multi-device support (TIP-001 era work).</p>
+<p>If a friend is online on relays {A, C} and not B, the pool receives two <code>peer_connect</code> events for the same <code>(userId, deviceId)</code> pair. The mesh's <code>ensurePeer</code> short-circuits on the second call. No race, no duplicate WebRTC handshake.</p>
+<p>If a friend disconnects on A, the pool receives a <code>peer_disconnect</code> from A — but only counts the peer as truly offline once <strong>all</strong> relays that previously announced them have reported the disconnect (or have themselves gone down). This requires the pool to track, per <code>(userId, deviceId)</code>, the set of relays that currently report the peer online.</p>
+<p><strong>Recommendation: ask every relay, track per-relay presence, treat the union as truth.</strong></p>
+<h3>4. Queue offline envelopes on every relay</h3>
+<p>For an offline recipient: send <code>queue_peer_envelope</code> to every connected relay. Cost: <code>N × envelope_size</code> extra storage across N relays; envelopes are ~1–2 KB and already capped at 500 per recipient per relay. Benefit: delivery survives the recipient choosing any one of the queued relays first.</p>
+<p>The recipient receives the same envelope from each of their relays that happens to overlap with a sender relay. <code>processed_peer_message_ids</code> dedupes. Receipts (<code>PEER_MESSAGE_TYPE_RECEIVED</code>) are themselves envelopes, so the same multi-relay path applies.</p>
+<p>Cleanup after delivery: each relay independently drops its copy once the recipient connects to that relay. Relays the recipient never connects to hold the envelope until the 500-cap evicts it. Acceptable.</p>
+<p><strong>Recommendation: queue on every connected relay.</strong></p>
+<h3>5. WebRTC signalling</h3>
+<p><code>sendPeerSignal(peerUserId, peerDeviceId, signal)</code> is broadcast to every relay. The receiving client may get the same ICE candidate or SDP offer through multiple relays:</p>
+<ul><li>Duplicate offer / answer: perfect-negotiation already handles redundant signals — the second is a no-op.</li><li>Duplicate ICE candidate: WebRTC accepts and silently de-dupes.</li></ul>
+<p>For the initial offer, the initiator is chosen by <code>getInitiatorClient</code> — deterministic by <code>(userId, deviceId)</code> ordering. Every relay computes the same initiator, so both endpoints agree regardless of which relay triggered the handshake first.</p>
+<h3>6. Same-user multi-device across relays</h3>
+<p>Each device has a stable <code>device_id</code>. Device A on relays {X, Y} and device B on relays {Y, Z} share Y → their self-mesh works through Y. If they have no relay in common they cannot signal at all and cannot sync ledger state. This is a configuration concern, not a protocol failure: the UI should warn the user when a device's relay set has no overlap with another device's relay set.</p>
+<h3>7. Settings UI</h3>
+<p>A new section on the settings page: <strong>Relays</strong>.</p>
+<ul><li>Default list (1–3 entries) seeded on first run from a constants file shipped with the app.</li><li>Add: text field for a <code>wss://host/ws</code> URL → connection attempt → result indicator.</li><li>Remove: trash icon per row. Disabled if it is the last remaining relay.</li><li>Status per relay: green (connected), amber (reconnecting), grey (manually disabled), red (failed handshake).</li><li>Each row shows <code>last_connected_at</code>.</li></ul>
+<p>Persistence: <code>state.user.relays</code> as an array of <code>{ url, enabled }</code> objects, normalised in <code>data-model.ts</code>.</p>
+<h3>8. Default relay set</h3>
+<p>On first launch the app populates <code>state.user.relays</code> from a small hardcoded list in the bundle (e.g. <code>["wss://iou-ui.up.railway.app/ws"]</code> plus future additions). This is the bootstrap network effect — every fresh install joins the default mesh and is discoverable by anyone else on the same default. Power users can prune the defaults later.</p>
+<h3>9. Friend's relay set is private</h3>
+<p>Clients do not exchange relay lists with friends. Discoverability is purely a function of "do our chosen relays happen to overlap." This keeps the relay choice a private metadata-routing decision. The cost is the asymmetric-relay-set failure mode (see §6 and Open Questions).</p>
+<hr />
+<h2>Performance Summary</h2>
+<div class="table-scroll"><table><thead><tr><th>Concern</th><th>Cost at N=5 relays</th><th>Mitigation</th></tr></thead><tbody><tr><td>Startup latency</td><td><code>max(connect_time)</code> ≈ same as today</td><td>Parallel connect</td></tr><tr><td>Memory (client)</td><td>5 × WebSocket state ≈ negligible</td><td>—</td></tr><tr><td>Memory (relay)</td><td>Unchanged per relay (each thinks it's the only one)</td><td>—</td></tr><tr><td>Network on relay register</td><td>5 × (tens of KB) ≈ low</td><td>—</td></tr><tr><td>Envelope storage</td><td>5 × per relay × cap of 500</td><td>Existing eviction</td></tr><tr><td>WebRTC handshake</td><td>Duplicate signals → no-op</td><td>Perfect negotiation already idempotent</td></tr><tr><td>Steady-state</td><td>Heartbeat / reconnect only</td><td>Dominant traffic stays on WebRTC</td></tr></tbody></table></div>
+<p>Performance is not the bottleneck of this design. The bottlenecks are configuration (asymmetric relay sets, §6) and operator trust (Trust Model).</p>
+<hr />
+<h2>Complexity Summary</h2>
+<p>What is easy in the current code base:</p>
+<ul><li><strong>Friend mesh</strong> is already keyed by <code>(peerUserId, peerDeviceId)</code> — handles N relays "for free."</li><li><strong>Envelope dedup</strong> already exists (<code>processed_peer_message_ids</code>) — handles N relays.</li><li><strong>Outbox</strong> in <code>peer/outbox.js</code> already deals with retry — fan-out to N relays is a one-line change in <code>queuePeerEnvelopeOnServer</code>.</li><li><strong>Signaling client</strong> is a closure with a clean callback surface — instantiating N of them is straightforward.</li></ul>
+<p>What was new:</p>
+<ul><li><code>relay-pool.js</code> (~150 LOC).</li><li>Settings UI for relay list.</li><li>Schema field on <code>state.user.relays</code> + normaliser entry in <code>data-model.ts</code>.</li><li>Presence union: per-relay tracking of which relay reports each peer online.</li></ul>
+<p>What did not need to change:</p>
+<ul><li>Server code (<code>websocket-server.js</code>) — already idempotent per the protocol property.</li><li><code>peer/client.js</code> — same singleton-shaped interface, just behind a pool.</li><li>WebRTC negotiation logic.</li><li>Ledger / commands.</li></ul>
+<hr />
+<h2>Security Analysis</h2>
+<h3>Adding a malicious relay</h3>
+<p>The biggest user-facing risk is the user adding a relay that is hostile. That relay sees:</p>
+<ul><li>The user's <code>npub</code> and <code>device_id</code>.</li><li>The <code>peer_candidates</code> list (who the user is willing to peer with).</li><li>Every SDP / ICE blob — i.e. WebRTC connection partners and times.</li><li>Every queued envelope's <code>from_user_id</code>, <code>to_user_id</code>, <code>id</code>, and ciphertext size.</li></ul>
+<p>It cannot forge content, read plaintext, or impersonate, but it can:</p>
+<ul><li>Drop messages — other relays still deliver.</li><li>Refuse to register the user — other relays still register them.</li><li>Aggregate metadata indefinitely.</li></ul>
+<p>A malicious relay controls the signalling channel and can substitute its own DTLS fingerprint into SDP offers and answers, technically allowing it to terminate both DTLS sessions. However, what it then sees inside the data channel is still useless: every envelope is encrypted to the recipient's public key and signed with the sender's private key. The relay gets ciphertext it cannot read and cannot forge without the private keys. DTLS MITM provides no capability beyond what the relay can already do as a message-drop proxy. The application-layer crypto completely nullifies it. The security boundary is: <strong>relay is trusted for availability and metadata, not for confidentiality or authenticity.</strong></p>
+<p>Mitigation: explicit per-relay confirmation in the UI when adding ("This relay will see your device ID and friend list. Continue?"), and labelling defaults as "recommended" rather than mandatory.</p>
+<h3>Relay fingerprinting / pinning</h3>
+<p>Out of scope for v1. A future TIP could add a signed relay identity (server publishes a stable pubkey, client pins on first add). For now, the URL is the identity.</p>
+<h3>Same envelope through multiple relays</h3>
+<p>Already handled by <code>processed_peer_message_ids</code>. No new attack surface.</p>
+<h3>Receipts and outbox cleanup</h3>
+<p><code>PEER_MESSAGE_TYPE_RECEIVED</code> receipts flow back through every relay too. Sender's outbox removal triggers on first valid receipt and is idempotent.</p>
+<h3>Origin restriction on <code>/ws</code></h3>
+<p>Currently absent (any origin can open the WebSocket). Secondary relays may want to apply origin restrictions to mitigate CSRF-style abuse from third-party pages. Worth noting but orthogonal to this TIP.</p>
+<hr />
+<h2>Open Questions</h2>
+<ol><li><strong>Asymmetric relay sets between friends.</strong> If user A is on {X, Y} and friend B is on {Z}, they cannot signal each other at all. Possible mitigations:<ul><li>Defaults remain large enough that "no overlap" is rare in practice.</li><li>Out-of-band relay-set exchange during friend-add (paste a small relay-hint block into the QR code / link). Leaks relay choice but only to chosen friends.</li><li>A "discovery relay" that publishes relay lists per <code>userId</code>. Reintroduces a central point.</li></ul></li></ol>
+<p>   The cleanest answer in v1 is probably: large overlapping defaults + UI warning when no overlap with a specific friend is detected.</p>
+<ol><li><strong>TURN / STUN servers.</strong> WebRTC needs ICE servers for NAT traversal. TURN config is independent of relay list — tying them together would force every relay operator to also run a TURN server, which is a much higher bar. TURN servers should be a separate list in settings (defaulting to a few well-known public STUN servers and optionally a self-hosted TURN). This is a separate settings section from relays.</li><li><strong>Relay reputation / discovery.</strong> Beyond defaults shipped in the bundle, how does a user learn about new relays? A list page? A friend recommending one? Out of scope for v1; ship with curated defaults.</li><li><strong>Backwards compatibility.</strong> Old single-relay clients will continue to work as long as they are connected to a relay also in the new client's set. Otherwise they are invisible. No protocol change is needed; this is a population-overlap issue.</li><li><strong>Cost of a failing relay.</strong> If a relay is reachable but malfunctioning (accepts connection, drops messages silently), the pool currently has no health probe beyond ping. A periodic round-trip test (send an addressed self-envelope and check delivery time) could surface this. Defer to v2.</li><li><strong>App bundle distribution.</strong> The user mentioned the current server also serves the app files. Should the bundle be served from a CDN independent of the relay list? This is desirable long-term (the app then has no privileged origin) but doesn't block this TIP.</li><li><strong>Same-user multi-device convergence.</strong> §6 — should the app refuse to be added as a second device unless the new device shares at least one relay with the existing device's relay set? Probably yes, with a clear error message.</li><li><strong>Settings-page ordering.</strong> When the user has 5 relays, is there a priority order? For envelope queue and signal broadcast we treat all relays equally. For <code>requestPeerConnection</code> we also broadcast. So priority is cosmetic only, and the UI can leave it as insertion order.</li><li><strong>Per-friend relay scoping.</strong> Should a user be able to say "use relay X only for friend group A"? Adds significant complexity and runs against the simpler "all relays are interchangeable" model. Defer indefinitely unless there's a clear use case.</li></ol>
+<hr />
+<h2>§10 — Telling Friends What Relays You Use (Phase 1)</h2>
+<h3>What shipped</h3>
+<ul><li><code>state.share_my_relays: boolean</code> — defaults to <code>true</code>. User toggles it in settings.</li><li><code>friends[].relays: string[]</code> — schema field in place, ready to receive data from Phase 2.</li><li>Settings toggle bound to the flag: "Tell friends what relays you use".</li></ul>
+<p>Phase 2 (the actual <code>my_relays</code> message exchange) and Phase 3 (refinements) are tracked separately in TIP-003-relay-sharing.md.</p>
+<hr />
+<h2>Implementation Notes</h2>
+<p><strong>Schema (<code>data-model.ts</code>)</strong></p>
+<ul><li>Added <code>state.user.relays: Array&lt;{ url: string, enabled: boolean }&gt;</code> with default seeded from <code>constants.RELAY_DEFAULTS</code>.</li><li>Normaliser: trim URLs, deduplicate, drop entries that don't parse as <code>wss://…/ws</code>.</li></ul>
+<p><strong>New module: <code>app/js/signaling/relay-pool.js</code></strong></p>
+<ul><li><code>createRelayPool({ relays, callbacks }) → { setSession, requestPeerConnection, sendPeerSignal, queuePeerEnvelopeOnServer, getStatuses, destroy }</code>.</li><li>Internally: N × <code>createSignalingClient</code>, presence union tracked as <code>Map&lt;peerKey, Set&lt;relayUrl&gt;&gt;</code>.</li><li>Emits <code>onPeerDisconnect</code> only when the last relay reporting that peer disconnects.</li></ul>
+<p><strong><code>peer/client.js</code></strong></p>
+<ul><li>Replaced <code>createSignalingClient(…)</code> with <code>createRelayPool({ relays: snapshot.relays, callbacks: … })</code>.</li><li><code>setSession</code> now also passes the relay list; pool reconciles add/remove against current connections.</li></ul>
+<p><strong>Settings UI (<code>app/ui-modules/settings-page</code>)</strong></p>
+<ul><li>New row group for relays. Reuses existing settings row styling.</li><li>Live status read from relay-status-registry on data change.</li></ul>
+<p><strong>Defaults</strong></p>
+<ul><li><code>app/js/constants/relay-defaults.js</code> exports the default list.</li></ul>
+<hr />
+<h2>Out of Scope</h2>
+<ul><li>Signed relay identity / TOFU pinning (future TIP).</li><li>TURN server federation.</li><li>Cross-relay envelope ordering guarantees beyond what the recipient's local <code>processed_peer_message_ids</code> provides.</li><li>A directory or discovery service for new relays.</li></ul>
+  </main>
+  <script src="assets/pages.js"></script>
+  <script src="assets/design.js"></script>
+</body>
+</html>

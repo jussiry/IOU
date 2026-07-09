@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Spec: Peer communication — Design</title>
+  <link rel="stylesheet" href="assets/design.css" />
+</head>
+<body>
+  <main class="page" data-status="reference">
+<div class="import-note">Imported as-is from <code>specs/peer-communication.md</code>. It may conflict with current code or other pages — kept verbatim, pending reconciliation.</div>
+<h1>Peer communication protocol</h1>
+<p>This document specifies how IOU clients exchange application messages with each other. It is written as a protocol-level spec so the same rules can be implemented on any transport, by any client, and against any compatible relay server.</p>
+<p>The core ideas are:</p>
+<ul><li><strong>Every user is their own identity.</strong> A user is a public key. There is no central user directory; a client only needs the recipient's public key to talk to them.</li><li><strong>Every message is encrypted end-to-end between a pair of users.</strong> The relay server learns routing metadata (sender, recipient, message id) but never reads the payload.</li><li><strong>Every message is signed by its author.</strong> The Schnorr signature travels inside the encrypted payload and lets any third party verify authorship later — even when a message is forwarded during ledger sync — without trusting the forwarder.</li><li><strong>Messages are delivered over any available path.</strong> A direct peer-to-peer channel is preferred; a relay server is the fallback so clients can exchange messages even when they are never online at the same time.</li><li><strong>The same message id is used on every path.</strong> A client that receives the same message through multiple paths processes it exactly once.</li></ul>
+<h2>1. Terminology</h2>
+<ul><li><strong>User</strong> — a participant identified by a long-lived secp256k1 public key (x-only, 32 bytes, as per BIP-340 / Nostr).</li><li><strong>Client</strong> — a program acting on behalf of one user. A user MAY run multiple clients; this document treats each client as if it holds the user's private key.</li><li><strong>Device</strong> — one live connection of a client to a relay server. The relay assigns each connection an ephemeral <code>device_id</code>. A user may have several devices (different browsers, phone + laptop, two tabs) online at once, all sharing the same <code>user_id</code> but each with a distinct <code>device_id</code>.</li><li><strong>Peer</strong> — another user a client wants to talk to. "Peer" is a role, not a network concept. When a user is online on multiple devices, <em>each</em> remote device is an independent peer at the transport layer even though they share a single <code>user_id</code>.</li><li><strong>Self-peer</strong> — another device of the <em>same</em> user. Self-peers share the sending user's private key and therefore already derive the same ECDH shared secret with every contact. Self-peers exist to keep the user's own devices in sync. See §13.</li><li><strong>Direct channel</strong> — any transport that carries bytes directly between two clients without a relay learning the contents (for example a WebRTC data channel, a LAN link, a Bluetooth link).</li><li><strong>Relay server</strong> — a server that accepts envelopes from one client and delivers them to another. It does not need to be trusted with message contents.</li><li><strong>Envelope</strong> — the ciphertext container exchanged on the wire. See §4.</li><li><strong>Inner message</strong> — the plaintext application message that is signed and then encrypted inside an envelope. See §3.</li><li><strong>Outbox</strong> — a client-local, persistent list of inner messages that still need to be delivered.</li><li><strong>Receipt</strong> — a small acknowledgement message sent by the recipient to confirm an inner message was received and processed.</li><li><strong>Ledger</strong> — a client-local, persistent, append-only log of signed peer messages. See the Ledger spec.</li></ul>
+<h2>2. Identity and keys</h2>
+<p>Each user is identified by an x-only secp256k1 public key (BIP-340). The corresponding private key stays on the client and MUST NOT leave it. Encoded forms:</p>
+<ul><li><strong>Hex</strong> — 64 lowercase hexadecimal characters, used internally for crypto operations.</li><li><strong>npub</strong> (bech32 with HRP <code>npub</code>) — the canonical user id used everywhere outside of raw crypto calls.</li></ul>
+<p>"User id" and "public key" are interchangeable in this spec; both refer to the <code>npub</code> encoding unless hex is explicitly stated.</p>
+<p>Two users who want to communicate MUST already know each other's public key. How they obtain it (QR code, out-of-band exchange, friend request flow) is out of scope for this document.</p>
+<h2>3. Inner message</h2>
+<p>Every application-level message a client sends to another user is first built as a plaintext <strong>inner message</strong> object, then Schnorr-signed, then encrypted into an envelope (§4).</p>
+<div class="table-scroll"><table><thead><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr></thead><tbody><tr><td><code>id</code></td><td>string</td><td>yes</td><td>Globally unique message id. MUST be generated by the sender and MUST be stable for retries.</td></tr><tr><td><code>type</code></td><td>string</td><td>yes</td><td>Application-specific message type (e.g. <code>friend_request</code>, <code>transaction_created</code>, <code>name_changed</code>).</td></tr><tr><td><code>from_user_id</code></td><td>string</td><td>yes</td><td><code>npub</code> of the sender.</td></tr><tr><td><code>to_user_id</code></td><td>string</td><td>yes</td><td><code>npub</code> of the intended recipient.</td></tr><tr><td><code>created_at</code></td><td>string</td><td>yes</td><td>ISO-8601 timestamp of when the sender created the message.</td></tr><tr><td><code>payload</code></td><td>object</td><td>yes</td><td>Type-specific fields. Opaque to this spec.</td></tr><tr><td><code>signature</code></td><td>string</td><td>yes</td><td>Hex-encoded Schnorr signature. See §3.3.</td></tr></tbody></table></div>
+<p>Additional fields MAY be present. Implementations MUST preserve unknown fields when storing or forwarding a message.</p>
+<h3>3.1 Message ids</h3>
+<p><code>id</code> is the unit of deduplication and retry. It MUST:</p>
+<ul><li>Be globally unique with overwhelming probability (e.g. UUIDv4, ULID, a random 128-bit token, or a hash of the message contents).</li><li>Be assigned exactly once by the sender, when the message is first created.</li><li>Remain the same across every retry and across every delivery path. Re-queuing a message from the outbox MUST NOT change its id.</li></ul>
+<p>A recipient who has already processed a given <code>id</code> from a given <code>from_user_id</code> MUST NOT process it again. See §7.</p>
+<h3>3.2 Transport-only messages</h3>
+<p>Some messages exist only to manage a live direct channel and have no meaning off that channel (for example <code>ping</code>, <code>pong</code>, and receipts for messages that were just delivered on the same channel). These messages:</p>
+<ul><li>MAY be sent as plaintext inside a live direct channel.</li><li>MUST NOT be sent through the relay server as plaintext.</li><li>If they need to traverse the relay, they MUST be wrapped in an envelope like any other inner message.</li></ul>
+<p>Transport-only messages are not persisted in the outbox.</p>
+<h3>3.3 Schnorr signatures</h3>
+<p>Every application inner message carries a Schnorr (BIP-340) signature produced by the sender's private key. The signature covers a <strong>canonical digest</strong> of the message content, independent of the transport envelope.</p>
+<p><strong>Why signatures in addition to ECDH encryption?</strong>   AES-GCM on the envelope proves that whoever holds the ECDH shared secret for <code>(sender, recipient)</code> produced the ciphertext. That is sufficient for live delivery between two parties. However, when a ledger entry from a <em>third</em> user is forwarded during sync recovery — for example, Bob sends Alice a <code>transaction_created</code> message that Carol needs to recover — the AES-GCM on the sync envelope only proves Bob produced the batch, not that the enclosed entry originated with Alice. Schnorr signatures on each entry prove authorship of the original <code>from_user_id</code> independent of the transport.</p>
+<p><strong>Digest construction:</strong></p>
+<ol><li>Take the inner message object with <code>signature</code> removed (or empty string).</li><li>Produce a canonical JSON string: keys sorted lexicographically, no extra whitespace.</li><li>Compute <code>digest = SHA-256(canonical_json)</code> (32 bytes, hex-encoded).</li></ol>
+<p><strong>Signing:</strong></p>
+<pre><code>signature_hex = schnorr_sign(digest_hex, sender_private_key_hex)</code></pre>
+<p>Uses BIP-340 Schnorr signatures on secp256k1.</p>
+<p><strong>Verification:</strong></p>
+<pre><code>ok = schnorr_verify(signature_hex, digest_hex, sender_public_key_hex)</code></pre>
+<p>The public key is derived from <code>from_user_id</code> (decoded from npub to 32-byte hex if needed).</p>
+<p><strong>When signatures are produced and stored:</strong></p>
+<ul><li>The sender signs the message at queue time (when <code>queuePeerMessage</code> is called).</li><li>The signature is reused on every retry — it MUST NOT change between retries.</li><li>The signature is preserved in the ledger's <code>signature</code> field so it can be verified offline after the fact.</li><li>Verifying a ledger entry requires reconstructing the same canonical inner-message shape from the stored entry, substituting <code>originated_at</code> for <code>created_at</code>.</li></ul>
+<h2>4. Envelope</h2>
+<p>An <strong>envelope</strong> is the object actually transmitted on the wire whenever an inner message has to cross any untrusted boundary (a direct channel carrying data to a second user, or a relay server). It looks like this:</p>
+<pre><code>{
+  "type": "peer_envelope",
+  "envelope_version": 2,
+  "id": "&lt;inner.id&gt;",
+  "from_user_id": "&lt;inner.from_user_id&gt;",
+  "to_user_id": "&lt;inner.to_user_id&gt;",
+  "ciphertext": "&lt;base64 of iv || aead(signed_inner_json)&gt;"
+}</code></pre>
+<div class="table-scroll"><table><thead><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr></thead><tbody><tr><td><code>type</code></td><td>string</td><td>yes</td><td>Constant string <code>"peer_envelope"</code>.</td></tr><tr><td><code>envelope_version</code></td><td>number</td><td>yes</td><td>Integer version of this envelope format. Current version is <code>2</code>.</td></tr><tr><td><code>id</code></td><td>string</td><td>yes</td><td>Copy of <code>inner.id</code>. Used for routing, dedup, and acknowledgements without decrypting.</td></tr><tr><td><code>from_user_id</code></td><td>string</td><td>yes</td><td>Copy of <code>inner.from_user_id</code>. Needed by the recipient to pick the right key for decryption.</td></tr><tr><td><code>to_user_id</code></td><td>string</td><td>yes</td><td>Copy of <code>inner.to_user_id</code>. Used by the relay server and by the recipient to verify addressing.</td></tr><tr><td><code>ciphertext</code></td><td>string</td><td>yes</td><td>Base64 of the AEAD ciphertext. Contents defined in §5.</td></tr></tbody></table></div>
+<p>The envelope's plaintext fields are <strong>claims</strong>. A recipient MUST verify those claims against the authenticated inner fields after decryption (see §5.3). A relay server MAY rely on these fields for routing but MUST treat them as untrusted.</p>
+<p><strong>Version 2 change from version 1:</strong> The signed inner message (including <code>signature</code>) is now encrypted into the ciphertext. Clients MUST reject envelopes with <code>envelope_version</code> other than <code>2</code>.</p>
+<p>Implementations MAY add non-normative fields (e.g. <code>queued_at</code> hints from a relay). Unknown fields MUST be ignored by receivers.</p>
+<h2>5. Encryption</h2>
+<h3>5.1 Shared secret (ECDH)</h3>
+<p>For each ordered pair of users <code>(A, B)</code>, both sides derive the same shared secret from their own private key and the other user's public key:</p>
+<pre><code>shared = ECDH(A.private, B.public) = ECDH(B.private, A.public)</code></pre>
+<p>The shared secret is the x-coordinate of the resulting secp256k1 curve point. Because public keys are x-only (BIP-340), receivers MUST lift them to full curve points choosing the even-y point before the scalar multiplication.</p>
+<p>The ECDH shared secret is <strong>symmetric</strong> — both sides derive the same value — so a single key covers both directions of the conversation.</p>
+<h3>5.2 Symmetric key derivation</h3>
+<p>A symmetric encryption key is derived from the shared secret:</p>
+<pre><code>key = SHA-256(shared_x_coordinate)   // 32 bytes</code></pre>
+<p>The derived key MUST be treated as sensitive and SHOULD be cached in memory per peer to avoid repeated scalar multiplication.</p>
+<h3>5.3 AEAD encryption</h3>
+<p>The signed inner message is encrypted with <strong>AES-256-GCM</strong> (96-bit IVs).</p>
+<p>Encryption:</p>
+<ol><li>Compute the Schnorr signature (§3.3) and attach it to the inner message as <code>signature</code>.</li><li>Serialize the signed inner message to UTF-8 JSON.</li><li>Generate a fresh 12-byte IV from a cryptographic random source. IVs MUST NOT be reused with the same key.</li><li>Compute <code>aead_output = AES_256_GCM_Encrypt(key, iv, plaintext)</code>. The output includes the 16-byte authentication tag.</li><li>Set <code>ciphertext = base64(iv || aead_output)</code>.</li></ol>
+<p>Decryption:</p>
+<ol><li><code>base64_decode</code> the ciphertext and split the first 12 bytes as <code>iv</code>, the remainder as <code>aead_output</code>.</li><li>Compute <code>plaintext = AES_256_GCM_Decrypt(key, iv, aead_output)</code>. If decryption fails (auth tag mismatch), drop the envelope.</li><li>Parse <code>plaintext</code> as JSON into an inner message object.</li><li>Verify that <code>inner.id</code>, <code>inner.from_user_id</code>, and <code>inner.to_user_id</code> match the envelope's plaintext fields. If any mismatch, drop the envelope.</li><li>Verify that <code>inner.to_user_id</code> is the receiving user's own public key. If not, drop the envelope.</li><li>Verify the Schnorr signature on <code>inner</code> against <code>inner.from_user_id</code> (§3.3). If invalid, drop the envelope.</li></ol>
+<p>Steps 2–5 establish that the ECDH peer produced the ciphertext and that the outer envelope was not tampered with. Step 6 additionally proves that the original <code>from_user_id</code> authored the inner content — this is what makes forwarded ledger entries trustworthy during sync (§12).</p>
+<h3>5.4 Algorithm negotiation</h3>
+<p><code>envelope_version</code> is the single negotiation point for the envelope format and cryptographic suite. A client MUST reject any envelope whose <code>envelope_version</code> it does not recognize. Future versions of this spec MAY introduce new values and new cipher suites.</p>
+<h2>6. Delivery paths</h2>
+<p>A message can travel from sender to recipient along any of these paths. A client MAY try several paths for the same message; the recipient's deduplication (§7) makes this safe.</p>
+<h3>6.1 Direct channel (preferred)</h3>
+<p>When the sender's client has an open direct channel to the recipient's client (e.g. a WebRTC data channel), it sends the envelope as a single JSON frame over that channel. The channel carries both encrypted envelopes and plaintext transport-only messages.</p>
+<p>Direct channels are typically negotiated using a signaling relay (§6.3) but may come from any source that lets two clients exchange raw bytes.</p>
+<h3>6.2 Relay server outbox (fallback)</h3>
+<p>When the sender cannot deliver an envelope directly — because the recipient is offline, or because no direct channel is available — it hands the envelope to a relay server. A relay server MUST implement at minimum these operations:</p>
+<ul><li><code>queue_peer_envelope(envelope)</code> — accept an envelope for later delivery.</li><li><code>peer_envelope(envelope)</code> — push a previously queued envelope to a recipient.</li></ul>
+<p>The relay server behaves as follows:</p>
+<ol><li>On receiving <code>queue_peer_envelope</code>:<ol><li>Validate that the envelope has <code>id</code>, <code>from_user_id</code>, <code>to_user_id</code>, and <code>ciphertext</code>.</li><li>If the recipient is currently connected, immediately push <code>peer_envelope</code> to them. If the push succeeds, the server MAY drop the envelope without storing it.</li><li>Otherwise, store the envelope in a per-recipient queue keyed by <code>envelope.id</code> (see §6.4 for limits).</li></ol></li><li>On receiving a <code>register</code> from a client that announces its own user id:<ol><li>Flush every envelope stored for that user id by pushing <code>peer_envelope</code> messages, one per envelope.</li><li>After flushing the entire queue, push a <code>queue_drained</code> signal to the client.</li><li>After a successful push, remove the envelope from the queue.</li></ol></li></ol>
+<p>The relay server MUST NOT modify envelopes. Clients MUST assume the server might reorder, drop, or duplicate envelopes; dedup and retries live on the clients.</p>
+<p>The relay server is an untrusted intermediary. It learns <code>from</code>, <code>to</code>, and <code>id</code> for every message routed through it, plus approximate timing. It does not learn the inner message contents.</p>
+<h3>6.3 Signaling for direct channels</h3>
+<p>When direct channels are WebRTC-based, the relay server also acts as a signaling relay: it announces peer presence, tells two clients to open a direct channel (<code>peer_connect</code> / <code>peer_disconnect</code> signals), and forwards WebRTC offer/answer/ICE payloads between them. Application messages — as opposed to signaling — always travel inside envelopes.</p>
+<p>Signaling is <strong>device-scoped</strong>. Because a user MAY be online on several devices at the same time (same <code>user_id</code>, different WebSocket sessions), every peer-scoped signaling message carries both <code>peer_user_id</code> and <code>peer_device_id</code>:</p>
+<div class="table-scroll"><table><thead><tr><th>Message</th><th>Required fields</th></tr></thead><tbody><tr><td><code>peer_connect</code></td><td><code>peer_user_id</code>, <code>peer_device_id</code>, <code>initiator</code> (bool)</td></tr><tr><td><code>peer_disconnect</code></td><td><code>peer_user_id</code>, <code>peer_device_id</code></td></tr><tr><td><code>webrtc_signal</code></td><td><code>peer_user_id</code>, <code>peer_device_id</code>, <code>signal</code> (offer / answer / ICE)</td></tr></tbody></table></div>
+<p>Clients MUST thread the <code>peer_device_id</code> they received on <code>peer_connect</code> through every subsequent <code>webrtc_signal</code> so the relay can route the ICE candidates to the exact device that sent the matching offer. The relay MAY fall back to user-level routing when the target user has a single active device, but clients MUST NOT rely on this.</p>
+<p>Envelopes (<code>peer_envelope</code>) are <em>not</em> device-scoped: when a sender hands an envelope to the relay, the relay MUST deliver a copy to every online device of the recipient user. Each recipient device independently decrypts and dedups against its own <code>processed_peer_message_ids</code> (§7) so overlapping deliveries are safe.</p>
+<h3>6.4 Server queue bounds</h3>
+<p>Relay servers MUST bound their per-recipient queue to avoid unbounded growth. When the queue for a recipient is full:</p>
+<ul><li>The server MAY evict the oldest stored envelope and accept the new one, OR</li><li>The server MAY reject the new envelope.</li></ul>
+<p>Either policy is conformant as long as the limit is documented. Clients MUST be prepared for their envelope to be silently dropped and rely on retries (§8.2) rather than any server-side guarantee.</p>
+<h3>6.5 Multiple relay servers</h3>
+<p>A client MAY be connected to more than one relay server at the same time, and a given envelope MAY be handed to several of them. Recipients rely on message-id deduplication to make this safe. There is no coordination between relay servers.</p>
+<h2>7. Deduplication</h2>
+<p>Every client maintains a set of <strong>processed message ids</strong>. On every inbound inner message — regardless of which path delivered it — the client MUST:</p>
+<ol><li>Validate the envelope (see §5.3).</li><li>If the message <code>id</code> is already in the processed set, drop the message and SHOULD still send a receipt (§8.1) so a stuck sender can progress.</li><li>Otherwise, apply the message to local state and add the <code>id</code> to the processed set.</li></ol>
+<p>The processed set MUST persist across client restarts. It MAY be pruned by age or size; a pruning policy is conformant as long as no message id is dropped from the set before any sender could reasonably stop retrying it.</p>
+<p>Dedup applies equally to:</p>
+<ul><li>The same envelope arriving via direct channel and via relay.</li><li>The same envelope arriving twice over different relay servers.</li><li>The same envelope arriving twice through a multi-hop peer mesh.</li><li>A sender retrying after a crash.</li></ul>
+<h2>8. Acknowledgements and retries</h2>
+<h3>8.1 Receipts</h3>
+<p>For every inner message a client accepts and processes, it SHOULD send a <strong>receipt</strong> back to the original sender. A receipt is itself an inner message with:</p>
+<ul><li><code>type = "received"</code></li><li><code>from_user_id</code> = the recipient of the original message (now the receipt sender)</li><li><code>to_user_id</code> = the sender of the original message</li><li><code>payload.message_id</code> = the <code>id</code> of the message being acknowledged</li><li><code>payload.result</code> = an application-defined status, at minimum distinguishing <code>"processed"</code> from <code>"ignored"</code></li></ul>
+<p>Receipts are inner messages and MUST follow the same encryption rules. They MAY be delivered via any path:</p>
+<ul><li>If the recipient has a live direct channel to the original sender, receipts MAY be sent as plaintext transport-only messages on that channel (see §3.2).</li><li>Otherwise the receipt MUST be wrapped in an envelope like any other inner message, and MAY be handed to a relay server for offline delivery.</li></ul>
+<p>A receipt MUST NOT itself generate a receipt. On receiving an inner message with <code>type = "received"</code>, a client processes it and stops — no acknowledgement is sent.</p>
+<h3>8.2 Outbox semantics</h3>
+<p>The sender keeps every unacknowledged inner message in its persistent outbox until a matching receipt arrives. While an id is in the outbox the sender MAY:</p>
+<ul><li>Retry delivery through any available path, any number of times, with its own backoff policy.</li><li>Hand the same envelope to the relay server again. Re-queuing is idempotent: the relay server keys its queue by <code>envelope.id</code>, so a given envelope takes at most one slot.</li></ul>
+<p>Once a receipt for <code>id</code> arrives, the sender removes the message from its outbox and stops retrying.</p>
+<p>If a client has previously handed an envelope to a relay server and then observes that the relay server has restarted (for example, by detecting a new WebSocket session), it MUST be prepared to re-queue the envelope. In practice this means the client SHOULD clear any in-memory "already queued on server" tracking whenever it (re-)registers with a relay server.</p>
+<h3>8.3 Sender-side dedup hint</h3>
+<p>A client MAY keep a per-session cache of envelope ids it has already handed to the relay server in the current session, to avoid spamming the relay with duplicates of the same envelope while no new events have changed its state. This cache is an optimisation only and MUST be reset on every (re)registration with the relay.</p>
+<h2>9. Data flows</h2>
+<p>This section walks through the four combinations of sender and recipient online state.</p>
+<p>Legend:</p>
+<ul><li><code>A → B</code> means user A sends to user B.</li><li><code>[…]</code> denotes an encrypted envelope.</li><li><code>--&gt;</code> is a direct channel, <code>==&gt;</code> is a relay path.</li></ul>
+<h3>9.1 Both online, direct channel available</h3>
+<pre><code>A                          Relay                           B
+|   sign + wrap inner as [msg]                             |
+|------------------------- [msg] --------------------------&gt;|
+|                                                          |   decrypt, verify sig, apply
+|                                                          |   add id to processed set
+|&lt;------------------------ [receipt] ----------------------|
+|   or over the same direct channel as plaintext           |
+|   remove id from outbox                                  |</code></pre>
+<p>The relay server is not involved. This is the common fast path.</p>
+<h3>9.2 Both online, no direct channel (yet)</h3>
+<pre><code>A                          Relay                           B
+|--- queue_peer_envelope([msg]) ---&gt;|                      |
+|                                   |-- peer_envelope([msg]) --&gt;|
+|                                                          |   decrypt, verify sig, apply
+|                                                          |&lt;-- queue_peer_envelope([receipt]) --|
+|&lt;-- peer_envelope([receipt]) ------|                      |</code></pre>
+<p>The relay forwards the envelope immediately instead of storing it. Same protocol on the receipt path.</p>
+<h3>9.3 Sender online, recipient offline</h3>
+<pre><code>A                          Relay                           B (offline)
+|--- queue_peer_envelope([msg]) ---&gt;|                      .
+|                                   |   store under B      .
+|                                   |                      .
+                                    .                      B comes online, registers
+                                    |&lt;----- queue_drained ----|
+                                    |-- peer_envelope([msg]) --&gt;|
+                                    |                       |   decrypt, verify sig, apply
+                                    |&lt;-- queue_peer_envelope([receipt]) --|
+A                                   |                       |
+|&lt;-- peer_envelope([receipt]) ------|                       |
+|   remove id from outbox                                   |</code></pre>
+<p>The relay stores the envelope in B's queue until B registers, then flushes it and sends <code>queue_drained</code>. B sends the receipt back the same way.</p>
+<h3>9.4 Both offline at different times</h3>
+<pre><code>A                          Relay                           B
+|--- queue_peer_envelope([msg]) ---&gt;|                      .
+|   (A goes offline)                |   store under B      .
+                                    |                      .
+                                    .                      B registers
+                                    |&lt;----- queue_drained ----|
+                                    |-- peer_envelope([msg]) --&gt;|
+                                    |                       |   decrypt, verify sig, apply
+                                    |&lt;-- queue_peer_envelope([receipt]) --|
+                                    |   store under A      |
+                                    |                      |   (B goes offline)
+A reconnects                        |                      .
+|-- register ---------------------&gt;|                       .
+|&lt;-- peer_envelope([receipt]) ------|                      .
+|   remove id from outbox            |                      .</code></pre>
+<p>Neither user is ever directly connected to the other. The relay holds both the original message and its receipt until each side comes back.</p>
+<h3>9.5 Racing paths</h3>
+<p>If A has both a direct channel to B and a relay route, A MAY send the envelope on both. B will decrypt whichever arrives first, apply the message, and drop the second as a duplicate (§7). B's receipt may likewise arrive at A via both paths; A processes whichever arrives first and treats the second as a no-op.</p>
+<h2>10. Security properties and non-goals</h2>
+<p>Properties provided by this protocol:</p>
+<ul><li><strong>Confidentiality</strong> against relay servers and network observers: envelopes are AEAD-encrypted under a key only the sender and recipient can derive.</li><li><strong>Integrity</strong> of the inner message: AEAD authentication makes any tampering observable.</li><li><strong>Sender authentication</strong> between two known users: successful decryption proves the envelope came from the claimed <code>from_user_id</code> (given the recipient trusts the public key binding).</li><li><strong>Non-repudiation / third-party verifiability:</strong> Schnorr signatures on inner messages let any party who knows <code>from_user_id</code>'s public key verify authorship, without trusting the message forwarder. This is what makes ledger sync secure — see §12 and the Ledger spec.</li><li><strong>Replay resistance at the application layer</strong> via the dedup set (§7). The protocol itself does not prevent a relay from replaying an envelope, but replays are discarded by the recipient.</li></ul>
+<p>Properties <strong>not</strong> provided:</p>
+<ul><li><strong>Forward secrecy.</strong> The ECDH key is long-lived. Compromise of either side's private key exposes all past messages that were recorded on the wire.</li><li><strong>Metadata privacy from the relay.</strong> The relay learns the pair <code>(from_user_id, to_user_id)</code> and the <code>id</code> for every envelope it sees.</li><li><strong>Ordering across paths.</strong> Messages from the same sender are not guaranteed to arrive in any particular order. Applications needing ordering MUST carry ordering information inside <code>payload</code>.</li><li><strong>Delivery guarantees.</strong> Clients retry, relays MAY drop, and direct channels come and go. "Delivered" is defined only by the receipt (§8.1).</li><li><strong>Denial of service protection on the relay.</strong> Rate limiting and quota enforcement are relay-specific policy.</li></ul>
+<h2>11. Versioning</h2>
+<p>This document describes version <code>2</code> of the envelope format (added Schnorr signatures inside the ciphertext). Any incompatible change — new required fields, different crypto suite, different serialization — MUST increment <code>envelope_version</code>. Receivers MUST reject unknown versions rather than trying to guess.</p>
+<p>Inner message <code>type</code> values are application-level and evolve independently; adding a new type is not a protocol change.</p>
+<h2>12. Sync protocol (ledger recovery)</h2>
+<p>The sync protocol allows a client whose local state has been wiped or partially lost to reconstruct its connection history from peers who hold signed ledger entries. It runs over an established direct channel after the relay's queued envelope delivery is complete.</p>
+<h3>12.1 Motivation</h3>
+<p>A client that resets its data (intentionally or due to corruption) loses knowledge of existing friendships and transactions. Because peers hold signed copies of every message they exchanged, they can replay that history to the recovering client. The Schnorr signature on each entry guarantees that the recovering client can trust the replayed content without trusting the forwarder.</p>
+<h3>12.2 Prerequisites</h3>
+<p>Before syncing, a client MUST wait for the <code>queue_drained</code> signal from the relay server. This ensures any envelopes the relay was holding are processed before the client requests a diff from peers — otherwise the client may ask for entries it is about to receive via the normal path.</p>
+<h3>12.3 Message types</h3>
+<p>Sync messages travel as regular encrypted inner messages (wrapped in envelopes, Schnorr-signed). Two new types are defined:</p>
+<div class="table-scroll"><table><thead><tr><th>Type</th><th>Direction</th><th>Purpose</th></tr></thead><tbody><tr><td><code>sync_hello</code></td><td>initiator → peer</td><td>Advertise the set of entry ids the initiator already knows.</td></tr><tr><td><code>sync_data</code></td><td>peer → initiator</td><td>Send the entries the initiator is missing.</td></tr></tbody></table></div>
+<p>Sync messages are <strong>not</strong> application messages in the domain sense — they carry no business event — and do not appear in <code>processed_peer_message_ids</code>. They also do not generate receipts.</p>
+<h3>12.4 Flow</h3>
+<pre><code>A (recovering)                             B (has history)
+|                                          |
+|  (queue_drained received from relay)     |
+|                                          |
+|--- sync_hello { known_ids: [...] } -----&gt;|
+|                                          |   filter own ledger for A&lt;-&gt;B entries
+|                                          |   subtract known_ids
+|&lt;--- sync_data { entries: [...] } --------|
+|                                          |
+|  for each entry (chronological):         |
+|    verify Schnorr signature              |
+|    apply to local state                  |
+|  persist updated state                   |
+|  update peerIds snapshot                 |</code></pre>
+<h3>12.5 sync_hello payload</h3>
+<pre><code>{
+  "known_ids": ["&lt;entry id&gt;", ...]
+}</code></pre>
+<p><code>known_ids</code> is the list of ledger entry ids the initiator already holds for the conversation with this peer (entries where <code>from_user_id</code> or <code>to_user_id</code> matches the peer).</p>
+<h3>12.6 sync_data payload</h3>
+<pre><code>{
+  "entries": [
+    {
+      "id": "...",
+      "type": "friend_accept",
+      "from_user_id": "npub1...",
+      "to_user_id": "npub1...",
+      "originated_at": "ISO-8601",
+      "timestamp": "ISO-8601",
+      "signature": "&lt;hex&gt;",
+      "payload": { ... }
+    }
+  ]
+}</code></pre>
+<p>The sender filters its ledger for entries involving the two parties, removes any ids listed in <code>sync_hello.known_ids</code>, and sends the remainder.</p>
+<h3>12.7 Entry classification on receipt</h3>
+<p>When a client receives <code>sync_data</code>, it classifies each entry:</p>
+<ul><li><strong>inbound-like</strong> (<code>to_user_id === my_id</code>): an entry addressed to me, potentially from the peer. Processed through the full application message handler (<code>applyInboundPeerMessage</code>) after signature verification. Applied in chronological order so earlier messages (e.g. <code>friend_accept</code>) are in place before later ones (e.g. <code>transaction_created</code>) that depend on them.</li><li><strong>outbound-only</strong> (<code>from_user_id === my_id</code>): an entry I originally authored that the peer is returning. Added to the local ledger so the id appears in future <code>sync_hello</code> known_ids, but not re-applied to local state (the effect was already applied when the message was first sent).</li></ul>
+<p>Entries that fail Schnorr signature verification are silently dropped. A compromised or malicious peer cannot inject forged history.</p>
+<h3>12.8 Remote peer allowance (friend mesh only)</h3>
+<p>When a client receives a <code>peer_connect</code> signal from the relay for a peer it does not currently recognise (the peer's id is not in its accepted friendships), it:</p>
+<ol><li>Creates a WebRTC peer connection and completes the sync protocol normally.</li><li>Starts a <strong>15-second remote allowance timer</strong>.</li><li>If sync succeeds and the peer is added to accepted friendships before the timer expires, the timer is cancelled and the peer connection remains open.</li><li>If the timer expires before the peer is recognised, the connection is closed.</li></ol>
+<p>This lets a resetting client recover friendships from arriving peers without opening a permanent connection to unknown parties.</p>
+<p>The allowance timer applies only to the <strong>friend mesh</strong>. Self-peers (§13) are always allowed and are never reaped by this mechanism.</p>
+<h2>13. Multi-device (same-user) sync</h2>
+<p>A single user MAY be online on multiple devices at the same time. Those devices MUST converge to the same local state so that an action taken on one device is visible on every other device — even if the triggering peer message was received on only one of them.</p>
+<p>This is achieved by running a second <strong>self-mesh</strong> overlay alongside the friend mesh. The two overlays share almost all machinery; this section describes the differences.</p>
+<h3>13.1 Connection establishment</h3>
+<p>The relay server signals <code>peer_connect</code> whenever it has two or more connected clients with the same <code>user_id</code> (one <code>peer_connect</code> per remote device). The client routes the signal to one of two meshes based on the claimed <code>peer_user_id</code>:</p>
+<div class="table-scroll"><table><thead><tr><th>Condition</th><th>Mesh</th><th>Key used inside the mesh</th></tr></thead><tbody><tr><td><code>peer_user_id !== my_user_id</code></td><td>Friend mesh</td><td><code>peer_user_id</code></td></tr><tr><td><code>peer_user_id === my_user_id</code></td><td>Self-mesh</td><td><code>peer_device_id</code></td></tr></tbody></table></div>
+<p>Using <code>peer_device_id</code> as the self-mesh key ensures that each remote device gets its own peer entry even though they all share the same user id.</p>
+<p>WebRTC negotiation, data channels, JSON framing, and envelope encoding are identical to the friend mesh. The polite/impolite role is still decided by lexicographic comparison of the local and remote key; on the self-mesh this compares device ids.</p>
+<h3>13.2 Encryption for self-envelopes</h3>
+<p>The envelope format (§4) and the ECDH key derivation (§5.1) are unchanged. Because the "peer" is another device of the same user, both ends hold the same private key, so:</p>
+<pre><code>shared = ECDH(my_priv, my_pub)
+key    = SHA-256(shared)</code></pre>
+<p>Both devices derive identical keys from the local key pair alone and can decrypt each other's envelopes with no additional key exchange. <code>from_user_id</code> and <code>to_user_id</code> inside the envelope are both set to the user's own npub.</p>
+<h3>13.3 Signatures on self-messages</h3>
+<p>Self-mesh messages MUST still carry valid Schnorr signatures (§3.3). Reuse of the same signing code keeps the inner-message construction identical to friend-mesh messages and lets any ledger entry delivered via self-sync pass the same verification on the receiving device (§12.7 of the Ledger spec).</p>
+<h3>13.4 Remote allowance</h3>
+<p>Self-peers are trusted on arrival: there is no 15-second allowance timer and no requirement that they appear in any "accepted" set. A self-peer connection persists for as long as the relay reports the other device online.</p>
+<h3>13.5 Live ledger broadcast</h3>
+<p>Whenever the local client appends a new ledger entry (outbound or inbound), it MUST also broadcast that entry to every currently-connected self-peer so all of the user's devices converge on the same ledger. The broadcast piggybacks on the existing sync protocol:</p>
+<ul><li>Transport: a <code>sync_data</code> inner message (§12.6) sent over each self-peer data channel.</li><li>Scope: the broadcast carries every <em>new</em> ledger entry — entries from all conversations, not just a bilateral slice, because self-peers are entitled to see the full ledger.</li><li>Loop prevention: the sender keeps a local set of already-broadcast ledger entry ids. A receiving self-peer seeds this set with the inbound ids <em>before</em> applying them so the resulting ledger-change tick does not echo them back.</li></ul>
+<h3>13.6 Initial self-sync (on connection)</h3>
+<p>Immediately after a self-peer data channel opens, both devices exchange a <code>sync_hello</code> (§12.5) carrying the ids they already hold, and respond with <code>sync_data</code> carrying the missing entries. Unlike friend-mesh sync, the entry filter is <strong>not bilateral</strong>: a self-peer returns <em>all</em> ledger entries whose id is not in the initiator's <code>known_ids</code>.</p>
+<p>On receipt, entries are classified using the same rule as friend sync (§12.7): inbound-like entries run through the application message handler; outbound-only entries are inserted into the ledger without re-application. Chronological replay is still required so dependent entries apply in order.</p>
+<h3>13.7 Receipts</h3>
+<p>Inner messages delivered via self-sync (both the initial catch-up and live broadcast) do <strong>not</strong> generate receipts. After convergence both devices share identical <code>processed_peer_message_ids</code>, so acknowledgement is redundant and a receipt from device A to device A' would itself need to be broadcast, causing an unbounded fan-out.</p>
+<h3>13.8 Security considerations</h3>
+<ul><li>Self-sync inherits the same signature and AEAD guarantees as friend sync: a hostile relay or network observer cannot forge or read self-mesh traffic.</li><li>A device that is <strong>not</strong> actually the same user cannot masquerade as a self-peer because the relay allocates <code>device_id</code> only for connections that authenticated with the matching <code>user_id</code> in <code>register</code> (see §6.2 and the signaling server implementation).</li><li>Signature verification at the receiver still runs on every entry, so even if the self-mesh were somehow spoofed, entries with invalid signatures for the claimed <code>from_user_id</code> would be rejected.</li></ul>
+  </main>
+  <script src="assets/pages.js"></script>
+  <script src="assets/design.js"></script>
+</body>
+</html>

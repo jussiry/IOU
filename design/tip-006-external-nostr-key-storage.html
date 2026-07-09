@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TIP-006 External Nostr key storage — Design</title>
+  <link rel="stylesheet" href="assets/design.css" />
+</head>
+<body>
+  <main class="page" data-status="implemented">
+<h1>TIP-006: External Nostr Key Storage</h1>
+<div class="table-scroll"><table><thead><tr><th>Field</th><th>Value</th></tr></thead><tbody><tr><td>Number</td><td>TIP-006</td></tr><tr><td>Title</td><td>External Nostr Key Storage</td></tr><tr><td>Status</td><td>Implemented (layers 1–5)</td></tr><tr><td>Author</td><td>Jussi Rytkönen</td></tr><tr><td>Created</td><td>2026-06-05</td></tr></tbody></table></div>
+<blockquote><p><strong>Context:</strong> The KeyProvider abstraction, <code>authorship</code> proofs and legacy signature migration, NIP-44 v2 transport (envelope v3 with v2 decrypt drain), and <strong>NIP-07</strong> browser-extension support are implemented and verified — including a successful real-signer test against nos2x. This document is the record of that implemented design. The remaining layer — <strong>NIP-46 remote signers and NIP-55 Android signers</strong> — is not implemented; its design continues in <code>../TIP-006-remote-signers.md</code>.</p></blockquote>
+<hr />
+<h2>Summary</h2>
+<p>Tally should support external Nostr key storage as an optional identity backend while keeping the existing IndexedDB-stored local key flow. Users who prefer browser extensions, remote signers, or native signer apps can bring an existing Nostr key without revealing the private key to Tally.</p>
+<p>The transport envelope remains Tally's current minimal envelope. Tally does <strong>not</strong> publish transactions as ordinary Nostr events, because Nostr event metadata (<code>pubkey</code>, <code>created_at</code>, <code>kind</code>, tags, event id, signature) would weaken Tally's current privacy model. Instead, Tally uses standard signer-compatible Nostr event signatures <strong>inside the encrypted payload</strong> as an authorship proof.</p>
+<p>Envelope encryption moves to <strong>NIP-44 as the single scheme</strong> for all key providers (local and external). The current bespoke <code>SHA-256(ECDH-x) → AES-256-GCM</code> scheme is retired, not kept alongside NIP-44. External signers (NIP-07/46/55) expose <code>nip44.encrypt/decrypt</code> and cannot speak Tally's custom scheme, so a local-key user and an external-key user can only interoperate if both use NIP-44. Maintaining two encryption schemes with capability negotiation would therefore be self-defeating bloat; v3 is NIP-44-only.</p>
+<hr />
+<h2>Motivation</h2>
+<p>Tally already uses Nostr-compatible identity keys (<code>npub</code> / <code>nsec</code>) and secp256k1 Schnorr signatures. Today the app stores the private key locally and performs signing, ECDH, encryption, and decryption itself.</p>
+<p>This is simple and fast, but it requires the Tally app to hold the user's private key. Many Nostr users already prefer external signers that keep private keys in a browser extension, mobile signer, remote signer, or dedicated key manager. Supporting those signers makes Tally easier to use with existing Nostr identities while reducing the number of apps that ever see the user's <code>nsec</code>.</p>
+<p>The goal is <strong>key custody flexibility</strong>, not public Nostr relay interoperability for Tally transactions.</p>
+<hr />
+<h2>Non-Goals</h2>
+<ul><li>Do not make Tally transactions public Nostr events.</li><li>Do not send transaction type, amount, note, app-specific tags, or Nostr event metadata to public Nostr relays.</li><li>Do not remove local IndexedDB key storage.</li><li>Do not require all signers to support non-standard raw Schnorr digest signing.</li><li>Do not change the server into a Nostr relay.</li></ul>
+<hr />
+<h2>Privacy Constraint</h2>
+<p>Current Tally envelopes intentionally expose as little metadata as possible to the relay:</p>
+<pre><code>{
+  type: "peer_envelope",
+  envelope_version: 2,
+  id: &lt;message id&gt;,
+  from_user_id: &lt;sender npub&gt;,
+  to_user_id: &lt;recipient npub&gt;,
+  ciphertext: &lt;encrypted signed inner message&gt;
+}</code></pre>
+<p>A normal Nostr event would expose additional metadata:</p>
+<pre><code>{
+  id: &lt;event hash&gt;,
+  pubkey: &lt;sender hex pubkey&gt;,
+  created_at: &lt;unix timestamp&gt;,
+  kind: &lt;event kind&gt;,
+  tags: [...],
+  content: &lt;encrypted payload&gt;,
+  sig: &lt;signature&gt;
+}</code></pre>
+<p>Even when <code>content</code> is encrypted with NIP-44, the event shell remains visible. This leaks app protocol details, timestamps, tags, event ids, and potentially recipient hints. That is not acceptable for Tally's ledger and transaction privacy model.</p>
+<p>Therefore Nostr events may be used as <strong>private signed proof objects</strong>, but not as the relay-visible transport envelope.</p>
+<hr />
+<h2>Key Provider Model</h2>
+<p>Tally should introduce a key provider abstraction. At minimum:</p>
+<pre><code>KeyProvider {
+  type: "local" | "nip07" | "nip46" | "nip55" | "custom"
+  getPublicKeyHex(): Promise&lt;string&gt;
+  signEvent(unsignedEvent): Promise&lt;SignedNostrEvent&gt;
+  nip44Encrypt(peerPublicKeyHex, plaintext): Promise&lt;string&gt;
+  nip44Decrypt(peerPublicKeyHex, ciphertext): Promise&lt;string&gt;
+}</code></pre>
+<p>The existing local IndexedDB key path becomes one provider implementation. It can keep using local private key material and local crypto. External providers use the best available standard API:</p>
+<ul><li>NIP-07 browser extensions: <code>window.nostr.getPublicKey</code>, <code>window.nostr.signEvent</code>, optional <code>window.nostr.nip44.encrypt/decrypt</code>.</li><li>NIP-46 remote signers: <code>get_public_key</code>, <code>sign_event</code>, <code>nip44_encrypt</code>, <code>nip44_decrypt</code>.</li><li>NIP-55 Android signers: <code>get_public_key</code>, <code>sign_event</code>, <code>nip44_encrypt</code>, <code>nip44_decrypt</code>.</li></ul>
+<p>If a custom signer exposes raw Schnorr digest signing, Tally may use it as an optimization or compatibility path, but broad support should be based on standard <code>sign_event</code>.</p>
+<hr />
+<h2>Envelope Version 3</h2>
+<p>External-key support should introduce a new envelope version rather than changing version 2 in place.</p>
+<p>Relay-visible shape:</p>
+<pre><code>{
+  type: "peer_envelope",
+  envelope_version: 3,
+  id: &lt;inner message id&gt;,
+  from_user_id: &lt;sender npub&gt;,
+  to_user_id: &lt;recipient npub&gt;,
+  ciphertext: &lt;NIP-44 ciphertext or local-provider equivalent&gt;
+}</code></pre>
+<p>The server still routes by <code>to_user_id</code> and treats all envelope fields as untrusted claims. The recipient still decrypts, parses, and checks the decrypted inner fields against the outer envelope.</p>
+<p>Version 3 changes:</p>
+<ul><li>Encryption uses <strong>NIP-44 v2</strong> for every provider. There is no AES-GCM path and no per-peer capability negotiation in v3 (see "Encryption Scheme" below).</li><li>Durable Tally messages carry a Tally-specific signed Nostr event as their authorship proof.</li><li>Sync transport messages and receipts do not need durable authorship signatures.</li></ul>
+<h3>Cutover</h3>
+<p>Because envelopes are <strong>transient transport</strong> (decrypted on arrival; nothing durable is stored in encrypted form), the cutover from v2/AES-GCM to v3/NIP-44 does not need a long dual-scheme coexistence. The only state that can still be v2 at cutover is:</p>
+<ul><li>messages already sitting in the server queue, and</li><li>a peer running an older app version mid-rollout.</li></ul>
+<p>For these, clients keep <strong>v2 decrypt</strong> alive as a short, read-only drain path; they never <em>send</em> v2. No capability advertising, no negotiated downgrade. Given the small user base and the PWA update flow (waiting-worker activation on reload), a hard send-side cutover with a brief tolerated-error window during rollout is acceptable. The v2 decrypt path can be removed in a later release once queues have drained and clients have updated.</p>
+<hr />
+<h2>Encryption Scheme</h2>
+<p>Envelope v3 uses <strong>NIP-44 v2</strong> (ChaCha20 + HMAC-SHA256, keys derived via HKDF-SHA256 from the secp256k1 ECDH shared secret, with NIP-44's length-hiding padding).</p>
+<h3>Provider responsibility</h3>
+<p>NIP-44 is part of the <code>KeyProvider</code> surface, not raw ECDH:</p>
+<ul><li><strong>Local provider</strong> implements <code>nip44Encrypt/Decrypt</code> directly with the bundled crypto primitives, using the locally-held private key.</li><li><strong>External providers</strong> delegate to the signer (<code>window.nostr.nip44.*</code> for NIP-07; <code>nip44_encrypt/nip44_decrypt</code> RPCs for NIP-46/NIP-55). The app never sees the private key.</li></ul>
+<p>This is why the conversation key is computed inside the provider — external signers own it and never expose the ECDH secret.</p>
+<h3>Implementation</h3>
+<p><strong>Do not hand-roll NIP-44.</strong> Its padding scheme, MAC-over-(<code>nonce ‖ ciphertext</code>), verify-before-decrypt ordering, and constant-time comparison are easy to get subtly wrong. Use an audited implementation with the official NIP-44 test vectors:</p>
+<ul><li>Reference implementation: <strong><code>nostr-tools/nip44</code></strong> (<code>nip44.v2.encrypt/decrypt</code>, <code>getConversationKey(privHex, pubHex)</code>), maintained by Nostr core and shipped with the spec's test vectors.</li><li>Underlying primitives: <code>@noble/ciphers</code> (chacha), <code>@noble/hashes</code> (hkdf/hmac/sha256), <code>@noble/curves</code> (secp256k1). Tally already vendors <code>@noble/curves</code> at <code>app/js/vendor/noble-secp256k1.js</code>.</li></ul>
+<p>The local provider should cache the per-peer <strong>conversation key</strong> (the HKDF-extract of the ECDH secret) exactly as the current code caches the derived AES key, so steady-state cost matches today's.</p>
+<h3>Service-worker constraint</h3>
+<p>The service worker is a classic worker and already loads an esbuild IIFE bundle (<code>app/sw-crypto-entry.js</code> → <code>app/dist/sw-crypto.js</code>) for push-hint decryption. NIP-44 decrypt for the local provider is added to that same bundle. If bundle size matters, copy <code>nostr-tools</code>' nip44 implementation verbatim on top of the already-bundled noble primitives rather than re-deriving the padding/MAC logic.</p>
+<hr />
+<h2>Tally-Specific Signing Event</h2>
+<p>Because standard Nostr signers sign Nostr events rather than arbitrary Tally digests, Tally signs a private Nostr event whose <code>content</code> contains the Tally message.</p>
+<p>Unsigned event given to the signer:</p>
+<pre><code>{
+  kind: 177700,
+  created_at: &lt;unix seconds&gt;,
+  tags: [
+    ["tally:v", "1"],
+    ["tally:purpose", "inner_message"]
+  ],
+  content: JSON.stringify({
+    schema: "tally.signed_message.v1",
+    message: {
+      id: &lt;peer message id&gt;,
+      type: &lt;peer message type&gt;,
+      from_user_id: &lt;sender npub&gt;,
+      to_user_id: &lt;recipient npub&gt;,
+      created_at: &lt;ISO-8601 sender timestamp&gt;,
+      payload: &lt;message payload&gt;
+    }
+  })
+}</code></pre>
+<p>The signer returns the full signed Nostr event:</p>
+<pre><code>{
+  id: &lt;nostr event id&gt;,
+  pubkey: &lt;sender hex pubkey&gt;,
+  created_at: &lt;unix seconds&gt;,
+  kind: 177700,
+  tags: [
+    ["tally:v", "1"],
+    ["tally:purpose", "inner_message"]
+  ],
+  content: &lt;same content string&gt;,
+  sig: &lt;schnorr signature&gt;
+}</code></pre>
+<p>This event is never sent as the outer transport object. It is placed inside the encrypted Tally inner message.</p>
+<p>Decrypted inner message:</p>
+<pre><code>{
+  id: &lt;peer message id&gt;,
+  type: &lt;peer message type&gt;,
+  from_user_id: &lt;sender npub&gt;,
+  to_user_id: &lt;recipient npub&gt;,
+  created_at: &lt;ISO-8601 sender timestamp&gt;,
+  payload: &lt;message payload&gt;,
+  authorship: {
+    scheme: "tally-nostr-event-v1",
+    event: &lt;signed Nostr event&gt;
+  }
+}</code></pre>
+<p>The signed event's Nostr metadata is visible only to the decrypting recipient.</p>
+<hr />
+<h2>Verification Rules</h2>
+<p>For durable peer messages, the receiver MUST verify:</p>
+<ol><li>The envelope decrypts successfully.</li><li>The decrypted inner message is valid JSON.</li><li><code>inner.id</code>, <code>inner.from_user_id</code>, and <code>inner.to_user_id</code> match the relay-visible envelope claims.</li><li><code>inner.to_user_id</code> is the receiving user's own id.</li><li><code>inner.authorship.scheme</code> is supported.</li><li>The embedded Nostr event id is correct for the event body.</li><li>The embedded Nostr event signature verifies against <code>event.pubkey</code>.</li><li><code>event.pubkey</code> corresponds to <code>inner.from_user_id</code>.</li><li>The event has Tally's expected kind, version tag, and purpose tag.</li><li><code>JSON.parse(event.content).schema === "tally.signed_message.v1"</code>.</li><li><code>JSON.parse(event.content).message</code> exactly matches the decrypted inner message fields, excluding <code>authorship</code>.</li></ol>
+<p>Only after these checks may the message be applied or appended to the ledger.</p>
+<hr />
+<h2>Signing Call Sites</h2>
+<p>Current Tally signing is centralized enough that this change should be manageable.</p>
+<h3>Durable outbox messages</h3>
+<p><code>queuePeerMessage</code> signs messages used by:</p>
+<ul><li><code>transaction_created</code></li><li><code>payment_request</code></li><li><code>payment_request_response</code></li><li><code>friend_request</code></li><li><code>friend_accept</code></li><li><code>trust_limit_suggestion</code></li><li><code>name_changed</code></li></ul>
+<p>Current behavior:</p>
+<pre><code>message.signature = signInnerMessage(message, privateKey)</code></pre>
+<p>New behavior:</p>
+<pre><code>message.authorship = signTallyMessage(message, keyProvider)</code></pre>
+<p>where <code>signTallyMessage</code> creates the Tally-specific signing event and calls <code>keyProvider.signEvent</code>.</p>
+<h3>Initial self-name ledger entry</h3>
+<p>Fresh identity creation currently creates a self-addressed <code>name_changed</code> entry signed by the new private key.</p>
+<p>New behavior is the same durable-message path:</p>
+<pre><code>initMsg.authorship = signTallyMessage(initMsg, keyProvider)
+appendLedgerEntryFromMessage(state, initMsg)</code></pre>
+<p>For local-key users this stays silent. For external-key users this may trigger one signer approval during onboarding.</p>
+<h3>Envelope fallback signing</h3>
+<p><code>wrapPeerMessage</code> currently signs a message if it lacks a signature. Version 3 should avoid treating all wrapped messages as durable ledger facts.</p>
+<p>For durable messages, <code>wrapPeerMessage</code> should require an existing <code>authorship</code> proof or create one via the key provider.</p>
+<p>For non-durable transport messages, <code>wrapPeerMessage</code> should be able to encrypt without authorship proof.</p>
+<h3>Sync transport messages</h3>
+<p>Sync envelopes do not need their own durable signature. They are transport containers. The security-critical facts inside sync batches are the ledger entries, and each ledger entry carries its own authorship proof.</p>
+<p>Version 3 sync messages should therefore be encrypted/authenticated by the envelope but not signed as durable Tally messages.</p>
+<h3>Receipts</h3>
+<p>Receipts are acknowledgements and do not need durable authorship signatures. If a receipt must cross the relay, it should be encrypted in an envelope but should not require signer approval.</p>
+<hr />
+<h2>Ledger Data Structure</h2>
+<p>The ledger should remain a Tally semantic ledger, not become a list of raw Nostr events.</p>
+<p>Recommended shape:</p>
+<pre><code>LedgerEntryModel {
+  id: string,
+  timestamp: string,
+  type: string,
+  from_user_id: string,
+  to_user_id: string,
+  originated_at: string,
+  payload: object,
+  authorship: AuthorshipProof
+}</code></pre>
+<p>For version 3 entries:</p>
+<pre><code>AuthorshipProof {
+  scheme: "tally-nostr-event-v1",
+  event: {
+    id: string,
+    pubkey: string,
+    created_at: number,
+    kind: number,
+    tags: string[][],
+    content: string,
+    sig: string
+  }
+}</code></pre>
+<p>For legacy version 2 entries, Tally may keep the old field during migration:</p>
+<pre><code>signature: &lt;legacy schnorr signature over canonical Tally digest&gt;</code></pre>
+<p>or normalize it into:</p>
+<pre><code>AuthorshipProof {
+  scheme: "tally-canonical-schnorr-v1",
+  signature: &lt;legacy signature&gt;
+}</code></pre>
+<p>The cleaner long-term form is one <code>authorship</code> field with a <code>scheme</code> discriminator. This avoids filling the ledger with parallel signature fields while still allowing old entries to verify.</p>
+<h3>Why not store only the signed Nostr event?</h3>
+<p>Storing only the signed event would make the ledger depend on parsing <code>event.content</code> for every query, balance reconstruction, sync slice, and UI operation. It would also let Nostr's generic event shape leak into every Tally data path.</p>
+<p>Keeping the semantic fields at the top level preserves the current ledger ergonomics:</p>
+<ul><li><code>type</code> remains directly queryable.</li><li><code>from_user_id</code> and <code>to_user_id</code> remain directly queryable.</li><li><code>originated_at</code> remains directly available for ordering and replay.</li><li><code>payload</code> remains the message-type-specific Tally object.</li><li><code>authorship</code> is a proof attached to the record, not the record itself.</li></ul>
+<p>The duplication between top-level fields and the signed event content is intentional. Verification requires the two copies to match exactly. If they do not match, the entry is rejected.</p>
+<hr />
+<h2>Storage for External-Key Users</h2>
+<p>External-key accounts should not store <code>private_key</code> or <code>private_key_hex</code>.</p>
+<p>The local user record should store:</p>
+<pre><code>{
+  id: &lt;npub&gt;,
+  public_key: &lt;npub&gt;,
+  public_key_hex: &lt;hex&gt;,
+  key_provider: {
+    type: "nip07" | "nip46" | "nip55" | "custom",
+    provider_id: &lt;optional provider identifier&gt;,
+    permissions: &lt;optional cached permission hints&gt;
+  },
+  private_key: "",
+  private_key_hex: ""
+}</code></pre>
+<p>Local-key accounts keep the existing private key fields and may set:</p>
+<pre><code>key_provider: { type: "local" }</code></pre>
+<hr />
+<h2>Performance</h2>
+<p>NIP-44 is <strong>not</strong> hardware-accelerated the way AES-GCM is. WebCrypto natively provides HKDF, HMAC-SHA256, and SHA-256, but <strong>not ChaCha20</strong>, so NIP-44's cipher runs in pure JS (noble). AES-GCM, by contrast, uses native AES-NI.</p>
+<p>This does not matter in practice, for two reasons:</p>
+<ol><li><strong>Payloads are tiny.</strong> Tally messages are small JSON objects; ChaCha20 over a few hundred bytes is sub-millisecond. The native-vs-JS gap only shows up at MB-scale throughput.</li><li><strong>The dominant cost is shared and unchanged.</strong> Both the old and new schemes perform a secp256k1 <strong>ECDH</strong> (BigInt scalar multiplication in pure JS — the reason the current code caches the derived key per peer). That dwarfs the symmetric layer. NIP-44 caches the per-peer conversation key the same way, so steady-state cost is effectively identical to today.</li></ol>
+<p>So the real latency to design around is <strong>not</strong> crypto but:</p>
+<ul><li>extension or remote-signer IPC (NIP-46 round-trips each <code>nip44_encrypt/decrypt</code> and <code>sign_event</code> over the network),</li><li>permission prompts and signer UI latency,</li><li>network and IndexedDB/rendering work.</li></ul>
+<p>Tally should still avoid unnecessary external signer calls. In particular, sync transport messages and receipts must not ask for durable signatures, and encrypt/decrypt batching matters most for NIP-46.</p>
+<hr />
+<h2>Migration</h2>
+<p>Tally should use versioned app-state migrations for this change. IndexedDB itself stores one <code>root_state</code> blob in one object store, so the database schema version does not need to change just because ledger fields change. The migration should run after <code>loadAppState()</code> and before <code>normalizeAppState()</code>, then save the migrated state once before the app starts using it.</p>
+<p>Migration files should be bound to <code>DATA_MODEL_VERSION</code>:</p>
+<pre><code>Migration {
+  version: &lt;DATA_MODEL_VERSION migrated to&gt;,
+  migrate(rootState): rootState
+}</code></pre>
+<p>On startup:</p>
+<pre><code>persisted = loadAppState()
+migrated = runMigrations(persisted, persisted.model_version, DATA_MODEL_VERSION)
+state = normalizeAppState(migrated)
+if migrationsRan:
+  saveAppState(state)</code></pre>
+<p>This keeps data migrations separate from IndexedDB object-store migrations. IndexedDB <code>DATABASE_VERSION</code> should only change when object stores or indexes change.</p>
+<p>The external-key migration should support three cases:</p>
+<ol><li>Existing local-key users with legacy <code>signature</code> fields.</li><li>New local-key users producing <code>authorship.scheme = "tally-nostr-event-v1"</code> or legacy local signatures, depending on implementation phase.</li><li>External-key users producing <code>authorship.scheme = "tally-nostr-event-v1"</code>.</li></ol>
+<h3>Signature field migration</h3>
+<p>When the app version that understands <code>authorship</code> ships, add a migration from the previous <code>DATA_MODEL_VERSION</code> to the new one.</p>
+<p>For every <code>ledger[]</code> entry:</p>
+<pre><code>if entry.authorship is absent and entry.signature is present:
+  entry.authorship = {
+    scheme: "tally-canonical-schnorr-v1",
+    signature: entry.signature
+  }</code></pre>
+<p>For every <code>outbox[]</code> message:</p>
+<pre><code>if message.authorship is absent and message.signature is present:
+  message.authorship = {
+    scheme: "tally-canonical-schnorr-v1",
+    signature: message.signature
+  }</code></pre>
+<p>The migration runs even though legacy signatures stay verifiable: it gives the whole app <strong>one</strong> field shape (<code>authorship</code> with a <code>scheme</code> discriminator) so signing, verification, normalization, and sync all read a single path instead of branching on "does this entry have <code>signature</code> or <code>authorship</code>?". This is the opposite of bloat — it collapses two field shapes into one. The migration may leave the raw top-level <code>signature</code> in place for one release for rollback/debuggability; a later cleanup migration removes it once <code>authorship</code> is the only field read.</p>
+<p>Verification permanently accepts two <strong>authorship schemes</strong>:</p>
+<pre><code>authorship.scheme === "tally-nostr-event-v1"        // all new entries (local + external)
+authorship.scheme === "tally-canonical-schnorr-v1"  // legacy, verify-only, never written</code></pre>
+<p>This dual <em>signing</em> path is <strong>not</strong> a temporary window. Ledger entries are immutable financial facts; existing entries are signed with the legacy canonical-Schnorr digest and are re-verified whenever a peer re-sends them during sync/merge. They cannot be re-signed (external-key users have no way to; timestamps and proofs are baked in). So <code>tally-canonical-schnorr-v1</code> verification stays as long as any pre-migration entry can appear in a sync — effectively permanent. It is a small, read-only switch case, not a parallel system.</p>
+<blockquote><p><strong>Contrast with encryption.</strong> Envelopes are transient transport, so the AES-GCM scheme can be cut cleanly (v2 decrypt kept only as a short drain path). Signatures protect durable history, so the legacy verify path stays. These two "keep both" decisions are independent and should not be conflated.</p></blockquote>
+<p>The signature-to-authorship migration should <strong>not</strong> run before the app implements <code>authorship</code> in <code>LedgerEntryModel</code>, <code>PeerMessageModel</code>, signing, verification, and sync. Otherwise normalization would either strip the new field or the rest of the app would ignore it.</p>
+<hr />
+<h2>Resolved Decisions</h2>
+<ul><li><strong>Encryption (was Open Q#5):</strong> NIP-44 v2 is <strong>mandatory</strong> for envelope v3, for all providers. No AES-GCM in v3 and no per-peer capability negotiation. v2 decrypt is kept only as a short read-only drain path.</li><li><strong>New-entry signing (was Open Q#1):</strong> All new durable entries — <strong>including local-key users</strong> — use <code>authorship.scheme = "tally-nostr-event-v1"</code>. The local provider produces the same Tally signing event internally; this keeps one signing/verification path. <code>tally-canonical-schnorr-v1</code> remains verify-only for legacy entries.</li></ul>
+<h2>Open Questions</h2>
+<ol><li>What custom event kind should Tally use for private signing events? (Draft uses <code>177700</code>.)</li><li>Should the Tally signing event include minimal tags only, or include a message id tag for signer UI readability? Since the event is encrypted before transport, this is a recipient- and signer-visible choice rather than a relay-visible privacy issue.</li><li>How should signer approval UX be batched for multi-entry actions such as accepting a payment request that also creates a transaction? (See "Signer UX" below for the current direction.)</li></ol>
+<hr />
+<h2>Signer UX</h2>
+<p>The signing/encryption surface differs sharply by provider, and the UI must reflect that.</p>
+<h3>Local provider</h3>
+<p>No UI. Signing, NIP-44 encrypt/decrypt all happen silently with the locally-held key, exactly as today. This is the default and the only path most users ever see.</p>
+<h3>NIP-07 browser extension (e.g. nos2x, Alby)</h3>
+<p>Mostly automatic, but <strong>not silent</strong>: the extension owns the approval UX. <code>getPublicKey</code>, <code>signEvent</code>, and <code>nip44.encrypt/decrypt</code> each may pop the extension's own prompt. Well-behaved extensions let the user "always allow" a site, after which calls resolve without prompts. Tally's job is:</p>
+<ul><li>detect <code>window.nostr</code> and offer it as a key option,</li><li>call the standard methods and surface a non-blocking "waiting for your signer…" state while a call is pending,</li><li>handle rejection/timeout gracefully (the action fails cleanly; nothing is half-applied).</li></ul>
+<p>There is <strong>no Tally-drawn signing dialog</strong> for NIP-07 — the extension is the trusted UI. Tally must not try to reproduce or wrap it.</p>
+<h3>NIP-46 remote signer / NIP-55 native signer</h3>
+<p>Not implemented. These signers and their pending-state / approval-batching UX are covered in the continuation doc <code>../TIP-006-remote-signers.md</code>.</p>
+<h3>Onboarding / welcome page</h3>
+<p>Today the welcome page only offers "create a new identity" (and transfer/restore). It should mention that <strong>external Nostr key storage is possible</strong> — a user can bring an existing Nostr identity via a browser extension or remote signer instead of letting Tally hold the key.</p>
+<p>For this first phase the copy stays <strong>general and forward-looking</strong>, since the external providers are not yet verified on real signers:</p>
+<ul><li>A short line/secondary action such as "Already have a Nostr key? You can use a browser extension or signer app." </li><li>Behind it, if <code>window.nostr</code> is detected, offer "Use my Nostr extension"; otherwise show a brief explanation and link out to NIP-07/NIP-46 concepts.</li><li>The default and prominent path remains "create a new identity" (local key).</li></ul>
+<p>The copy is intentionally vague at first and tightened as NIP-07 (then NIP-46/NIP-55) are actually tested. Reference signer for NIP-07 testing: <strong>nos2x</strong> (<code>https://github.com/fiatjaf/nos2x</code>).</p>
+<hr />
+<h2>Recommendation</h2>
+<p>External keys were implemented in layers:</p>
+<ol><li>✅ Add the <code>KeyProvider</code> abstraction (local provider only) while keeping behavior unchanged; route all signing/encryption through it.</li><li>✅ Add <code>authorship</code> as the single ledger/peer-message proof field; migrate legacy <code>signature</code> → <code>authorship{scheme:"tally-canonical-schnorr-v1"}</code> (verify-only); add Tally-specific Nostr signing events (<code>tally-nostr-event-v1</code>) as the path for all new durable messages.</li><li>✅ Stop requiring durable signatures for sync transport messages and receipts.</li><li>✅ Add NIP-44 v2 to the local provider and the SW bundle; introduce envelope v3 (NIP-44 send-only, v2 decrypt as drain). Verify against NIP-44 official test vectors.</li><li>✅ Add NIP-07 support (detect <code>window.nostr</code>, key-option in onboarding, pending-state UX) and the general welcome-page mention of external key storage. Test against nos2x.</li><li>⬜ Add NIP-46/NIP-55 where the app environment supports them, with explicit approval/pending UX and signature batching. <strong>Not implemented — see <code>../TIP-006-remote-signers.md</code>.</strong></li></ol>
+<p>This keeps Tally's ledger clean, preserves minimal transport metadata, uses one encryption scheme and one new-entry signing scheme, and makes external Nostr key storage an additive capability rather than a rewrite of the app around public Nostr event transport.</p>
+  </main>
+  <script src="assets/pages.js"></script>
+  <script src="assets/design.js"></script>
+</body>
+</html>

@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Plan: Architecture — Design</title>
+  <link rel="stylesheet" href="assets/design.css" />
+</head>
+<body>
+  <main class="page" data-status="reference">
+<div class="import-note">Imported as-is from <code>plan/arcitecture.md</code>. It may conflict with current code or other pages — kept verbatim, pending reconciliation.</div>
+<h1>Architecture</h1>
+<p>IOU is a peer-to-peer mobile web app, that uses Node.js backend to initiate connections between clients.</p>
+<h2>Data</h2>
+<p>Application data is stored in peer-to-peer network where each client keeps its own data and updates it according to messages reveived from its peers. Each node in the network only needs to know its own state in relation to its peers and thus there is no need for globally shared data (e.g. blockchain) between all participants.</p>
+<h2>Client</h2>
+<p>Client is a modularly designed mobile web application.</p>
+<p>Technologies used:</p>
+<ul><li>IndexedDb for storing application data</li><li>SubtleCrypto Web API for security</li><li>Progressive web app tehconologies (Web application manifest, Web Workers, etc.) to allow native like features.</li></ul>
+<h2>Relay bakckends</h2>
+<p>Node.js backend, that has two main functions: to serve client files and initiate peer-to-peer WebRTC connections between clients. These functionalities should be kept separete since later they may be split into two different servers. Backends may also be used to cache messages for clients that are offline at the time of sending the message. To keep application decentralized there can be many backends / relay servers, and client can choose in its settings to which servers to connect to.</p>
+  </main>
+  <script src="assets/pages.js"></script>
+  <script src="assets/design.js"></script>
+</body>
+</html>

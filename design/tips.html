@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TIPs — Design</title>
+  <link rel="stylesheet" href="assets/design.css" />
+</head>
+<body>
+  <main class="page" data-status="reference">
+<h1>TIPs — Tally Improvement Proposals</h1>
+<p>A <strong>TIP</strong> is a design document for a non-trivial change to Tally: it captures the motivation, the design, the trade-offs considered, and the implementation plan for a feature before (and while) it is built. TIPs are the project's durable design record — the place to understand <em>why</em> something works the way it does, not just <em>how</em>.</p>
+<p>Each TIP has a header table with a <strong>Status</strong> (<code>Draft</code>, <code>Implemented</code>, …), a number, and an author. A TIP number can span more than one document when a feature ships in phases (see the implemented/unimplemented split below).</p>
+<h2>Implemented vs. unimplemented</h2>
+<p>Documents are organized by what has actually shipped:</p>
+<ul><li><strong><code>TIPs/</code></strong> (this folder) holds TIPs — or the <strong>parts of a TIP</strong> — that are</li></ul>
+<p>  <strong>not yet implemented</strong>: drafts, and the still-pending phases of a feature   whose earlier phases have already landed.</p>
+<ul><li><strong><code>TIPs/implemented/</code></strong> holds the design records for work that **is</li></ul>
+<p>  implemented and verified**. Moving a doc here marks the design as done and   preserves it as the canonical record of what was built.</p>
+<h3>Splitting a phased TIP</h3>
+<p>When a TIP ships in layers, we <strong>split it</strong> rather than move the whole thing:</p>
+<ol><li>The implemented design moves to <code>implemented/</code> (Status → <code>Implemented</code>), with</li></ol>
+<p>   a short context banner noting which layers are done and pointing to the    continuation.</p>
+<ol><li>A continuation doc stays in <code>TIPs/</code> covering only the <strong>unimplemented</strong></li></ol>
+<p>   phases, with its own context banner pointing back to the implemented base.</p>
+<p>This keeps <code>implemented/</code> an accurate record of shipped work while the root folder always reflects what is still outstanding.</p>
+  </main>
+  <script src="assets/pages.js"></script>
+  <script src="assets/design.js"></script>
+</body>
+</html>

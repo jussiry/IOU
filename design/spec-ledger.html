@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Spec: Ledger — Design</title>
+  <link rel="stylesheet" href="assets/design.css" />
+</head>
+<body>
+  <main class="page" data-status="reference">
+<div class="import-note">Imported as-is from <code>specs/ledger.md</code>. It may conflict with current code or other pages — kept verbatim, pending reconciliation.</div>
+<h1>IOU Ledger Specification</h1>
+<p><strong>Version:</strong> 2   <strong>Last updated:</strong> 2026-04-18</p>
+<hr />
+<h2>1. Overview</h2>
+<p>The ledger is an append-only log of every peer message the local user has produced or received. It is persisted in IndexedDB (see <code>specs/data-storage.md</code>) as the <code>ledger</code> array inside the root state object.</p>
+<p>Its two primary purposes are:</p>
+<ol><li><strong>Audit trail</strong> — a tamper-evident history of all bilateral interactions (friend requests, transactions, trust-limit changes, payment requests).</li><li><strong>State recovery</strong> — if a user's IndexedDB is wiped, a peer who still holds their ledger entries can replay them chronologically and fully reconstruct the wiped user's view of the shared relationship.</li></ol>
+<p>Unlike the <code>outbox</code> (which holds messages pending delivery), the ledger is permanent. Entries are never removed.</p>
+<hr />
+<h2>2. Entry Structure</h2>
+<p>See <code>specs/data-storage.md §4.4</code> for the full field table. The key semantic distinction between the two timestamp fields:</p>
+<div class="table-scroll"><table><thead><tr><th>Field</th><th>Who sets it</th><th>Signed?</th><th>Purpose</th></tr></thead><tbody><tr><td><code>timestamp</code></td><td>Local machine at append time</td><td>No</td><td>Ordering and display</td></tr><tr><td><code>originated_at</code></td><td>Sender (copied from <code>created_at</code>)</td><td>Yes</td><td>Digest reconstruction for signature verification</td></tr></tbody></table></div>
+<p>Because <code>timestamp</code> is local it cannot be trusted by a sync peer. <code>originated_at</code> is what was inside the sender's signed inner message; it must be preserved unchanged so the Schnorr signature can be re-verified at any future point.</p>
+<hr />
+<h2>3. Local Appends</h2>
+<h3>3.1 <code>appendLedgerEntry(state, fields)</code></h3>
+<p>The primitive append. Sets <code>timestamp</code> to the current time, normalises through <code>createLedgerEntryModel</code>, and <strong>prepends</strong> (unshifts) so the array stays newest-first. Callers supply:</p>
+<pre><code>id          — matches the originating peer message id
+type        — peer message type
+fromUserId  — sender npub
+toUserId    — recipient npub
+payload     — message-type-specific plain object
+signature   — Schnorr sig hex from the peer message
+originatedAt — the peer message's created_at timestamp</code></pre>
+<h3>3.2 <code>appendLedgerEntryFromMessage(state, message)</code></h3>
+<p>Convenience wrapper for the common case of mirroring an outbound or freshly-applied inbound peer message into the ledger. Copies <code>message.created_at</code> → <code>originatedAt</code> and <code>message.signature</code> → <code>signature</code>.</p>
+<p><strong>When to call for outbound messages:</strong> at the moment the command is executed (e.g. <code>acceptFriend</code> in <code>commands/friendship.js</code> calls this immediately after building and signing the accept message, before the message leaves the outbox). This ensures the entry is in the ledger even if the peer never acknowledges receipt.</p>
+<p><strong>When to call for inbound messages:</strong> inside the message handler, after the handler has applied state changes and determined the message is legitimate. The bridge (<code>peer/bridge.js</code>) calls <code>appendLedgerEntryFromMessage</code> for every successfully applied inbound peer message as part of <code>markProcessedPeerMessage</code>.</p>
+<hr />
+<h2>4. Queries</h2>
+<h3>4.1 <code>getLedgerEntriesForPeer(ledger, myId, peerId)</code></h3>
+<p>Returns all entries where <code>(from_user_id === myId &amp;&amp; to_user_id === peerId) || (from_user_id === peerId &amp;&amp; to_user_id === myId)</code>. This is the bilateral slice offered to a <strong>friend</strong> sync peer — entries involving third parties are never forwarded.</p>
+<h3>4.2 <code>getAllLedgerEntries(ledger)</code></h3>
+<p>Returns a shallow copy of the full ledger. Used by the <strong>self-mesh</strong> (same-user devices) during initial catch-up and live broadcast (see §9): a self-peer is entitled to the full ledger because it represents another device of the same user.</p>
+<hr />
+<h2>5. Signature Verification</h2>
+<h3>5.1 Why verify?</h3>
+<p>The AES-256-GCM envelope that wraps sync messages (<code>sync_data</code>) proves the <em>transport peer</em> produced the batch — but not that the individual entries inside it were authored by whoever they claim. A compromised peer could forward forged entries with a fabricated <code>from_user_id</code>. Schnorr verification on each entry's claimed author closes this gap.</p>
+<h3>5.2 <code>verifyLedgerEntrySignature(entry)</code></h3>
+<p>Reconstructs the inner-message shape from the stored entry:</p>
+<pre><code>{
+  id:           entry.id,
+  type:         entry.type,
+  from_user_id: entry.from_user_id,
+  to_user_id:   entry.to_user_id,
+  created_at:   entry.originated_at || entry.timestamp,
+  payload:      entry.payload || {},
+  signature:    entry.signature,
+}</code></pre>
+<p>Then calls <code>verifyInnerSignature(innerShape)</code> from <code>peer/envelope.js</code>, which:</p>
+<ol><li>Serialises the shape as canonical JSON (fields in a fixed order, <code>signature</code> field excluded).</li><li>Computes SHA-256 of the JSON string.</li><li>Verifies the BIP-340 Schnorr signature against <code>from_user_id</code>'s secp256k1 public key.</li></ol>
+<p>Returns <code>false</code> if <code>signature</code> is absent or empty — unsigned entries are always rejected during sync.</p>
+<hr />
+<h2>6. Sync Merge</h2>
+<h3>6.1 <code>mergeSyncedLedgerEntries(state, entries)</code></h3>
+<p>Merges a batch of entries received from a sync peer:</p>
+<ol><li>Builds a set of existing entry ids.</li><li>For each entry: normalises, skips duplicates, runs <code>verifyLedgerEntrySignature</code>.</li><li>Entries that fail verification are logged and discarded.</li><li>New entries are prepended; after the loop the array is sorted descending by <code>timestamp</code>.</li><li>Returns the count of entries actually added.</li></ol>
+<p>Does <strong>not</strong> persist. The caller owns persistence so a single <code>saveAppState</code> can cover the ledger update and any concurrent state changes.</p>
+<hr />
+<h2>7. Recovery via Peer Sync</h2>
+<p>When a user's IndexedDB is wiped (data loss, device migration, or a deliberate test reset), peers who hold the other side of the ledger can fully reconstruct the wiped user's view of each shared relationship. The mechanism is the sync protocol (fully described in <code>specs/peer-communication.md §12</code>); this section focuses on what happens at the ledger and handler level.</p>
+<h3>7.1 Prerequisites</h3>
+<p>Sync is initiated only after the WebSocket server signals <code>queue_drained</code>, ensuring any server-queued envelopes (normal inbound messages) are delivered first. This prevents re-requesting entries that are about to arrive anyway via the regular inbound path.</p>
+<h3>7.2 Entry Classification</h3>
+<p>When <code>sync_data</code> arrives with a batch of ledger entries, each entry (after signature verification) is placed into one of two buckets:</p>
+<div class="table-scroll"><table><thead><tr><th>Bucket</th><th>Condition</th><th>Processing</th></tr></thead><tbody><tr><td><code>inboundLike</code></td><td><code>entry.to_user_id === myId</code></td><td>Applied via <code>applyInboundPeerMessage</code> — full handler logic runs</td></tr><tr><td><code>outboundOnly</code></td><td><code>entry.from_user_id === myId</code></td><td>Inserted into ledger via <code>addLedgerEntries</code> — no handler, state not changed</td></tr></tbody></table></div>
+<p>Entries addressed to neither side are silently dropped (should not occur for well-behaved peers; <code>getLedgerEntriesForPeer</code> on the sender side prevents this).</p>
+<p><code>outboundOnly</code> entries represent the user's own past outbound messages that were stored in the peer's ledger. They are backfilled into the local ledger for completeness but cannot affect local state (the local user's own actions are already reflected; the peer cannot add new obligations on the user's behalf).</p>
+<h3>7.3 Chronological Replay</h3>
+<p><code>inboundLike</code> entries are sorted ascending by <code>timestamp</code> before replay. This matters for recovery: a <code>tx_created</code> entry can only apply after the <code>friend_accept</code> that re-created the connection. Replaying out of order would cause the transaction handler to fail to find the connection and silently drop the entry.</p>
+<h3>7.4 The <code>friend_accept</code> Recovery Path</h3>
+<p><code>applyFriendAcceptMessage</code> (in <code>peer/handlers.js</code>) handles the case where no connection exists yet at replay time — i.e. the wiped user has no record of the friendship. The handler:</p>
+<ol><li>Detects that no <code>userConnection</code> exists (<code>isRecovery = !userConnection</code>).</li><li>Calls <code>ensureUserConnection</code> to create the connection with <code>friendship_status: accepted</code>.</li><li>Because <code>isRecovery</code> is <code>true</code>, skips the <code>wasAccepted</code> check that would otherwise return <code>null</code> (the shortcut for "friend was already accepted — nothing to do").</li><li>Returns a notification object so the caller knows the message was processed.</li><li>The caller (<code>routeInboundMessage</code>) calls <code>markProcessedPeerMessage</code>, adding the entry's id to <code>processed_peer_message_ids</code>, ensuring the same <code>friend_accept</code> is not replayed again on the next sync.</li></ol>
+<p>Without step 3 the function would return <code>null</code> in recovery (because <code>ensureUserConnection</code> immediately sets <code>friendship_status: accepted</code>, making the subsequent <code>isAcceptedFriendshipStatus</code> check return <code>true</code>). <code>routeInboundMessage</code> treats a <code>null</code> return as an illegal/unhandled message and does <strong>not</strong> call <code>markProcessedPeerMessage</code>, causing the entry to be re-processed every time the peer reconnects — an infinite recovery loop.</p>
+<h3>7.5 Trust-Limit Recovery</h3>
+<p>The <code>friend_accept</code> message payload carries <code>trust_credit_limit_eur</code> — the value the accepter agreed to from the original <code>friend_request</code>. Replaying the <code>friend_accept</code> during recovery restores the established limit without any extra negotiation.</p>
+<p>Bob's subsequent <code>trust_limit_update</code> (a <code>friend_trust_limit</code> message) arrives as a separate ledger entry. If it is also in the peer's ledger it will be replayed in chronological order after <code>friend_accept</code>, resulting in the lowered limit.</p>
+<h3>7.6 Remote Peer Allowance Timer</h3>
+<p>When a wiped user reconnects, peers who do not yet have a <code>peer_connect</code> signal from the server for the wiped user may still initiate a WebRTC connection via their own <code>peer_connect</code> — because the wiped user looks like a new registrant on the signalling server. The <code>REMOTE_INITIATED_PEER_GRACE_PERIOD_MS = 15000</code> (15-second) timer in <code>peer/mesh.js</code> keeps such a connection alive even when it is not in the wiped user's current <code>peerIds</code> snapshot (which starts empty after wipe). Without this grace period the connection would be immediately closed by <code>closePeersNotInSet</code> before the sync could complete.</p>
+<hr />
+<h2>7.7 Self-Authored Seed Entry on Identity Creation</h2>
+<p>When a new identity is created (a fresh keypair — <strong>not</strong> when logging in with an existing nsec or ncryptsec), the client appends a self-addressed <code>name_changed</code> ledger entry as part of <code>createUser</code>:</p>
+<pre><code>from_user_id = to_user_id = &lt;new user's npub&gt;
+payload      = { name: &lt;chosen display name, or npub if empty&gt; }
+originated_at = &lt;now&gt;
+signature     = Schnorr over the canonical inner-message digest</code></pre>
+<p>This seed entry ensures that the <em>first</em> device of a new user ships with the authoritative name already in the ledger. When the user later pairs a second device of the same identity, the self-mesh sync (§8) delivers the entry and the second device can derive the display name from the ledger without a round-trip.</p>
+<p>The seed entry MUST NOT be created during login with an existing <code>nsec</code> / <code>ncryptsec</code>. Doing so would insert a fresh <code>name_changed</code> entry timestamped <em>now</em> and addressed from the user to themselves — which <code>applyOwnNameFromLedger</code> (§7.8) would then pick as the most-recent name and overwrite the real name already carried in the user's older ledger entries from their other devices.</p>
+<h2>7.8 <code>applyOwnNameFromLedger</code></h2>
+<p>After any self-mesh sync completes, the client scans the ledger for entries where:</p>
+<ul><li><code>type === "name_changed"</code></li><li><code>from_user_id === myId</code></li><li><code>payload.name</code> is a non-empty trimmed string</li></ul>
+<p>Entries are sorted ascending by <code>originated_at</code> (falling back to <code>timestamp</code>), and the most recent one wins. The resulting name is assigned to <code>state.user.name</code> and propagated to every contact's stored <code>person_name</code> via <code>syncUserNameAcrossContacts</code> so the user's own devices and every friend's copy of the user's display name agree after convergence.</p>
+<p>This pass is idempotent: if the derived name already matches <code>state.user.name</code>, nothing is persisted.</p>
+<hr />
+<h2>8. Multi-Device Live Broadcast</h2>
+<p>Beyond recovery-after-wipe, the ledger is also the convergence substrate for a single user running multiple devices (laptop + phone, two browsers, etc.). Each device keeps its own IndexedDB record; the ledger is what brings them into agreement.</p>
+<p>The mechanism has two halves:</p>
+<ol><li><strong>Initial catch-up (on self-peer connection).</strong> As soon as a WebRTC data channel opens between two devices of the same user, they exchange <code>sync_hello</code> / <code>sync_data</code> exactly as friend sync would, except the sender returns <em>all</em> ledger entries whose id is missing from the initiator's <code>known_ids</code> (not the bilateral slice). Entries are verified, classified, and replayed identically to §7.</li><li><strong>Live broadcast (on every append).</strong> Whenever the local client appends a ledger entry — whether from an outbound action or a freshly-applied inbound peer message — it MUST push that entry to every currently connected self-peer as a <code>sync_data</code> batch containing a single entry (or a small tail).</li></ol>
+<h3>8.1 Loop Prevention</h3>
+<p>Without guardrails the live broadcast would echo forever: A broadcasts to B, B appends and broadcasts back to A, A appends and broadcasts again. Two cooperating rules break the cycle:</p>
+<ul><li>The sender maintains a <code>broadcastedLedgerIds</code> set and skips any entry already in it.</li><li>On receiving <code>sync_data</code> via the self-mesh, the receiver <strong>seeds this set with each inbound id before applying the entries</strong>. The resulting data-change tick therefore sees the id as "already broadcast" and the entry is not echoed back.</li></ul>
+<h3>8.2 No Receipts on Self-Sync</h3>
+<p>Self-sync inner messages do not generate receipts (see <code>specs/peer-communication.md §13.7</code>). After convergence, both devices share identical <code>processed_peer_message_ids</code> maps, so an acknowledgement would be redundant; moreover, a receipt from device A to device A' would itself trigger a broadcast, causing unbounded fan-out.</p>
+<h3>8.3 Signature Handling</h3>
+<p>Every self-sync entry still carries its original BIP-340 Schnorr signature and is verified by the receiver exactly like a friend-sync entry. Reusing the signature path keeps the merge code DRY and guarantees that even if the self-mesh were somehow spoofed, forged entries with invalid signatures would be rejected before touching local state.</p>
+<hr />
+<h2>9. Security Properties</h2>
+<div class="table-scroll"><table><thead><tr><th>Property</th><th>Mechanism</th></tr></thead><tbody><tr><td><strong>Authorship integrity</strong></td><td>Every entry carries a BIP-340 Schnorr signature by <code>from_user_id</code>; <code>verifyLedgerEntrySignature</code> rejects entries without a valid signature</td></tr><tr><td><strong>Non-repudiation</strong></td><td>The signature is over the canonical inner-message digest (id, type, from/to, created_at, payload); neither the transport peer nor the server can produce a valid signature for a different <code>from_user_id</code></td></tr><tr><td><strong>No forged history</strong></td><td><code>mergeSyncedLedgerEntries</code> and <code>handleSyncData</code> reject unsigned or invalidly-signed entries before they enter the local state</td></tr><tr><td><strong>Replay-safe deduplication</strong></td><td><code>processed_peer_message_ids</code> prevents the same entry from being applied twice, even across multiple sync cycles</td></tr><tr><td><strong>Bilateral isolation</strong></td><td><code>getLedgerEntriesForPeer</code> only shares entries involving both parties; third-party conversations are never forwarded</td></tr></tbody></table></div>
+<h3>9.1 Limitations</h3>
+<ul><li><strong>Key compromise</strong> — if a user's private key is stolen, an attacker can produce valid signatures for arbitrary messages. There is currently no key rotation mechanism.</li><li><strong>Timestamp forgery</strong> — <code>originated_at</code> is sender-asserted and covered by the signature, so it cannot be altered after signing; however, a malicious sender can choose any timestamp at signing time.</li><li><strong>Selective disclosure</strong> — a peer can withhold entries from <code>sync_data</code>. There is no way for the recovering peer to know that entries are missing. Full recovery depends on peers being cooperative.</li></ul>
+  </main>
+  <script src="assets/pages.js"></script>
+  <script src="assets/design.js"></script>
+</body>
+</html>

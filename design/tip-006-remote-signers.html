@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TIP-006 Remote signers (cont.) — Design</title>
+  <link rel="stylesheet" href="assets/design.css" />
+</head>
+<body>
+  <main class="page" data-status="proposal">
+<h1>TIP-006 (cont.): NIP-46 Remote &amp; NIP-55 Native Signers</h1>
+<div class="table-scroll"><table><thead><tr><th>Field</th><th>Value</th></tr></thead><tbody><tr><td>Number</td><td>TIP-006</td></tr><tr><td>Title</td><td>Remote &amp; Native Nostr Signers</td></tr><tr><td>Status</td><td>Draft</td></tr><tr><td>Author</td><td>Jussi Rytkönen</td></tr><tr><td>Created</td><td>2026-06-15</td></tr></tbody></table></div>
+<blockquote><p><strong>Context:</strong> The external-key foundation — KeyProvider abstraction, <code>authorship</code> proofs, NIP-44 v2 transport (envelope v3), and <strong>NIP-07</strong> browser-extension support — is implemented and verified; see <code>implemented/TIP-006-external-nostr-key-storage.md</code>. This document covers the one remaining layer: <strong>NIP-46 remote signers</strong> and <strong>NIP-55 Android native signers</strong>. Both slot into the existing <code>KeyProvider</code> seam without changing the rest of the app.</p></blockquote>
+<hr />
+<h2>Summary</h2>
+<p>Add two more <code>KeyProvider</code> implementations alongside <code>local</code> and <code>nip07</code>:</p>
+<ul><li><strong>NIP-46 (remote signer):</strong> the private key lives in a separate signer</li></ul>
+<p>  service the user authorizes. Operations are JSON-RPC requests round-tripped   over a relay/transport: <code>get_public_key</code>, <code>sign_event</code>, <code>nip44_encrypt</code>,   <code>nip44_decrypt</code>.</p>
+<ul><li><strong>NIP-55 (Android native signer):</strong> the same operations exposed by a native</li></ul>
+<p>  signer app via the platform's signer intent/IPC: <code>get_public_key</code>,   <code>sign_event</code>, <code>nip44_encrypt</code>, <code>nip44_decrypt</code>.</p>
+<p>Neither exposes raw key material to Tally. Because envelope v3 is NIP-44-only and all new durable entries already sign via <code>signEvent</code> (a standard Nostr event, kind 177700), these providers need no new wire formats — they only supply the four standard methods the <code>KeyProvider</code> interface already defines.</p>
+<hr />
+<h2>Provider interface (already defined)</h2>
+<pre><code>KeyProvider {
+  type: "local" | "nip07" | "nip46" | "nip55" | "custom"
+  getPublicKeyHex(): Promise&lt;string&gt;
+  signEvent(unsignedEvent): Promise&lt;SignedNostrEvent&gt;
+  nip44Encrypt(peerPublicKeyHex, plaintext): Promise&lt;string&gt;
+  nip44Decrypt(peerPublicKeyHex, ciphertext): Promise&lt;string&gt;
+}</code></pre>
+<ul><li><strong>NIP-46:</strong> map each method to its RPC (<code>get_public_key</code>, <code>sign_event</code>,</li></ul>
+<p>  <code>nip44_encrypt</code>, <code>nip44_decrypt</code>) over the chosen NIP-46 transport; persist the   signer connection / bunker descriptor so the provider can be rebuilt from   state, the way the local and nip07 providers are built in   <code>createKeyProviderFromState</code>.</p>
+<ul><li><strong>NIP-55:</strong> map each method to the Android signer intent/IPC equivalents.</li><li><code>signer_type</code> on the user model gains <code>"nip46"</code> / <code>"nip55"</code> (today it is</li></ul>
+<p>  <code>"local" | "nip07"</code>), and <code>createKeyProviderFromState</code> learns to build them.</p>
+<p><code>signCanonicalDigest</code> and the legacy AES-GCM <code>encryptForPeer/decryptFromPeer</code> have no equivalent on these signers and should throw, exactly as the nip07 provider does — these accounts never produced v2 envelopes and always sign via events.</p>
+<hr />
+<h2>Signer UX</h2>
+<p>Unlike NIP-07 (mostly automatic once "always allow" is granted), these signers are <strong>not automatic.</strong> Each <code>sign_event</code> / <code>nip44_*</code> is an async round-trip to a remote service or separate app, often with a push/approval on another device. The UI must:</p>
+<ul><li>show an explicit pending state ("Approve this in your signer app"),</li><li>tolerate multi-second latency and offline/unreachable signers (the action</li></ul>
+<p>  fails cleanly; nothing is half-applied),</p>
+<ul><li>batch where possible (below) to minimize approvals.</li></ul>
+<h3>Approval batching</h3>
+<p>A single user action can produce several durable entries (e.g. accepting a payment request that also creates a transaction, or onboarding's self-name entry). For external signers, each durable entry is a separate <code>sign_event</code>. The direction: group the entries of one user action and request their signatures together / sequentially behind one "Approve in your signer" affordance, rather than firing isolated prompts. Sync transport messages and receipts are never signed, so they never prompt.</p>
+<hr />
+<h2>Performance</h2>
+<p>The dominant per-message cost for these providers is <strong>signer IPC</strong>, not crypto: NIP-46 round-trips each <code>nip44_encrypt/decrypt</code> and <code>sign_event</code> over its transport, and NIP-55 crosses an app boundary. Tally should therefore:</p>
+<ul><li>never request durable signatures for sync transport messages or receipts,</li><li>cache the per-peer NIP-44 conversation key where the signer allows it,</li><li>batch encrypt/decrypt and signing for a single user action (most impactful</li></ul>
+<p>  for NIP-46).</p>
+<hr />
+<h2>Open Questions</h2>
+<ol><li>Which NIP-46 transport(s) to support, and how to persist/restore the signer</li></ol>
+<p>   connection across reloads and devices.</p>
+<ol><li>How aggressively to batch approvals without making a single decline leave a</li></ol>
+<p>   user action partially applied.</p>
+<ol><li>Whether NIP-55 is in scope for Tally's current (web PWA) environment or only</li></ol>
+<p>   once a native/Android wrapper exists.</p>
+<hr />
+<h2>Implementation outline</h2>
+<ol><li>Extend <code>signer_type</code> and <code>createKeyProviderFromState</code> to recognize <code>nip46</code> /</li></ol>
+<p>   <code>nip55</code> and build the matching provider.</p>
+<ol><li>Implement <code>createNip46KeyProvider</code> (RPC transport) and, where the environment</li></ol>
+<p>   supports it, <code>createNip55KeyProvider</code> (native intent/IPC).</p>
+<ol><li>Add the pending-state UX and approval batching for grouped durable entries.</li><li>Extend onboarding to offer "connect a remote/native signer" beside the</li></ol>
+<p>   existing NIP-07 option.</p>
+<ol><li>Test against a real NIP-46 bunker and a NIP-55 signer app.</li></ol>
+  </main>
+  <script src="assets/pages.js"></script>
+  <script src="assets/design.js"></script>
+</body>
+</html>

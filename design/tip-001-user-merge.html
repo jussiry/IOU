@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TIP-001 User merge — Design</title>
+  <link rel="stylesheet" href="assets/design.css" />
+</head>
+<body>
+  <main class="page" data-status="proposal">
+<h1>TIP-001: User Merge</h1>
+<div class="table-scroll"><table><thead><tr><th>Field</th><th>Value</th></tr></thead><tbody><tr><td>Number</td><td>TIP-001</td></tr><tr><td>Title</td><td>User Merge</td></tr><tr><td>Status</td><td>Draft</td></tr><tr><td>Author</td><td>Jussi Rytkönen</td></tr><tr><td>Created</td><td>2026-05-03</td></tr></tbody></table></div>
+<hr />
+<h2>Summary</h2>
+<p>A mechanism for merging two existing Tally identities — both owned by the same person — into one. The old user's private key is imported into the device running the new user, and used to sign and broadcast a merge announcement to all of the old user's friends. Friends replace the old user connection with the new user. Once all friends have acknowledged, the old identity is fully deprecated.</p>
+<hr />
+<h2>Motivation</h2>
+<p>Users may end up with two separate identities — for example after creating a throwaway account, after losing access to a device, or after deliberately splitting identities for different social circles. The merge flow lets them consolidate to a single identity while preserving all existing relationships and balances.</p>
+<p>The key insight is that relationships and debts live in the friends' ledgers, not only in the user's own. A merge must therefore propagate outward: the old user signals every friend, and the friend re-wires their local connection from the old identity to the new one.</p>
+<hr />
+<h2>Trust Model</h2>
+<p>Both the old and new user are controlled by the same person. This is a first-party operation, not a transfer between strangers. The threat model is therefore:</p>
+<ul><li><strong>Internal</strong>: accidental actions from the old device during the merge transition (bugs, race conditions, user error). These are handled primarily through UI locking and message ordering.</li><li><strong>External</strong>: a third party who has obtained the old private key (key theft). This is a pre-existing risk regardless of the merge feature — handled the same way key compromise is always handled.</li></ul>
+<p>The old user is not treated as adversarial. The design goals for the in-flight / race-condition handling are <strong>correctness and avoiding error states</strong>, not protection against a malicious actor.</p>
+<hr />
+<h2>Message Routing — How the Announcement Reaches Friends</h2>
+<p>Before describing the merge steps it is worth explaining the relevant property of the server's <code>queue_peer_envelope</code> handler, because this determines the simplest implementation path.</p>
+<p>When a client sends <code>queue_peer_envelope</code> the server checks:</p>
+<ul><li>The sending client is registered (has a <code>user_id</code>)</li><li>The <code>to_user_id</code> is present and not the sender</li><li>Required envelope fields (<code>id</code>, <code>from_user_id</code>, <code>ciphertext</code>) exist</li></ul>
+<p><strong>The server does not validate that <code>envelope.from_user_id</code> matches the sending client's own <code>user_id</code>.</strong> It routes purely by <code>to_user_id</code>. If the recipient is online the envelope is delivered immediately over WebSocket; if offline it is queued for delivery on reconnection. Neither path involves WebRTC or the <code>peer_candidates</code> eligibility check.</p>
+<p>This means: the new device — registered with the server as <code>new_pubkey</code> — can send an envelope with <code>from_user_id: old_pubkey</code> to any of the old user's friends. The server will deliver it. The envelope is signed with the old private key, so signature verification on the receiving end passes correctly. From the friend's perspective the message is cryptographically identical to one the old device sent itself.</p>
+<p>No second WebSocket connection, no changes to the server, and no WebRTC establishment with new friends is needed for announcement delivery. The entire merge announcement flow runs through the existing server relay, reusing the same path ordinary offline messages already use.</p>
+<hr />
+<h2>Design</h2>
+<h3>1. Importing the old key</h3>
+<p>The user imports the old private key into the new device using the same encrypted key export that already exists for "Transfer user to another device or server" (NIP-49 / <code>ncryptsec</code> blob + passphrase). No new key-transport primitive is needed.</p>
+<p>Once imported, the new device holds both private keys temporarily — the new user's (permanent) and the old user's (used only to produce and sign the merge announcement and subsequent deprecation messages).</p>
+<h3>2. Merge announcement message</h3>
+<p>The new device (acting as the old user at the cryptographic layer) sends a <strong>MergeAnnouncement</strong> to every friend of the old user. It does this by calling <code>queue_peer_envelope</code> once per friend, with <code>from_user_id: old_pubkey</code> and content signed by the old private key. The server delivers immediately if the friend is online, or queues for offline delivery — the same path regular messages already take.</p>
+<p>The inner message content:</p>
+<pre><code>MergeAnnouncement {
+  kind:             "merge_announcement"
+  old_pubkey:       &lt;old user's public key&gt;
+  new_pubkey:       &lt;new user's public key&gt;
+  merge_id:         &lt;random UUID — idempotency token&gt;
+  freeze_seq:       &lt;old user's last outgoing event sequence number&gt;
+  balance_snapshot: &lt;map of friend_pubkey → balance, from old user's perspective&gt;
+  timestamp:        &lt;unix ms&gt;
+  signature:        &lt;signed by old private key over all above fields&gt;
+}</code></pre>
+<p>Fields explained:</p>
+<ul><li><strong>merge_id</strong> — unique per merge operation. Friends store this and ignore duplicate announcements, making the operation idempotent.</li><li><strong>freeze_seq</strong> — the sequence number of the last event the old user legitimately dispatched before initiating the merge. Friends use this as a high-water mark to accept any buffered-but-in-flight messages from old user up to and including this number, and to safely ignore anything after.</li><li><strong>balance_snapshot</strong> — the old user's view of each balance at the moment of freezing. Used for cross-referencing and reconciliation, not as a settlement instruction (see §4).</li><li><strong>signature</strong> — signed by the old private key over all above fields. This proves to the friend that the merge was authorised by the holder of the old key (i.e. the user themselves), not forged by a third party.</li></ul>
+<h3>3. Ledger stacking</h3>
+<p>The old user's transaction history is merged into the new user's ledger as a historical baseline. The new user's ledger takes logical precedence: in any conflict (e.g. duplicate event IDs, clashing trust limits) the new user's record wins. Events are ordered by timestamp, with the new user's events considered canonical for the same instant.</p>
+<h3>4. Friend behaviour on receipt</h3>
+<p>When a friend receives a MergeAnnouncement:</p>
+<ol><li><strong>Validate the signature</strong> — reject if invalid.</li><li><strong>Check merge_id</strong> — if already seen, ignore (idempotent).</li><li><strong>Check if connected to both old and new user</strong> — if yes, enter the <strong>dual-connection reconciliation flow</strong> (see §6).</li><li>Otherwise: create a connection to <code>new_pubkey</code> if not already present, inheriting the old user's trust limit and carrying over the balance from the friend's own ledger.</li><li>Remove the old user connection.</li><li>Send a <strong>MergeAck</strong> back to the old user (so the old device can track deprecation progress).</li></ol>
+<p><strong>On the balance snapshot</strong>: friends carry forward their own locally recorded balance with the old user — that is their ground truth. The <code>balance_snapshot</code> from the announcement is compared against it purely to surface any discrepancy (e.g. a transaction that was sent by old user but never delivered before the merge). If there is a meaningful difference, the friend is shown a reconciliation prompt. The snapshot is never applied automatically.</p>
+<h3>5. Old device behaviour after initiating merge</h3>
+<p>Immediately upon dispatching the MergeAnnouncement, the old device enters <strong>deprecated mode</strong>:</p>
+<ul><li>All outgoing transaction and friend-request actions are blocked in the UI. This is the primary safeguard against accidental actions.</li><li>The device remains reachable to receive MergeAck messages and to display deprecation progress to the user ("8 of 12 friends have switched over").</li><li>The old private key is discarded from the new device's memory once the session ends.</li></ul>
+<p>The old device is fully deprecated once all friends have sent MergeAck. At that point the app prompts the user to remove the old user data from the old device (the existing "remove user" flow).</p>
+<h3>6. Dual-connection reconciliation</h3>
+<p>If a friend is connected to both the old and new user:</p>
+<ul><li>They have two separate balances. These must be combined into one.</li><li><strong>Default rule</strong>: add the two balances together. If old user owes friend €20 and new user owes friend €5, the merged balance is new user owes friend €25.</li><li>The app presents a clear summary before the friend confirms: "Alice (old account) owed you €20. Alice (new account) owed you €5. After merge, Alice owes you €25."</li><li>Trust limit: take the more generous of the two existing limits.</li><li>The friend confirms before anything is applied locally.</li></ul>
+<h3>7. Handling in-flight messages</h3>
+<p><strong>The scenario</strong>: old device dispatches a transaction to friend F at moment T. At moment T+1 the merge is initiated and the MergeAnnouncement is dispatched. In the current single-server architecture, server message ordering means F receives the transaction before the announcement — no problem. In a future multi-relay architecture the two could arrive out of order.</p>
+<p><strong>Resolution — freeze_seq watermark</strong>:</p>
+<p>The <code>freeze_seq</code> field in the announcement is a high-water mark. Any message from the old user with seq ≤ freeze_seq was legitimately dispatched before the merge and must be accepted. Any message with seq &gt; freeze_seq was dispatched after the merge (which deprecated mode should prevent in the first place) and can be safely ignored.</p>
+<p>This is deterministic, requires no timer or grace period, and handles the multi-relay edge case cleanly without any extended trust in the old key.</p>
+<p><strong>Alternative considered — grace period</strong>:</p>
+<p>The new device could accept transactions signed by the old key for a short window, in the same way cloned devices currently share a key. This is more tolerant of unusual scenarios but is unnecessary given deprecated mode + freeze_seq, and adds implementation complexity. Excluded from v1.</p>
+<hr />
+<h2>Security Analysis</h2>
+<h3>Signature — what it proves</h3>
+<p>The MergeAnnouncement signed by the old private key proves that the holder of the old key authorised the merge. Since both accounts are the same person's, this is the intended proof: it tells friends "this is really me asking you to update my connection, not a third party forging my identity".</p>
+<p>Every field including <code>new_pubkey</code> is covered by the signature, so a man-in-the-middle cannot substitute a different target key without breaking signature verification.</p>
+<h3>Key compromise by a third party</h3>
+<p>If an attacker has obtained the old private key, they could forge a MergeAnnouncement pointing to their own identity — redirecting the victim's friends to connect to the attacker instead. This is not a new risk introduced by the merge feature; it is the standard consequence of key compromise. The merge flow does not make this easier or harder than any other action the attacker could take with a stolen key.</p>
+<p>The receiving friend's UI should display the new user's name and key clearly and require explicit confirmation, so friends have a chance to notice something is wrong. This mirrors the care already taken when initially adding a friend.</p>
+<h3>Idempotency and replay</h3>
+<p>The <code>merge_id</code> (random UUID stored by each friend) ensures the announcement is processed exactly once. A delayed or duplicated delivery of the same announcement has no effect after the first processing.</p>
+<h3>Accidental old-user actions</h3>
+<p>This is the primary practical concern given the first-party trust model. Mitigations in order of importance:</p>
+<ol><li><strong>Deprecated mode UI lock</strong> — the most effective mitigation. The old device cannot initiate transactions once merge has started.</li><li><strong>freeze_seq watermark</strong> — handles the small window between the last legitimate old-user action and the moment the announcement arrives at each friend.</li><li><strong>Message queue ordering</strong> — in the current single-server architecture, the announcement arrives at friends before any subsequent messages from old user (there shouldn't be any, but this is a belt-and-suspenders guarantee).</li></ol>
+<h3>Friend removal / debt absolution dependency</h3>
+<p>The MergeAck (removal notice from friend back to old user) depends on a clean friend-removal primitive with debt absolution. That primitive is not yet implemented. When it is built: the balance with the old user is considered transferred to the new user at the moment of the MergeAck, so old user's ledger with that friend settles to zero.</p>
+<hr />
+<h2>UI Sketch</h2>
+<h3>New device — initiate merge (Settings → Merge another account)</h3>
+<ol><li>Enter passphrase + paste <code>ncryptsec</code> of old account (same form as importing a transferred user).</li><li>App decrypts and displays: "Old account: Alice (npub1abc…). Merge into your current account?"</li><li>Confirm → old device enters deprecated mode, announcements dispatched.</li><li>Progress screen: "Notifying friends… 8 / 12 updated."</li><li>When complete: "Merge done. You can now remove the old account from any other devices."</li></ol>
+<h3>Friend's device — receiving the announcement</h3>
+<ol><li>Notification / banner: "Alice has consolidated to a new account. Update your connection?"</li><li>Shows: current balance, current trust limit, the new account's name and key, confirm button.</li><li>Dual-connection case: extra reconciliation screen showing combined balance before confirmation.</li></ol>
+<h3>Old device — deprecated state</h3>
+<ul><li>All action buttons disabled. Banner: "This account has been merged into a new one. 8 / 12 friends updated."</li><li>Option to resend the announcement to friends who have not yet acknowledged (they may have been offline).</li><li>Once all friends acknowledged: prompt to delete old account data.</li></ul>
+<hr />
+<h2>Open Questions</h2>
+<ol><li><strong>Partial merge</strong> — should it be possible to merge only a subset of old-user connections? For v1 no; user can manually add remaining friends to the new account instead.</li><li><strong>Chain of merges</strong> — if a user has merged twice (A→B, B→C), should friends of A eventually learn about C? Would require a merge history on the profile. Exclude for v1.</li><li><strong>Offline friends and TTL</strong> — if a friend never comes online, the old account can never fully deprecate. Should there be a TTL after which the old account is forcibly removed regardless, accepting that the disconnected friend will have a stale identity reference until they next sync?</li><li><strong>Revocation on the new user's profile</strong> — the new user could publish a signed statement "npub1old… is my former account" as a secondary verification signal for friends. Requires some form of addressable public profile, which the current P2P architecture does not have. Future consideration.</li></ol>
+<hr />
+<h2>Implementation Notes</h2>
+<p><strong>Server — no changes required.</strong> The existing <code>queue_peer_envelope</code> handler already supports sending announcements from the new device on behalf of the old user, because it does not validate <code>from_user_id</code> against the sending client's identity. Routing, online delivery, and offline queuing all work as-is.</p>
+<p><strong>Client — new device side:</strong></p>
+<ul><li>Reuse <code>encryptNcryptsec</code> / NIP-49 for the old-key import step — no new crypto primitives needed.</li><li>After import, the merge flow calls <code>queue_peer_envelope</code> for each friend in the old user's friend list, with <code>from_user_id: old_pubkey</code> and the announcement encrypted to each friend's pubkey and signed by the old private key. This is a thin wrapper over the existing outbox/envelope mechanism.</li><li><code>freeze_seq</code> requires the outgoing event sequence counter to be accessible at the app-state level; verify whether it is already tracked in <code>data-model.ts</code>.</li><li>Deprecated mode for the old user's local record can be persisted as a flag in IndexedDB so it survives page reload.</li><li>Settings page needs a new entry: <strong>Merge another account</strong> (distinct from "Transfer user to another device").</li></ul>
+<p><strong>Client — friend side:</strong></p>
+<ul><li>Add <code>merge_announcement</code> as a new handled message kind in <code>bridge.js</code> / <code>processInnerPeerMessage</code>.</li><li>On receipt: validate signature, check idempotency by <code>merge_id</code>, update peer list, trigger the dual-connection reconciliation flow if needed, send MergeAck.</li><li>After processing, add <code>new_pubkey</code> to <code>peer_candidates</code> and re-register with the server so WebRTC with the new user can be established on next mutual online moment.</li></ul>
+  </main>
+  <script src="assets/pages.js"></script>
+  <script src="assets/design.js"></script>
+</body>
+</html>

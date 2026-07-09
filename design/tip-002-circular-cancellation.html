@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TIP-002 Circular cancellation — Design</title>
+  <link rel="stylesheet" href="assets/design.css" />
+</head>
+<body>
+  <main class="page" data-status="proposal">
+<h1>TIP-002: Circular Debt Cancellation</h1>
+<div class="table-scroll"><table><thead><tr><th>Field</th><th>Value</th></tr></thead><tbody><tr><td>Number</td><td>TIP-002</td></tr><tr><td>Title</td><td>Circular Debt Cancellation</td></tr><tr><td>Status</td><td>Draft</td></tr><tr><td>Author</td><td>Jussi Rytkönen</td></tr><tr><td>Created</td><td>2026-05-04</td></tr></tbody></table></div>
+<hr />
+<h2>Summary</h2>
+<p>When a cycle of debts exists in the trust network — A owes B, B owes C, C owes A — the minimum amount across all edges can be cancelled without money changing hands. This TIP defines a two-phase protocol for discovering such cycles and executing a multi-party signed cancellation transaction, while minimising the amount of debt information shared with participants outside the cycle.</p>
+<hr />
+<h2>Motivation</h2>
+<p>Without cancellation, debts in a mutual-credit network can accumulate indefinitely even when circular cancellation opportunities exist. Manual cancellation requires all participants to coordinate out-of-band. Automated circular cancellation makes the ledger self-cleaning and reduces the cognitive overhead of tracking many small IOUs.</p>
+<hr />
+<h2>Key Structural Properties</h2>
+<p>Before describing the protocol it is worth noting two properties that make implementation straightforward:</p>
+<p><strong>1. All message paths in a cycle go between direct friends.</strong></p>
+<p>In a 3-hop cycle A→B→C→A: A and B are friends (A owes B), B and C are friends (B owes C), C and A are friends (C owes A). Every hop in the search and every cancellation message travels between nodes that already have an established peer connection. No message ever needs to be routed through a non-friend. The same holds for longer cycles: each edge in the cycle is a friendship by definition.</p>
+<p>This means the entire protocol runs on top of the existing signed peer-envelope infrastructure without any changes to routing.</p>
+<p><strong>2. Loop search messages are ephemeral; only the cancellation is a ledger entry.</strong></p>
+<p>Loop search and loop-found messages are transient protocol traffic — similar to <code>sync_hello</code> or <code>ping</code> — and are not written to the ledger. Only the completed cancellation is a permanent ledger entry.</p>
+<p><strong>3. The protocol is non-blocking.</strong></p>
+<p>Every message is fire-and-forget. No node waits for a response before continuing other work. If a signing chain stalls (a node is offline or doesn't respond), the unsigned proposal simply evaporates — there is no persistent "waiting" state to clean up. The only in-memory state across the whole protocol is the Phase 1 <code>search_id</code> cache, which expires automatically via TTL. The loop will be re-discovered on the next search cycle.</p>
+<hr />
+<h2>Loop Length: 3-hop for v1, 4-hop as extension</h2>
+<p><strong>3-hop (triangle) loops:</strong></p>
+<ul><li>The minimum case. Most common in tight-knit communities.</li><li>Discovery requires exactly 2 forwarding hops.</li><li>Each node talks only to its immediate neighbours in the cycle.</li><li>Privacy leakage is bounded (see §Privacy Analysis).</li></ul>
+<p><strong>4-hop and longer:</strong></p>
+<ul><li>Discover more cancellation opportunities in larger or sparser networks.</li><li>Each additional hop adds one more participant who learns about the search.</li><li>Protocol is mechanically identical — just <code>max_hops</code> increases by 1.</li><li>Worth adding in v2 once 3-hop is stable; the code change is small.</li></ul>
+<p><strong>Recommendation</strong>: implement with a configurable <code>max_hops</code> parameter (default 2 for 3-hop cycles). 4-hop can be enabled later by raising the limit.</p>
+<hr />
+<h2>Phase 1: Loop Discovery</h2>
+<h3>Trigger</h3>
+<p>A node initiates a loop search when:</p>
+<ul><li>It records a new tally (the new debt might complete a loop).</li><li>It comes online and connects to a peer (background scan).</li></ul>
+<p>To avoid a flood of searches, a node should not re-initiate a search for the same creditor more than once per session, and should apply a short debounce after creating a new tally.</p>
+<h3>Message: <code>loop_search</code></h3>
+<p>Sent from a node to one of its creditors (someone they owe). This message is ephemeral — not written to either party's ledger.</p>
+<pre><code>loop_search {
+  search_id:  uuid          // unique per search run, used only to deduplicate forwarding
+  initiator:  A_pubkey      // who started the search
+  chain:      [A, B, ...]   // ordered list of pubkeys in the chain so far
+  max_hops:   number        // how many more forwards are allowed (decrements each hop)
+}</code></pre>
+<p><code>search_id</code> exists only to prevent the same search from being forwarded multiple times by the same node (e.g. if a message is delivered twice). It is scoped to Phase 1 and never appears in Phase 2 or the ledger entry.</p>
+<h3>Discovery flow (3-hop example: A→B→C→A)</h3>
+<p><strong>Step 1 — A initiates:</strong> A owes B. A sends B a <code>loop_search</code>:</p>
+<pre><code>{ search_id: uuid, initiator: A, chain: [A], max_hops: 2 }</code></pre>
+<p><strong>Step 2 — B forwards:</strong> B receives the search. B checks:</p>
+<ul><li>Is B already in <code>chain</code>? If yes, ignore.</li><li>Has B already seen this <code>search_id</code>? If yes, ignore.</li><li>Is <code>max_hops</code> &gt; 0?</li></ul>
+<p>For each creditor C that B owes <strong>and that is not already in <code>chain</code></strong>, B sends C a <code>loop_search</code>:</p>
+<pre><code>{ search_id: uuid, initiator: A, chain: [A, B], max_hops: 1 }</code></pre>
+<p>The chain membership filter happens at the sender before dispatching — no receiver needs to check whether it is in the chain.</p>
+<p><strong>Step 3 — C checks for closure:</strong> C receives the search. C checks:</p>
+<ul><li>Does C have a debt <strong>to</strong> the initiator A (i.e., <code>chain[0]</code>)?</li></ul>
+<p>If yes: loop A→B→C→A found. C sends A a <code>loop_found</code> directly (C and A are friends):</p>
+<pre><code>loop_found {
+  chain: [A, B, C]   // full ordered loop; A is both start and implicit end
+}</code></pre>
+<p>If no, and <code>max_hops</code> &gt; 0: C continues forwarding to its own creditors (for 4-hop extension).</p>
+<h3>Idempotency</h3>
+<p>Each node keeps a short-lived in-memory set of seen <code>search_id</code>s (TTL ~5 minutes). A search received with a known <code>search_id</code> is silently dropped. This is the only persistent state Phase 1 requires.</p>
+<hr />
+<h2>Phase 2: Cancellation</h2>
+<p>When A receives <code>loop_found</code>, A becomes the coordinator. Phase 2 has two sub-phases: an unsigned amount-negotiation pass to find the cancel amount M, then a signing pass on the agreed final record.</p>
+<h3>Phase 2a — Amount negotiation (unsigned, ephemeral)</h3>
+<p>Each participant contributes their edge amount; the running minimum propagates forward. These messages carry no IDs — they are identified solely by their <code>chain</code> content, are never stored, and evaporate if the chain stalls.</p>
+<p><strong>A → B:</strong></p>
+<pre><code>{ chain: [A,B,C], running_min: X }   // X = A_owes_B</code></pre>
+<p><strong>B → C:</strong> B clips to its own edge: <code>running_min = min(X, Y)</code> where Y = B_owes_C.</p>
+<pre><code>{ chain: [A,B,C], running_min: min(X,Y) }</code></pre>
+<p><strong>C → A:</strong> C clips to its own edge: <code>M = min(running_min, Z)</code> where Z = C_owes_A. C returns the final amount:</p>
+<pre><code>{ chain: [A,B,C], final_amount: M }</code></pre>
+<h3>Phase 2b — Signing (permanent)</h3>
+<p>Now that M is known, all participants sign the same canonical record. A creates it and passes it around the loop for sequential signing:</p>
+<p><strong>A → B → C:</strong> each adds their signature over <code>{chain, cancel_amount: M}</code>.</p>
+<p>C, holding all three signatures, broadcasts the completed record to A and B.</p>
+<h3>Final cancellation record</h3>
+<pre><code>LedgerEntry {
+  type:    "loop_cancellation"
+  payload: {
+    chain:         [A, B, C]   // ordered: each node cancels their debt to the next
+    cancel_amount: M
+    signatures: {
+      A: &lt;sig over {chain, cancel_amount: M}&gt;,
+      B: &lt;sig over {chain, cancel_amount: M}&gt;,
+      C: &lt;sig over {chain, cancel_amount: M}&gt;
+    }
+  }
+}</code></pre>
+<p>Each participant writes this same record to their own ledger. The ledger handler applies it:</p>
+<ul><li>For A: reduce A's debt to B by M.</li><li>For B: reduce B's debt to C by M.</li><li>For C: reduce C's debt to A by M.</li></ul>
+<p>Which edge to reduce is determined by each node's position in <code>chain</code>: node at index <code>i</code> reduces their debt to node at index <code>(i+1) % len(chain)</code>.</p>
+<p>The entry is valid if and only if:</p>
+<ol><li>All signatures in <code>chain</code> are present and verify against <code>{chain, cancel_amount}</code>.</li><li><code>cancel_amount ≤ current_debt</code> on this node's edge (verified before writing).</li></ol>
+<p>Condition 2 is the sole correctness guard for concurrent cancellations — no additional deduplication mechanism is needed.</p>
+<hr />
+<h2>Privacy Analysis</h2>
+<h3>What each participant learns</h3>
+<p>In a 3-hop cycle A→B→C→A:</p>
+<div class="table-scroll"><table><thead><tr><th>Party</th><th>Already knew</th><th>Learns during discovery</th><th>Learns during cancellation</th></tr></thead><tbody><tr><td>A</td><td>A_owes_B</td><td>B and C are in a cycle with A</td><td>B_owes_C, C_owes_A, M</td></tr><tr><td>B</td><td>A_owes_B, B_owes_C</td><td>A is searching, C is a link to A</td><td>C_owes_A, M</td></tr><tr><td>C</td><td>B_owes_C, C_owes_A</td><td>A and B are in the chain</td><td>A_owes_B, M</td></tr></tbody></table></div>
+<h3>Irreducible minimum leakage</h3>
+<p><strong>C learning that A owes B</strong> is unavoidable: C cannot check "do I owe the initiator?" without knowing who the initiator is.</p>
+<p><strong>Each participant learning all three amounts during cancellation</strong> is also unavoidable: every participant must verify <code>cancel_amount ≤ their own edge</code> to sign validly. The sequential minimum approach limits exposure to the minimum value, not the individual edge amounts, but bounds inference is possible.</p>
+<h3>What non-participants never learn</h3>
+<ul><li>Any party not in the cycle learns nothing about the cycle or its amounts.</li><li>The amounts of non-cycle edges (e.g. if B also owes D, D learns nothing).</li><li>The server sees only encrypted opaque envelopes.</li></ul>
+<h3>Leakage comparison with 4-hop cycles</h3>
+<p>Each additional hop adds one participant who learns one more chain segment. The leakage profile scales linearly with loop length. For 3-hop it is minimal; for long chains it becomes more significant.</p>
+<hr />
+<h2>Edge Cases</h2>
+<h3>Competing cancellations</h3>
+<p>Any two cancellations that share an edge — whether they are the same loop discovered by two different peers (e.g. [A,B,C] and [B,C,A]) or different loops that happen to share an edge (e.g. [A,B,C] and [A,B,D]) — are handled identically: whichever completes first reduces the shared edge; the second is rejected at signing time when the node on that edge detects <code>cancel_amount &gt; remaining_debt</code> and stops forwarding. The residual debt is re-discoverable on the next search.</p>
+<h3>Signing chain stalls</h3>
+<p>If any participant in Phase 2 is offline or unresponsive, the unsigned proposal is never completed. No node holds any persistent state waiting for it — the proposal evaporates. No rollback or cleanup is needed. The loop is re-discovered on the next search cycle.</p>
+<h3>Partial vs full cancellation</h3>
+<p>The protocol cancels exactly <code>min(all edge amounts)</code>. The smallest debt is fully cleared; the others are reduced by the same amount. No edge goes negative.</p>
+<hr />
+<h2>Ledger Integration</h2>
+<p>The <code>loop_cancellation</code> entry type is new but fits the existing append-only ledger. It is handled in <code>handlers.js</code> with a new case in <code>routeInboundEntry</code> / <code>routeOutboundEntry</code> that reduces <code>debt_eur</code> on the relevant connection by <code>cancel_amount</code>.</p>
+<p>The <code>loop_search</code>, <code>loop_found</code>, and Phase 2 negotiation messages are <strong>not</strong> ledger entries. They are handled as transport-layer messages (similar to <code>sync_hello</code>) and hold no persistent state beyond the Phase 1 <code>search_id</code> cache.</p>
+<hr />
+<h2>Open Questions</h2>
+<ol><li><strong>When to initiates</strong> a loop searches and how to deal with <strong>WebRTC connection (actively peers) vs. server connection (partly active peers)</strong>? WebRTC connections can be querried more performantly</li><li><strong>Re-initiation after stall.</strong> After a signing chain evaporates, should the coordinator automatically retry after a backoff, or wait for the next new tally to trigger a fresh search?</li><li><strong>Maximum chain length in practice.</strong> In a community of 30 people with average 5 friends each, what fraction of debts participate in 3-hop vs 4-hop cycles? Empirical data would inform whether 4-hop is worth the extra complexity.</li><li><strong>Notification UX.</strong> Should the user see "€15 cancelled in a 3-way loop with Bob and Carol"? Silent is simpler; notification is better for trust and transparency. Probably notification for v1.</li><li><strong>Search frequency throttling.</strong> Re-run when a new tally is created, and at most once per hour otherwise — or trigger on peer reconnect.</li><li><strong>Multi-currency loops.</strong> A future with multiple currencies requires matching loop edges by currency before attempting cancellation.</li></ol>
+<hr />
+<h2>Implementation Notes</h2>
+<ul><li>New ephemeral peer message kinds: <code>loop_search</code>, <code>loop_found</code>, <code>loop_cancel_negotiate</code>, <code>loop_cancel_sign</code>.</li><li>New ledger entry type: <code>loop_cancellation</code>.</li><li>New command: <code>cancelLoop(chain, cancelAmount)</code> — analogous to <code>createTransaction</code>.</li><li>Phase 1 state: in-memory <code>Set&lt;search_id&gt;</code> with TTL expiry. Not persisted to IndexedDB.</li><li>Phase 2 state: none. All negotiation and signing messages are fire-and-forget.</li><li>Signature payload: <code>{chain, cancel_amount}</code> — no IDs required.</li></ul>
+  </main>
+  <script src="assets/pages.js"></script>
+  <script src="assets/design.js"></script>
+</body>
+</html>

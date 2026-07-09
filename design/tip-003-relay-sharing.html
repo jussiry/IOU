@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TIP-003 Relay sharing (cont.) — Design</title>
+  <link rel="stylesheet" href="assets/design.css" />
+</head>
+<body>
+  <main class="page" data-status="proposal">
+<h1>TIP-003 (cont.): Telling Friends What Relays You Use</h1>
+<div class="table-scroll"><table><thead><tr><th>Field</th><th>Value</th></tr></thead><tbody><tr><td>Number</td><td>TIP-003</td></tr><tr><td>Title</td><td>Relay Sharing with Friends</td></tr><tr><td>Status</td><td>Draft</td></tr><tr><td>Author</td><td>Jussi Rytkönen</td></tr><tr><td>Created</td><td>2026-05-21</td></tr></tbody></table></div>
+<blockquote><p><strong>Context:</strong> The relay pool transport and Phase 1 schema fields are implemented — see <code>implemented/TIP-003-multiple-relay-servers.md</code>. This document covers the unimplemented phases.</p></blockquote>
+<hr />
+<h2>Summary</h2>
+<p>When a user is connected to a friend (over WebRTC) and <strong>both sides have opted in</strong>, they exchange a <code>my_relays</code> peer message. Each side stores the other's relay list in <code>friends[].relays</code>. The aggregated info is surfaced in the add-relay UI as a list of popular-among-your-friends relays you don't yet use, to help users converge on overlapping relay sets without a central directory.</p>
+<p>This complements the QR-code relay-hint approach (Open Question 1 in the base TIP) — that one handles new-friend discovery; this one keeps existing friends' relay sets fresh.</p>
+<hr />
+<h2>Drawbacks</h2>
+<p>These shaped the design and are worth keeping in mind when the suggestion-ranking algorithm is built:</p>
+<ol><li><strong>Centralization-via-popularity.</strong> A naive "most-used among friends" suggestion creates a network effect that pushes the social graph toward a few popular relays — exactly what multi-relay is trying to prevent. Friend networks overlap heavily; the popular list reinforces itself.</li><li><strong>Metadata aggregation by friends.</strong> Each friend now carries a persisted copy of the user's relay set. A compromised friend gives an adversary a directory of every relay the user is on, including secondaries chosen for privacy.</li><li><strong>Sock-puppet manipulation.</strong> A hostile relay operator can create fake friend identities, get added by real users, and inflate the popularity ranking of their own relay. Once a hostile relay reaches the suggested list, it onboards by social proof without anyone explicitly vetting it.</li><li><strong>Stale data, no clean revocation.</strong> The user can't reliably "untell" a friend that they've stopped using relay X, especially friends offline at the moment of change. Stale info will accumulate.</li><li><strong>Cross-friend linkability.</strong> Unusual relay overlap between two friends can be used by a third party (who is friends with both) to infer that those two friends know each other — a side-channel leak of social-graph structure.</li><li><strong>Default-on raises consent expectations.</strong> Relay choice is the kind of preference some users feel privately about. Default-on means a user who doesn't read the toggle carefully shares silently.</li></ol>
+<hr />
+<h2>Design</h2>
+<p><strong>State (already in schema):</strong></p>
+<ul><li><code>state.share_my_relays: boolean</code> — defaults to <code>true</code>. User toggles it in settings.</li><li><code>friends[].relays: string[]</code> — populated by inbound <code>my_relays</code> messages.</li></ul>
+<p><strong>Message — <code>my_relays</code>:</strong></p>
+<pre><code>{
+  type: "my_relays",
+  from_user_id: &lt;user pubkey&gt;,
+  to_user_id: &lt;friend pubkey&gt;,
+  payload: { relays: ["wss://...", ...] }   // urls only, no flags
+}</code></pre>
+<ul><li>Sent when: a WebRTC channel opens with an eligible friend AND <code>share_my_relays</code> is true, debounced so we don't resend unchanged lists every reconnect.</li><li>The list is the union the pool uses: main relay + secondary relays added in settings.</li></ul>
+<p><strong>Suggestion-ranking:</strong></p>
+<ul><li><strong>Popularity ranking</strong>: sort by number of friends using the relay. Any attempt to apply a "diversity bias" collapses to the same ranking when the signal is derived from the same friend list — a genuine diversity signal requires external data (out of scope).</li><li><strong>Per-friend dedup</strong>: count each friend's relay set once.</li><li><strong>TTL</strong>: drop entries older than N days so a long-disconnected friend doesn't anchor suggestions to defunct relays.</li><li><strong>Floor</strong>: don't suggest relays seen on fewer than M friends (Sybil resistance against drawback 3).</li></ul>
+<hr />
+<h2>Implementation Phases</h2>
+<h3>Phase 2</h3>
+<ul><li><code>my_relays</code> peer message type: send on WebRTC channel open + debounce.</li><li>Inbound handler that updates <code>friends[].relays</code>.</li><li>Suggestion row in the add-relay form, ranked by friend-popularity with the floor + TTL above.</li></ul>
+<h3>Phase 3</h3>
+<ul><li>Per-relay private flag so the user can mark specific relays as not shared.</li><li>Embedded relay hints in friend-add QR codes (asymmetric-relay-set mitigation from Open Question 1).</li><li>TTL background job to drop expired relay info from <code>friends[].relays</code>.</li></ul>
+  </main>
+  <script src="assets/pages.js"></script>
+  <script src="assets/design.js"></script>
+</body>
+</html>

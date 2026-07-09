@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Plan: Data model — Design</title>
+  <link rel="stylesheet" href="assets/design.css" />
+</head>
+<body>
+  <main class="page" data-status="reference">
+<div class="import-note">Imported as-is from <code>plan/data-model.md</code>. It may conflict with current code or other pages — kept verbatim, pending reconciliation.</div>
+<h1>Client data model (IndexedDB)</h1>
+<p>Runtime state is stored in IndexedDB (<code>iou_client_db</code>, object store <code>app_state</code>, key <code>root_state</code>).</p>
+<h2>Root state</h2>
+<pre><code>{
+  "model_version": 2,
+  "user": { "...": "PersonModel" },
+  "contacts": { "&lt;npub&gt;": { "...": "ContactPersonModel" } },
+  "logs": [{ "...": "LogEntryModel" }],
+  "outbox": [{ "...": "PeerMessageModel" }],
+  "processed_peer_message_ids": ["peer_..."]
+}</code></pre>
+<h2>PersonModel</h2>
+<pre><code>{
+  "id": "npub1...",
+  "name": "Alice",
+  "public_key": "npub1...",
+  "public_key_hex": "&lt;64-char hex&gt;",
+  "private_key": "nsec1...",
+  "private_key_hex": "&lt;64-char hex&gt;",
+  "connections": [{ "...": "ConnectionModel" }]
+}</code></pre>
+<p><code>id</code> uses the same <code>npub</code> format as Nostr and is the canonical user ID.</p>
+<h2>ContactPersonModel</h2>
+<p>Same as <code>PersonModel</code>, except contact records do not store <code>private_key</code> or <code>private_key_hex</code>.</p>
+<h2>ConnectionModel</h2>
+<pre><code>{
+  "person_id": "npub1...",
+  "person_name": "Bob",
+  "friendship_status": "accepted",
+  "debt_eur": 0,
+  "trust_credit_limit_eur": 0,
+  "recent_transactions": [{ "...": "TransactionModel" }]
+}</code></pre>
+<p><code>friendship_status</code> is one of:</p>
+<ul><li><code>accepted</code></li><li><code>pending_outgoing</code></li><li><code>pending_incoming</code></li><li><code>rejected</code></li></ul>
+<h2>TransactionModel</h2>
+<pre><code>{
+  "id": "tx_...",
+  "date": "YYYY-MM-DD",
+  "amount_eur": 0,
+  "note": "string"
+}</code></pre>
+<h2>LogEntryModel</h2>
+<pre><code>{
+  "id": "log_...",
+  "transaction_id": "tx_...",
+  "timestamp": "ISO-8601",
+  "text": "summary",
+  "message": "optional detail",
+  "friend_id": "npub1...",
+  "amount_eur": 0
+}</code></pre>
+<h2>PeerMessageModel</h2>
+<pre><code>{
+  "id": "peer_...",
+  "type": "friend_request",
+  "from_user_id": "npub1...",
+  "to_user_id": "npub1...",
+  "created_at": "ISO-8601",
+  "payload": { "...": "type-specific data" }
+}</code></pre>
+<p>Current peer message types:</p>
+<ul><li><code>friend_request</code></li><li><code>friend_accept</code></li><li><code>friend_reject</code></li><li><code>trust_limit_suggestion</code></li><li><code>transaction_created</code></li><li><code>received</code></li></ul>
+  </main>
+  <script src="assets/pages.js"></script>
+  <script src="assets/design.js"></script>
+</body>
+</html>

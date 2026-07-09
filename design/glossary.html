@@ -4,6 +4,9 @@
   Migrated from GLOSSARY.md (root). Authored text-first; reads cleanly as raw
   HTML. Synonyms are comma-separated in each term, most-commonly-used first.
   Scope is the Tally app only (not GraphEditor/ or web/).
+
+  Every term has a stable id so other pages can deep-link to it, e.g.
+  glossary.html#ledger. The term itself is a self-link to that anchor.
 -->
 <!doctype html>
 <html lang="en">
@@ -30,6 +33,9 @@
         first.</strong> e.g. <em>Record, Durable message</em> — both name the
         same thing and "record" is heard more often. Overlap is intentional: it
         marks where a conversation most needs clarification.</li>
+      <li><strong>Each term is linkable.</strong> Every entry has a stable
+        anchor — click a term to get its link, or deep-link from any page as
+        <code>glossary.html#ledger</code>.</li>
       <li><strong>Focus is app-specific terms.</strong> Generic/industry terms
         (WebRTC, STUN, Nostr…) appear only when crucial and used in a
         project-specific way.</li>
@@ -43,168 +49,176 @@
 
     <h2>Core domain</h2>
     <dl>
-      <dt>Tally</dt>
+      <dt id="tally"><a class="term-self" href="#tally">Tally</a></dt>
       <dd>Three related meanings, usually clear from context: (1) the app itself;
         (2) the running balance of debt between you and one friend — positive
         means they owe you (synonyms in this sense: <em>balance</em>,
         <em>debt</em>, stored as <code>debt_eur</code>); (3) the app's main page.
-        "Signing a tally" = recording a transaction. → see Transaction.</dd>
+        "Signing a tally" = recording a
+        <a href="#transaction">transaction</a>.</dd>
 
-      <dt>Transaction, IOU, Record</dt>
+      <dt id="transaction"><a class="term-self" href="#transaction">Transaction, IOU, Record</a></dt>
       <dd>The act (and record) of the user taking on or settling debt with a
-        friend — "I owe you". The most common kind of durable record. In the UI
-        this is the <em>record</em> screen ("record a tally"); in the code it's a
+        friend — "I owe you". The most common kind of
+        <a href="#durable-message">durable record</a>. In the UI this is the
+        <em>record</em> screen ("record a tally"); in the code it's a
         <code>transaction</code> peer message. "IOU" is also the project's former
-        name. → see Record, Tally.</dd>
+        name. → see <a href="#tally">Tally</a>.</dd>
 
-      <dt>Friend, Connection</dt>
+      <dt id="friend"><a class="term-self" href="#friend">Friend, Connection</a></dt>
       <dd>An accepted peer relationship between two users. "Connection" is the
-        legacy term (still present as deprecated data-model aliases); <strong>friend</strong>
-        is the current word everywhere in UI and new code.</dd>
+        legacy term (still present as deprecated data-model aliases);
+        <strong>friend</strong> is the current word everywhere in UI and new
+        code.</dd>
 
-      <dt>Contact</dt>
+      <dt id="contact"><a class="term-self" href="#contact">Contact</a></dt>
       <dd>A cached public identity (npub + display name) of a person the client
-        has seen. Broader than <em>friend</em>: every friend has a contact, but a
-        contact is not necessarily an accepted friend.</dd>
+        has seen. Broader than <a href="#friend">friend</a>: every friend has a
+        contact, but a contact is not necessarily an accepted friend.</dd>
 
-      <dt>Payment request</dt>
+      <dt id="payment-request"><a class="term-self" href="#payment-request">Payment request</a></dt>
       <dd>Asking a friend to pay you. Accepting one materializes the mirroring
-        transaction on both sides. → see Transaction.</dd>
+        <a href="#transaction">transaction</a> on both sides.</dd>
 
-      <dt>Trust limit, Credit limit</dt>
+      <dt id="trust-limit"><a class="term-self" href="#trust-limit">Trust limit, Credit limit</a></dt>
       <dd>The maximum amount you allow a friend to owe you. Lowering takes effect
         immediately; raising requires the friend's agreement (sits pending until
         they echo it). "Credit limit" is the term used in the message payload;
         "trust limit" is the UI / most-common term.</dd>
 
-      <dt>Command</dt>
+      <dt id="command"><a class="term-self" href="#command">Command</a></dt>
       <dd>A domain module under <code>app/js/commands/</code> that performs one
         user action (friendship, transaction, payment request, trust limit,
         relays, stun…). <strong>Not</strong> a CLI command. Each command loads
-        state, validates, queues a peer message, mirrors it to the ledger, and
-        persists.</dd>
+        state, validates, queues a <a href="#peer-message">peer message</a>,
+        mirrors it to the <a href="#ledger">ledger</a>, and persists.</dd>
     </dl>
 
     <h2>Messages, ledger &amp; sync</h2>
     <dl>
-      <dt>Peer message</dt>
+      <dt id="peer-message"><a class="term-self" href="#peer-message">Peer message</a></dt>
       <dd>Any JSON message exchanged between two clients (friend↔friend or a
         user's own device↔device). Has a type; may or may not be durable.</dd>
 
-      <dt>Record, Durable message, Ledger entry</dt>
-      <dd>A peer message that is a permanent fact in the ledger (a transaction,
-        friend request/accept, name change, trust-limit change…) and therefore
-        carries an authorship proof. "Record" is the user-facing word; "durable
-        message" is the transport term; "ledger entry" is its stored form.
-        Contrast: transport-only messages (ping/pong, sync, receipts) are
-        <strong>non-durable</strong> and carry no authorship. → see Ledger,
-        Authorship proof.</dd>
+      <dt id="durable-message"><a class="term-self" href="#durable-message">Record, Durable message, Ledger entry</a></dt>
+      <dd>A <a href="#peer-message">peer message</a> that is a permanent fact in
+        the <a href="#ledger">ledger</a> (a transaction, friend request/accept,
+        name change, trust-limit change…) and therefore carries an
+        <a href="#authorship">authorship proof</a>. "Record" is the user-facing
+        word; "durable message" is the transport term; "ledger entry" is its
+        stored form. Contrast: transport-only messages (ping/pong, sync,
+        receipts) are <strong>non-durable</strong> and carry no authorship.</dd>
 
-      <dt>Ledger</dt>
-      <dd>The append-only local log of every durable message the user has
-        authored or received. The source of truth from which all balances are
-        derived. Not a blockchain and not shared wholesale — it is reconciled
-        peer-by-peer via sync.</dd>
+      <dt id="ledger"><a class="term-self" href="#ledger">Ledger</a></dt>
+      <dd>The append-only local log of every <a href="#durable-message">durable
+        message</a> the user has authored or received. The source of truth from
+        which all balances are derived. Not a blockchain and not shared
+        wholesale — it is reconciled peer-by-peer via <a href="#sync">sync</a>.</dd>
 
-      <dt>Outbox</dt>
+      <dt id="outbox"><a class="term-self" href="#outbox">Outbox</a></dt>
       <dd>The queue of outbound peer messages awaiting delivery, persisted so
         they survive reloads and retries.</dd>
 
-      <dt>Envelope</dt>
-      <dd>The encrypted wrapper around a peer message. Routing fields (id/from/to)
-        stay in plaintext so the relay server can deliver it; the inner message
-        is encrypted to the recipient. Versioned: <strong>v3</strong> = NIP-44
-        (current), <strong>v2</strong> = legacy AES-GCM (accepted on receipt
-        only, to drain old messages).</dd>
+      <dt id="envelope"><a class="term-self" href="#envelope">Envelope</a></dt>
+      <dd>The encrypted wrapper around a peer message. Routing fields
+        (id/from/to) stay in plaintext so the <a href="#relay">relay server</a>
+        can deliver it; the inner message is encrypted to the recipient.
+        Versioned: <strong>v3</strong> = NIP-44 (current), <strong>v2</strong> =
+        legacy AES-GCM (accepted on receipt only, to drain old messages).</dd>
 
-      <dt>Authorship proof, Authorship</dt>
-      <dd>A signed Nostr event embedded inside a durable message proving
-        <em>who</em> authored it, so forwarded/third-party records can be trusted
-        during sync. Replaced the older bare per-message signature.</dd>
+      <dt id="authorship"><a class="term-self" href="#authorship">Authorship proof, Authorship</a></dt>
+      <dd>A signed <a href="#nostr">Nostr</a> event embedded inside a durable
+        message proving <em>who</em> authored it, so forwarded/third-party
+        records can be trusted during sync. Replaced the older bare per-message
+        signature.</dd>
 
-      <dt>Sync (sync_hello / sync_data)</dt>
-      <dd>The exchange two connected peers/devices use to reconcile their ledgers:
-        each offers what it has, the other sends back what's missing. How a
-        recovering or reconnecting device catches up.</dd>
+      <dt id="sync"><a class="term-self" href="#sync">Sync (sync_hello / sync_data)</a></dt>
+      <dd>The exchange two connected peers/devices use to reconcile their
+        ledgers: each offers what it has, the other sends back what's missing.
+        How a recovering or reconnecting device catches up.</dd>
 
-      <dt>Receipt</dt>
+      <dt id="receipt"><a class="term-self" href="#receipt">Receipt</a></dt>
       <dd>A transport-level acknowledgement that a peer message was received.
         Non-durable; never enters the ledger.</dd>
 
-      <dt>Push hint</dt>
-      <dd>A small encrypted payload attached to a queued envelope so the relay can
-        wake an offline recipient via Web Push without learning its contents.</dd>
+      <dt id="push-hint"><a class="term-self" href="#push-hint">Push hint</a></dt>
+      <dd>A small encrypted payload attached to a queued envelope so the relay
+        can wake an offline recipient via Web Push without learning its
+        contents.</dd>
     </dl>
 
     <h2>Transport &amp; connectivity</h2>
     <dl>
-      <dt>Peer</dt>
+      <dt id="peer"><a class="term-self" href="#peer">Peer</a></dt>
       <dd>A remote endpoint the client connects to: a friend's device, or one of
         the user's <em>own</em> other devices. Keyed by
         <code>(userId, deviceId)</code>.</dd>
 
-      <dt>Mesh</dt>
-      <dd>The WebRTC overlay of live peer connections. Split into two: the
-        <strong>friend mesh</strong> (one connection per friend device) and the
-        <strong>self-mesh</strong> (one connection per the user's <em>own</em>
-        other devices, used to sync devices in lock-step).</dd>
+      <dt id="mesh"><a class="term-self" href="#mesh">Mesh</a></dt>
+      <dd>The <a href="#webrtc">WebRTC</a> overlay of live peer connections. Split
+        into two: the <strong>friend mesh</strong> (one connection per friend
+        device) and the <strong>self-mesh</strong> (one connection per the user's
+        <em>own</em> other devices, used to sync devices in lock-step).</dd>
 
-      <dt>Relay, Relay server, Signaling server</dt>
+      <dt id="relay"><a class="term-self" href="#relay">Relay, Relay server, Signaling server</a></dt>
       <dd>Tally's own WebSocket server. It does two jobs: relays WebRTC signaling
-        so peers can connect, and does store-and-forward of encrypted envelopes
-        when a peer is offline (or when direct P2P can't form). Distinct from a
-        <em>TURN relay</em> and an ICE <em>relay candidate</em> (below). The
-        <strong>main relay</strong> is the server that served the app;
-        <strong>secondary relays</strong> are user-added in settings.</dd>
+        so peers can connect, and does store-and-forward of encrypted
+        <a href="#envelope">envelopes</a> when a peer is offline (or when direct
+        P2P can't form). Distinct from a <em>TURN relay</em> and an
+        <a href="#ice">ICE relay candidate</a>. The <strong>main relay</strong>
+        is the server that served the app; <strong>secondary relays</strong> are
+        user-added in settings.</dd>
 
-      <dt>Snapshot, Realtime snapshot</dt>
+      <dt id="snapshot"><a class="term-self" href="#snapshot">Snapshot, Realtime snapshot</a></dt>
       <dd>The in-memory object built from persisted state and handed to the
-        transport layer: who to connect to, what to deliver, and the KeyProvider
-        to sign/encrypt with. Rebuilt whenever state changes.</dd>
+        transport layer: who to connect to, what to deliver, and the
+        <a href="#keyprovider">KeyProvider</a> to sign/encrypt with. Rebuilt
+        whenever state changes.</dd>
 
-      <dt>KeyProvider</dt>
+      <dt id="keyprovider"><a class="term-self" href="#keyprovider">KeyProvider</a></dt>
       <dd>The single abstraction through which all signing and peer encryption
         flow. Implementations: <code>local</code> (private key in-app) and
         <code>nip07</code> (key held in a browser extension). Lets the private key
         live outside the app without the rest of the code touching raw key
         material.</dd>
 
-      <dt>WebRTC / data channel</dt>
+      <dt id="webrtc"><a class="term-self" href="#webrtc">WebRTC / data channel</a></dt>
       <dd>Used here <strong>only</strong> to carry encrypted JSON app messages
         peer-to-peer (never audio/video). The "green icon" state.</dd>
 
-      <dt>STUN</dt>
+      <dt id="stun"><a class="term-self" href="#stun">STUN</a></dt>
       <dd>A public server used during connection setup so each peer can discover
         its own public (reflexive) address, enabling direct connections across
         networks. User-configurable in settings; defaults to Cloudflare.</dd>
 
-      <dt>ICE candidate (host / srflx / relay)</dt>
+      <dt id="ice"><a class="term-self" href="#ice">ICE candidate (host / srflx / relay)</a></dt>
       <dd>The address options WebRTC tries when connecting: <em>host</em> = local
-        network (same-LAN only), <em>srflx</em> = public address via STUN
-        (cross-network), <em>relay</em> = via a TURN server (not used here). Note
-        "relay" here is unrelated to Tally's <em>relay server</em>.</dd>
+        network (same-LAN only), <em>srflx</em> = public address via
+        <a href="#stun">STUN</a> (cross-network), <em>relay</em> = via a TURN
+        server (not used here). Note "relay" here is unrelated to Tally's
+        <a href="#relay">relay server</a>.</dd>
     </dl>
 
     <h2>Identity &amp; cryptography</h2>
     <dl>
-      <dt>Nostr, npub, nsec</dt>
+      <dt id="nostr"><a class="term-self" href="#nostr">Nostr, npub, nsec</a></dt>
       <dd>Tally identities are Nostr keys. <code>npub…</code> is the public key (a
         user's id); <code>nsec…</code> is the secret key. Tally uses Nostr keys
         and signatures but does <strong>not</strong> publish transactions to
         public Nostr relays.</dd>
 
-      <dt>NIP-01 / NIP-07 / NIP-44 / NIP-49</dt>
+      <dt id="nips"><a class="term-self" href="#nips">NIP-01 / NIP-07 / NIP-44 / NIP-49</a></dt>
       <dd>The Nostr standards in use: event/signature format (01),
         browser-extension signer (07), encrypted payloads (44), and
         passphrase-encrypted key export / <code>ncryptsec</code> (49).</dd>
 
-      <dt>Schnorr / secp256k1</dt>
-      <dd>The signature scheme and curve behind Nostr identities and authorship
-        proofs.</dd>
+      <dt id="schnorr"><a class="term-self" href="#schnorr">Schnorr / secp256k1</a></dt>
+      <dd>The signature scheme and curve behind Nostr identities and
+        <a href="#authorship">authorship proofs</a>.</dd>
 
-      <dt>TIP</dt>
+      <dt id="tip"><a class="term-self" href="#tip">TIP</a></dt>
       <dd>Tally Improvement Proposal: a design document under <code>TIPs/</code>.
-        See <code>TIPs/README.md</code> for the implemented-vs-draft
+        See the <a href="tips.html">TIPs index</a> for the implemented-vs-draft
         convention.</dd>
     </dl>
   </main>

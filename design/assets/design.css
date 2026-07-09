@@ -43,14 +43,20 @@ html, body {
 }
 
 /* ---- Base (JS-off): single readable column ---------------------------- */
+/* Cap the measure at the container width so narrow viewports never overflow —
+   74ch is ~700px, wider than a phone, and margin:auto would otherwise let the
+   column grow to that and clip. */
 main.page {
   display: block;
-  max-width: var(--measure);
+  max-width: min(var(--measure), 100%);
   margin: 0 auto;
   padding: 28px 22px 80px;
 }
 
 /* ---- Enhanced (JS-on): topbar + sidebar shell ------------------------- */
+/* The shell fills the viewport and the topbar + sidebar stay fixed; only the
+   content column scrolls. `height` (not min-height) + the per-region overflow
+   below are what pin the nav in place as you scroll long pages. */
 body.enhanced {
   display: grid;
   grid-template-columns: var(--sidebar-w) 1fr;
@@ -58,9 +64,14 @@ body.enhanced {
   grid-template-areas:
     "topbar topbar"
     "toc    content";
-  min-height: 100vh;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
 }
-body.enhanced > main.page { grid-area: content; overflow: auto; }
+/* min-width:0 lets the content column shrink below the intrinsic width of a
+   wide child (e.g. a long code line) instead of overflowing the viewport; the
+   wide child then scrolls within itself (see pre/table rules below). */
+body.enhanced > main.page { grid-area: content; overflow-y: auto; min-width: 0; }
 
 #topbar {
   grid-area: topbar;
@@ -187,9 +198,37 @@ main.page code {
   font-size: 0.9em;
 }
 main.page hr { border: none; border-top: 1px solid var(--border); margin: 28px 0; }
+main.page { overflow-wrap: break-word; }
+main.page pre {
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  overflow-x: auto;
+}
+main.page pre code { background: none; border: none; padding: 0; }
+main.page blockquote {
+  margin: 12px 0;
+  padding: 2px 14px;
+  border-left: 3px solid var(--border-2);
+  color: var(--muted);
+}
+/* Wide tables scroll inside a .table-scroll wrapper (added by the importer)
+   instead of forcing page overflow. */
+main.page .table-scroll { overflow-x: auto; margin: 12px 0; }
 main.page table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 14px; }
+main.page .table-scroll > table { margin: 0; }
 main.page th, main.page td { border: 1px solid var(--border); padding: 7px 10px; text-align: left; vertical-align: top; }
 main.page th { background: var(--panel); }
+
+/* Definition lists (the glossary). Each term is an anchor target with a
+   self-link; scroll-margin keeps it clear of the top when jumped to. */
+main.page dl { margin: 8px 0; }
+main.page dt { font-weight: 700; margin-top: 16px; scroll-margin-top: 16px; }
+main.page dd { margin: 4px 0 0; color: var(--text); }
+main.page .term-self { color: inherit; text-decoration: none; }
+main.page .term-self:hover { text-decoration: underline; text-decoration-style: dotted; }
+main.page dt:target { color: var(--link); }
 
 /* Inline status tag for a single term/row, e.g. <span class="tag" data-status>. */
 .tag {
@@ -201,6 +240,17 @@ main.page th { background: var(--panel); }
   border: 1px solid var(--st, var(--border-2));
   border-radius: 999px;
   padding: 1px 8px;
+}
+
+/* Banner on pages imported verbatim from Markdown, pending reconciliation. */
+.import-note {
+  border: 1px solid var(--st-proposal);
+  color: var(--muted);
+  background: color-mix(in srgb, var(--st-proposal) 10%, transparent);
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin: 0 0 18px;
+  font-size: 13px;
 }
 
 /* ---- Responsive ------------------------------------------------------- */
