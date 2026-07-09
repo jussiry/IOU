@@ -18,6 +18,15 @@ const WEB_ROOT = path.resolve(__dirname, "..", "web");
 const WEB_PREFIX = "/web";
 const WEB_DOMAINS = new Set(["tally.earth", "www.tally.earth"]);
 
+// The Design docs site (design/) is a standalone static folder — plain HTML
+// pages with only relative links, so it also opens directly from disk with no
+// server at all. Here it's nested under the web landing site's own base path
+// ("/design" on the tally.earth domain, "/web/design" on localhost) rather
+// than mounted on the main Tally app server, since it's public-facing project
+// documentation, not part of the app.
+const DESIGN_ROOT = path.resolve(__dirname, "..", "design");
+const DESIGN_SUBPATH = "/design";
+
 const MIME_TYPES = new Map([
   [".css", "text/css; charset=utf-8"],
   [".gif", "image/gif"],
@@ -114,12 +123,14 @@ const sendFile = async (request, response, filePath) => {
   }
 };
 
-const resolveWebFilePath = async (requestPath) => {
+// Resolves a request path against a static root (web/ or design/), used for
+// both the landing site and the nested Design docs site.
+const resolveStaticFilePath = async (root, requestPath) => {
   const normalizedPath = requestPath === "/" || requestPath === "" ? "/index.html" : requestPath;
   try {
     const decoded = decodeURIComponent(normalizedPath);
-    const resolved = path.resolve(WEB_ROOT, `.${decoded}`);
-    if (!isInsideRoot(WEB_ROOT, resolved)) return null;
+    const resolved = path.resolve(root, `.${decoded}`);
+    if (!isInsideRoot(root, resolved)) return null;
     const stats = await fsp.stat(resolved);
     if (stats.isDirectory()) {
       const indexPath = path.join(resolved, "index.html");
@@ -165,12 +176,19 @@ const server = http.createServer(async (request, response) => {
     const webPath = isWebPrefix
       ? requestUrl.pathname.slice(WEB_PREFIX.length) || "/"
       : requestUrl.pathname;
-    const webFilePath = await resolveWebFilePath(webPath);
-    if (!webFilePath) {
+
+    // Design is nested under the web site's own base path, so it lands at
+    // tally.earth/design on the public domain and /web/design on localhost.
+    const isDesignPath = webPath === DESIGN_SUBPATH || webPath.startsWith(`${DESIGN_SUBPATH}/`);
+    const staticRoot = isDesignPath ? DESIGN_ROOT : WEB_ROOT;
+    const staticPath = isDesignPath ? webPath.slice(DESIGN_SUBPATH.length) || "/" : webPath;
+
+    const staticFilePath = await resolveStaticFilePath(staticRoot, staticPath);
+    if (!staticFilePath) {
       sendText(response, 404, "Not found.");
       return;
     }
-    await sendFile(request, response, webFilePath);
+    await sendFile(request, response, staticFilePath);
     return;
   }
 
