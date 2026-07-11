@@ -1,0 +1,81 @@
+<!--
+  purpose.html — why Tally exists. The vision and economic model, drawn from
+  plan/idea.md and README. The original hand-written notes are kept alongside as
+  plan-idea.html (imported).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Purpose — Design</title>
+  <link rel="stylesheet" href="assets/design.css" />
+</head>
+<body>
+  <main class="page" data-status="reference">
+    <h1>Purpose</h1>
+
+    <p class="lede">
+      Money, in its essence, is bookkeeping that tracks good deeds owed back.
+      Tally returns money to that root: it is <strong>money as peer-to-peer
+      IOUs</strong> — promissory notes between people who trust each other —
+      extended to strangers through a chain of mutual friends.
+    </p>
+
+    <h2>The idea</h2>
+    <p>
+      Anyone can issue their own IOU ("I owe you"): a promise to pay back an
+      agreed value. Value is denominated in whatever participants agree on —
+      euros by default. An IOU is only worth taking if you trust you can spend it
+      later, so at the base level trades happen between
+      <a href="glossary.html#friend">friends</a> who trust one another. A
+      <a href="glossary.html#transaction">transaction</a> records one such IOU
+      and moves the running <a href="glossary.html#tally">tally</a> of debt
+      between two friends.
+    </p>
+
+    <h2>Trust, and chained transactions</h2>
+    <p>
+      Two quantities drive everything:
+    </p>
+    <ul>
+      <li><strong>Debt</strong> — the current balance of IOUs with a friend:
+        positive (they owe you) or negative (you owe them). It only moves when
+        you send or receive an IOU.</li>
+      <li><strong>Trust</strong> — the
+        <a href="glossary.html#trust-limit">trust limit</a> you set per friend:
+        the most you're comfortable being owed by them.</li>
+    </ul>
+    <p>
+      Trust limits let value flow between people who <em>don't</em> know each
+      other. If Alice→Bob and Bob→Charlie each trust one another, Alice can pay
+      Charlie by passing an IOU through Bob: Alice's IOU to Bob, Bob's own IOU to
+      Charlie. Bob is left neutral (equal in and out), and Charlie gets an IOU he
+      trusts. Chains can be any length, so with enough trust in the network,
+      anyone can transact with anyone. The
+      <a href="glossary.html#available-trust">available trust</a> along a route
+      is the headroom these chains flow through.
+    </p>
+
+    <h2>Why it's built the way it is</h2>
+    <p>
+      This purpose sets hard constraints the rest of the docs elaborate: it must
+      be <strong>local-first and peer-to-peer</strong> (no central ledger or
+      authority — see <a href="p2p.html">P2P</a>), transactions must stay
+      <strong>private</strong> between the parties (see
+      <a href="security.html">Security</a>), and it must keep working when peers
+      are offline or hard to reach (see
+      <a href="communication.html">Communication</a>).
+    </p>
+
+    <p>
+      For the full original framing — including future ideas like routing
+      <em>fees</em> to incentivise keeping the network liquid — see the imported
+      <a href="plan-idea.html">original idea notes</a>.
+    </p>
+  </main>
+
+  <script src="assets/pages.js"></script>
+  <script src="assets/design.js"></script>
+</body>
+</html>

@@ -36,6 +36,10 @@
       <li><strong>Each term is linkable.</strong> Every entry has a stable
         anchor — click a term to get its link, or deep-link from any page as
         <code>glossary.html#ledger</code>.</li>
+      <li><strong>Kept short, links out.</strong> The glossary is meant to grow
+        wide (many terms) but stay shallow: each entry is a one- or two-line
+        orientation that links to the group page or code where the concept is
+        explained in full.</li>
       <li><strong>Focus is app-specific terms.</strong> Generic/industry terms
         (WebRTC, STUN, Nostr…) appear only when crucial and used in a
         project-specific way.</li>
@@ -85,6 +89,14 @@
         immediately; raising requires the friend's agreement (sits pending until
         they echo it). "Credit limit" is the term used in the message payload;
         "trust limit" is the UI / most-common term.</dd>
+
+      <dt id="available-trust"><a class="term-self" href="#available-trust">Available trust</a></dt>
+      <dd>A friend's <a href="#trust-limit">trust limit</a> plus the current
+        balance with them — how much more they could still owe you before hitting
+        the limit. E.g. a 50 € limit with Bob already owing you 30 € leaves 20 €
+        of available trust (and Bob has 80 €). Never negative: if the balance
+        already exceeds the limit, available trust is 0. The headroom chained
+        transactions route through.</dd>
 
       <dt id="command"><a class="term-self" href="#command">Command</a></dt>
       <dd>A domain module under <code>app/js/commands/</code> that performs one

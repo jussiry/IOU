@@ -1,0 +1,64 @@
+<!--
+  security.html — orientation for identity, keys, encryption, and privacy.
+  Written from app/js/crypto/ and app/js/peer/authorship + envelope. No prior
+  doc; kept short.
+-->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Security — Design</title>
+  <link rel="stylesheet" href="assets/design.css" />
+</head>
+<body>
+  <main class="page" data-status="reference">
+    <h1>Security</h1>
+
+    <p class="lede">
+      Identity, keys, and the trust of data. Tally identities are
+      <a href="glossary.html#nostr">Nostr</a> keys; every durable record is
+      signed and every message is encrypted end-to-end. Crypto lives in
+      <code>app/js/crypto/</code>.
+    </p>
+
+    <h2>Identity &amp; keys</h2>
+    <p>
+      A user <em>is</em> a Nostr keypair (<code>npub</code> public id,
+      <code>nsec</code> secret). All signing and encryption flow through one
+      seam, the <a href="glossary.html#keyprovider">KeyProvider</a>, so the key
+      can live in-app (local) or in a browser extension (NIP-07) without the rest
+      of the code touching raw key material.
+    </p>
+
+    <h2>Encryption &amp; authorship</h2>
+    <ul>
+      <li><strong>Confidentiality.</strong> Messages travel as
+        <a href="glossary.html#envelope">envelopes</a> encrypted with NIP-44;
+        the transport (relay or WebRTC) only ever sees ciphertext plus routing
+        fields.</li>
+      <li><strong>Authenticity.</strong> Durable records carry an
+        <a href="glossary.html#authorship">authorship proof</a> (a signed Nostr
+        event), so a record forwarded by a third party during
+        <a href="glossary.html#sync">sync</a> can still be verified as authored
+        by its true creator.</li>
+    </ul>
+
+    <h2>Privacy model</h2>
+    <p>
+      Although identities and signatures are Nostr-compatible, Tally
+      <strong>never publishes transactions to public Nostr relays</strong> —
+      doing so would leak the social and financial graph. Signatures are used
+      <em>inside</em> the encrypted payload only.
+    </p>
+
+    <p>
+      A note on cost: secp256k1 in JS is slow, which shapes some choices —
+      see <a href="plan-performance.html">Performance</a>.
+    </p>
+  </main>
+
+  <script src="assets/pages.js"></script>
+  <script src="assets/design.js"></script>
+</body>
+</html>

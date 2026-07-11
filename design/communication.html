@@ -1,0 +1,62 @@
+<!--
+  communication.html — orientation for how peers connect and exchange data.
+  Written from app/js/peer/, app/js/signaling/, and server/. Links the imported
+  peer-communication spec for depth.
+-->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Communication — Design</title>
+  <link rel="stylesheet" href="assets/design.css" />
+</head>
+<body>
+  <main class="page" data-status="reference">
+    <h1>Communication</h1>
+
+    <p class="lede">
+      How peers find each other and move data. Tally prefers a direct
+      encrypted <a href="glossary.html#peer">peer-to-peer</a> channel and falls
+      back to its own relay when that can't form — but it never trusts the
+      transport for authenticity; that's <a href="security.html">Security</a>'s
+      job.
+    </p>
+
+    <h2>The connection path</h2>
+    <ul>
+      <li><strong>Direct (WebRTC).</strong> Peers form a
+        <a href="glossary.html#mesh">mesh</a> of WebRTC data channels — a
+        friend mesh (per friend device) and a self-mesh (your own devices).
+        <a href="glossary.html#stun">STUN</a> helps them find a route across
+        networks; there is no TURN server.</li>
+      <li><strong>Relay fallback.</strong> The
+        <a href="glossary.html#relay">relay server</a> does WebRTC signaling and,
+        when a direct channel can't form or a peer is offline, store-and-forwards
+        the encrypted <a href="glossary.html#envelope">envelopes</a> (waking the
+        recipient with a Web Push <a href="glossary.html#push-hint">hint</a>).</li>
+    </ul>
+
+    <h2>What flows</h2>
+    <p>
+      Outbound messages queue in the <a href="glossary.html#outbox">outbox</a>
+      and travel as encrypted envelopes. When two peers connect they
+      <a href="glossary.html#sync">sync</a> — reconciling their ledgers so a
+      reconnecting or recovering device catches up. Transport-only messages
+      (ping, sync, <a href="glossary.html#receipt">receipts</a>) are distinct
+      from durable records and carry no authorship.
+    </p>
+
+    <h2>Go deeper</h2>
+    <p>
+      Imported, pending reconciliation:
+      <a href="spec-peer-communication.html">Peer communication protocol</a>.
+      Code lives in <code>app/js/peer/</code>,
+      <code>app/js/signaling/</code>, and <code>server/</code>.
+    </p>
+  </main>
+
+  <script src="assets/pages.js"></script>
+  <script src="assets/design.js"></script>
+</body>
+</html>

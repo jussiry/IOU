@@ -1,0 +1,66 @@
+<!--
+  p2p.html — orientation for Tally's peer-to-peer core: local-first data, the
+  ledger, and the trust model. Links to the imported specs/plan pages that go
+  deeper (pending reconciliation).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>P2P — Design</title>
+  <link rel="stylesheet" href="assets/design.css" />
+</head>
+<body>
+  <main class="page" data-status="reference">
+    <h1>P2P</h1>
+
+    <p class="lede">
+      The peer-to-peer core: there is <strong>no central ledger and no
+      authority</strong>. Each device keeps its own append-only record of what it
+      has done, and peers reconcile directly. This is what makes Tally
+      local-first — it works offline and owes nothing to a server for its truth.
+    </p>
+
+    <h2>The ledger</h2>
+    <p>
+      The <a href="glossary.html#ledger">ledger</a> is the append-only local log
+      of every <a href="glossary.html#durable-message">durable record</a> the
+      user has authored or received. All balances —
+      <a href="glossary.html#tally">tallies</a>,
+      <a href="glossary.html#trust-limit">trust limits</a>,
+      <a href="glossary.html#available-trust">available trust</a> — are
+      <em>derived</em> from replaying it, so the log is the single source of
+      truth and the UI never stores balances of its own.
+    </p>
+
+    <h2>State &amp; storage</h2>
+    <p>
+      Runtime state (user, friends, contacts, ledger, outbox) is a single
+      normalised object persisted in IndexedDB and reshaped by versioned
+      migrations on load. Data-heavy parts are written in TypeScript
+      (<code>app/js/models/</code>, <code>app/js/ledger.ts</code>,
+      <code>app/js/storage/</code>).
+    </p>
+
+    <h2>The trust model</h2>
+    <p>
+      The economics that make P2P value transfer possible — debt, trust limits,
+      and chained transactions through mutual friends — are described in
+      <a href="purpose.html">Purpose</a>.
+    </p>
+
+    <h2>Go deeper</h2>
+    <p>
+      Imported specs and notes, kept as-is pending reconciliation:
+      <a href="spec-ledger.html">Ledger spec</a>,
+      <a href="spec-data-storage.html">Data storage spec</a>,
+      <a href="plan-data-model.html">Data model</a>, and
+      <a href="plan-architecture.html">Architecture</a>.
+    </p>
+  </main>
+
+  <script src="assets/pages.js"></script>
+  <script src="assets/design.js"></script>
+</body>
+</html>

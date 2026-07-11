@@ -1,0 +1,51 @@
+<!--
+  tooling.html — orientation for how the project is built and maintained: the
+  Design site itself, GraphEditor, dev/test tooling. The Design site's own
+  roadmap lives here (design-roadmap.html).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Tooling — Design</title>
+  <link rel="stylesheet" href="assets/design.css" />
+</head>
+<body>
+  <main class="page" data-status="reference">
+    <h1>Tooling</h1>
+
+    <p class="lede">
+      How the project is built, understood, and maintained — the meta-layer
+      around the app itself.
+    </p>
+
+    <h2>This site (Design)</h2>
+    <p>
+      Design is a set of standalone, text-first HTML pages served at
+      <code>/design</code> (and openable straight from disk). Its own direction,
+      conventions, and open questions live in the
+      <a href="design-roadmap.html">Design roadmap</a>.
+    </p>
+
+    <h2>GraphEditor</h2>
+    <p>
+      A standalone tool that renders the codebase as an interactive dependency
+      graph — each file a node, each import an edge — to make the shape of the
+      code legible. Currently its own project under <code>GraphEditor/</code>; a
+      candidate to fold in here later so documentation flows into visualising.
+    </p>
+
+    <h2>Dev &amp; test</h2>
+    <p>
+      Seeded dev identities (Alice/Bob/Carol) for local multi-user testing, a
+      headless peer helper, and two-client end-to-end scenarios under
+      <code>tests/</code>. Build and optimisation notes:
+      <a href="plan-performance.html">Performance</a>.
+    </p>
+  </main>
+
+  <script src="assets/pages.js"></script>
+  <script src="assets/design.js"></script>
+</body>
+</html>

@@ -248,11 +248,17 @@ main.page th { background: var(--panel); }
 /* Definition lists (the glossary). Each term is an anchor target with a
    self-link; scroll-margin keeps it clear of the top when jumped to. */
 main.page dl { margin: 8px 0; }
-main.page dt { font-weight: 700; margin-top: 16px; scroll-margin-top: 16px; }
+main.page dt { font-weight: 700; margin-top: 24px; scroll-margin-top: 16px; }
 main.page dd { margin: 4px 0 0; color: var(--text); }
-main.page .term-self { color: inherit; text-decoration: none; }
-main.page .term-self:hover { text-decoration: underline; text-decoration-style: dotted; }
-main.page dt:target { color: var(--link); }
+main.page .term-self { color: inherit; }
+/*main.page .term-self { text-decoration: underline; text-decoration-style: dotted; }*/
+/*main.page dt:target { color: var(--link); }*/
+
+a {
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  color: inherit;
+}
 
 /* Inline status tag for a single term/row, e.g. <span class="tag" data-status>. */
 .tag {

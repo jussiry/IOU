@@ -1,10 +1,7 @@
 <!--
-  index.html — the Design site's landing page.
-
-  Design is Tally's single place to understand and (eventually) shape the
-  system: overview, architecture, specs, glossary, and the TIP design docs,
-  cross-linked and status-tagged. Authored text-first — this file reads cleanly
-  as raw HTML; assets/design.js renders the shared shell.
+  index.html — the Design site's landing page: what Tally is, and a map of how
+  its docs are split across the sidebar groups. Authored text-first; reads
+  cleanly as raw HTML. assets/design.js renders the shared shell.
 -->
 <!doctype html>
 <html lang="en">
@@ -19,68 +16,61 @@
     <h1>Design</h1>
 
     <p class="lede">
-      One place to understand — and, in time, to shape — how Tally works.
-      Overview, architecture, specs, glossary, and design proposals (TIPs),
-      cross-linked and honest about what is built versus merely planned.
+      Design is where you understand — and, in time, shape — how
+      <strong>Tally</strong> works: one cross-linked, status-tagged place for the
+      whole project.
     </p>
 
+    <h2>What Tally is</h2>
     <p>
-      "Design" here means <em>system</em> design (how the app is built), not
-      visual design. Everything is authored <strong>text-first as plain
-      HTML</strong>: each page reads cleanly as raw source for a human or an AI,
-      and with JavaScript off it is just a readable page. The shared sidebar and
-      topbar are progressive enhancement — they add navigation, never content,
-      so the markup of each page stays the single source of truth.
+      Tally is money returned to its root as bookkeeping of trust:
+      <strong>peer-to-peer IOUs</strong> between friends, extended to strangers
+      through a chain of mutual trust. No bank, no central ledger — each device
+      keeps its own record and peers reconcile directly. The
+      <a href="purpose.html">Purpose</a> page tells the full story.
     </p>
 
-    <h2>Status convention</h2>
+    <h2>How these docs are split</h2>
     <p>
-      Every page — and, where useful, individual claims — carries a status so
-      its maturity is explicit in the source and colour-coded in the render:
+      The sidebar groups mirror the anatomy of the project. Start anywhere:
+    </p>
+    <ul>
+      <li><a href="purpose.html"><strong>Purpose</strong></a> — what Tally is and
+        why: the trust economics and chained transactions.</li>
+      <li><a href="glossary.html"><strong>Glossary</strong></a> — the shared
+        vocabulary; short entries that link into the rest.</li>
+      <li><a href="ui.html"><strong>UI</strong></a> — what people see and do:
+        pages, flows, presence.</li>
+      <li><a href="p2p.html"><strong>P2P</strong></a> — the peer-to-peer core:
+        the local-first ledger, state, and storage.</li>
+      <li><a href="communication.html"><strong>Communication</strong></a> — how
+        peers connect and sync: WebRTC, the relay, envelopes.</li>
+      <li><a href="security.html"><strong>Security</strong></a> — identity, keys,
+        encryption, authorship, and the privacy model.</li>
+      <li><a href="tips.html"><strong>TIPs</strong></a> — Tally Improvement
+        Proposals: design docs with an implemented/draft lifecycle.</li>
+      <li><a href="tooling.html"><strong>Tooling</strong></a> — how the project
+        is built and maintained, including this site.</li>
+    </ul>
+
+    <h2>Conventions</h2>
+    <p>
+      Everything is authored <strong>text-first as plain HTML</strong>: each page
+      reads cleanly as raw source for a human or an AI, and works with
+      JavaScript off. The shell only adds navigation, never content. Every page
+      carries a <em>status</em> so its maturity is explicit:
     </p>
     <ul class="legend">
-      <li class="chip" data-status="implemented">implemented — exists and works in the code today</li>
-      <li class="chip" data-status="planned">planned — decided and well-defined, not built yet</li>
-      <li class="chip" data-status="proposal">proposal — a suggestion, draft, or open question</li>
-      <li class="chip" data-status="reference">reference — background, rationale, or a spec/contract</li>
+      <li class="chip" data-status="implemented">implemented — exists in the code today</li>
+      <li class="chip" data-status="planned">planned — decided, not built yet</li>
+      <li class="chip" data-status="proposal">proposal — a draft or open question</li>
+      <li class="chip" data-status="reference">reference — background or a spec</li>
     </ul>
     <p>
-      When a page makes claims about the code, it should say when they were last
-      verified against it (e.g. "verified 2026-07-09"), not assume they stay true
-      forever.
-    </p>
-
-    <h2>How this is organised</h2>
-    <ul>
-      <li><strong>Standalone pages.</strong> Each topic is its own
-        <code>.html</code> file in <code>design/</code>; the sidebar (from
-        <code>assets/pages.js</code>) ties them together. CSS/JS live under
-        <code>assets/</code>, out of the way.</li>
-      <li><strong>Migrated incrementally.</strong> Existing docs
-        (<code>TIPs/</code>, <code>specs/</code>, <code>plan/</code>,
-        <code>GLOSSARY.md</code>) move in over time. They may <em>conflict</em>
-        with each other or with the code at first — that is expected. The plan
-        is to bring them in, tag their status, and reconcile in place rather
-        than block on a perfect merge. The hand-written <code>plan/</code> notes
-        in particular hold original rationale worth preserving even where parts
-        have aged.</li>
-      <li><strong>Scope.</strong> For now this covers the Tally app. GraphEditor
-        (the dependency-graph tool) is a candidate to fold in later, at which
-        point Design spans documenting <em>and</em> editing/visualising.</li>
-    </ul>
-
-    <h2>Pages</h2>
-    <p>
-      Use the sidebar to navigate. Available so far:
-    </p>
-    <ul>
-      <li><a href="glossary.html">Glossary</a> — project-specific vocabulary
-        (<span class="tag" data-status="reference">reference</span>).</li>
-    </ul>
-    <p>
-      More to come as documents migrate in: overview/vision, architecture,
-      data model, the ledger and peer-communication specs, and the TIP design
-      proposals.
+      Some pages are still <em>imported as-is</em> from older Markdown notes
+      (marked with a banner) and may conflict with the code until reconciled.
+      See the <a href="design-roadmap.html">Design roadmap</a> for where this site
+      is headed.
     </p>
   </main>
 

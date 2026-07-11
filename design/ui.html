@@ -1,0 +1,60 @@
+<!--
+  ui.html — orientation for Tally's user interface. No prior doc; written from
+  app/ui-modules/ and app/js/ui/. Kept short — a map, not a manual.
+-->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>UI — Design</title>
+  <link rel="stylesheet" href="assets/design.css" />
+</head>
+<body>
+  <main class="page" data-status="reference">
+    <h1>UI</h1>
+
+    <p class="lede">
+      What people see and do. The client is a plain-HTML/JS progressive web app;
+      UI code lives in <code>app/ui-modules/</code> (one folder per page or
+      component, co-locating its JS/HTML/CSS) with shared helpers in
+      <code>app/js/ui/</code>.
+    </p>
+
+    <h2>Main pages</h2>
+    <ul>
+      <li><strong>Tally</strong> — the home view: your overall position and
+        quick actions.</li>
+      <li><strong>Friends</strong> — the friend list, each row showing the
+        running <a href="glossary.html#tally">tally</a> and a presence icon
+        (green = direct <a href="glossary.html#peer">peer</a> connection, amber =
+        via <a href="glossary.html#relay">relay</a>, grey = offline).</li>
+      <li><strong>Logs</strong> — a readable history of activity.</li>
+      <li><strong>Settings</strong> — identity, relays, STUN servers,
+        notifications, and account transfer/removal.</li>
+      <li><strong>Welcome</strong> — first-run onboarding: create an identity,
+        restore one, or connect an external signer.</li>
+    </ul>
+
+    <h2>Flows (subpages)</h2>
+    <p>
+      Task-focused subpages under <code>app/ui-modules/subpage/</code>: record a
+      transaction, request a payment, set a trust limit, add a friend (QR /
+      key), and transfer the account to another device.
+    </p>
+
+    <h2>How it connects to the rest</h2>
+    <p>
+      The UI is a pure read/act surface: it renders a sanitised
+      <em>view</em> derived from state (never touching private keys), and user
+      actions call <a href="glossary.html#command">commands</a>, which update the
+      <a href="p2p.html">ledger</a> and propagate over
+      <a href="communication.html">the transport</a>. There is a ~400 ms animated
+      transition between pages.
+    </p>
+  </main>
+
+  <script src="assets/pages.js"></script>
+  <script src="assets/design.js"></script>
+</body>
+</html>
