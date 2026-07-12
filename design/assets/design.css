@@ -159,6 +159,31 @@ body.enhanced > main.page { grid-area: content; overflow-y: auto; min-width: 0; 
   background: var(--st, var(--muted));
 }
 
+/* A group whose single page is named after it: the header is a direct link
+   (no caret). Reuses .toc-group sizing/case; text-decoration off. */
+#toc a.toc-group-link { text-decoration: none; }
+#toc a.toc-group-link:hover,
+#toc a.toc-group-link.active { color: var(--text); background: var(--panel-2); }
+
+/* Overview: the one ungrouped top-level link. */
+#toc a.toc-top { margin-bottom: 2px; }
+
+/* Current page's heading outline (h2/h3/h4), rendered under its nav entry.
+   Depth comes from the heading level; deeper headings indent further. */
+#toc .page-outline { list-style: none; margin: 2px 0 8px; padding: 0; }
+#toc .outline-link {
+  display: block;
+  padding: 3px 8px 3px 26px;
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--muted);
+  text-decoration: none;
+  border-radius: 6px;
+}
+#toc .outline-link:hover { background: var(--panel-2); color: var(--text); }
+#toc .outline-link[data-depth="1"] { padding-left: 40px; }
+#toc .outline-link[data-depth="2"] { padding-left: 54px; }
+
 /* Status token mapping — usable on any element via [data-status]. */
 [data-status="implemented"] { --st: var(--st-implemented); }
 [data-status="planned"]     { --st: var(--st-planned); }
@@ -211,6 +236,8 @@ main.page[data-status="proposal"]    > h1::after { content: "proposal"; }
 main.page[data-status="reference"]   > h1::after { content: "reference"; }
 main.page h2 { font-size: 19px; margin: 30px 0 10px; }
 main.page h3 { font-size: 15px; margin: 22px 0 8px; }
+/* Clear the sticky topbar when an outline link jumps to a heading. */
+main.page h2, main.page h3, main.page h4 { scroll-margin-top: 16px; }
 main.page p, main.page li { color: var(--text); }
 main.page .lede { font-size: 17px; color: var(--muted); }
 main.page a { color: var(--link); }

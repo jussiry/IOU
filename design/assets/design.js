@@ -40,49 +40,115 @@
 
   // ---- Sidebar table of contents ---------------------------------------
   // Groups fold to just their header, except the group containing the current
-  // page (open by default) and any group the user has manually expanded — so
-  // the sidebar stays scannable on a site with many pages while always
-  // surfacing where you are.
+  // page (open by default) or one the user expands — so the sidebar stays
+  // scannable while always surfacing where you are. The open page also gets its
+  // own headers (h2/h3/h4) rendered beneath it as a nested outline; navigating
+  // to another page reloads and rebuilds this for that page only. A group with
+  // a single page named after the group (Glossary, UI) has no fold — its header
+  // is a direct link to that page.
   var toc = document.createElement("nav");
   toc.id = "toc";
   toc.setAttribute("aria-label", "Pages");
 
-  var currentGroup = current ? current.group : null;
-  var lastGroup = null;
-  var list = null;
-  var groupButton = null;
-  pages.forEach(function (p) {
-    if (p.group && p.group !== lastGroup) {
-      var isOpen = p.group === currentGroup;
-      var h = document.createElement("button");
-      h.type = "button";
-      h.className = "toc-group";
-      h.setAttribute("aria-expanded", String(isOpen));
-      h.innerHTML =
-        '<span class="toc-group-label">' + escapeHtml(p.group) + "</span>" +
-        '<span class="toc-group-caret" aria-hidden="true"></span>';
-      toc.appendChild(h);
-      list = document.createElement("ul");
-      list.hidden = !isOpen;
-      toc.appendChild(list);
-      lastGroup = p.group;
-      groupButton = h;
-    }
-    var li = document.createElement("li");
+  var isCurrent = function (p) { return current && p.href === current.href; };
+
+  // Build a nested outline of the current page's headings, giving each a stable
+  // id (slugified) so the links resolve. Returns a <ul> or null if no headings.
+  var buildOutline = function () {
+    var headings = main.querySelectorAll("h2, h3, h4");
+    if (!headings.length) return null;
+    var used = {};
+    document.querySelectorAll("[id]").forEach(function (el) { used[el.id] = true; });
+    var slugify = function (text) {
+      var base = text.toLowerCase().trim().replace(/[^\w]+/g, "-").replace(/^-+|-+$/g, "") || "section";
+      var s = base, n = 2;
+      while (used[s]) s = base + "-" + n++;
+      used[s] = true;
+      return s;
+    };
+    var ul = document.createElement("ul");
+    ul.className = "page-outline";
+    headings.forEach(function (h) {
+      if (!h.id) h.id = slugify(h.textContent);
+      var li = document.createElement("li");
+      var a = document.createElement("a");
+      a.href = "#" + h.id;
+      a.className = "outline-link";
+      a.setAttribute("data-depth", String(Number(h.tagName.slice(1)) - 2)); // h2->0
+      a.textContent = h.textContent;
+      li.appendChild(a);
+      ul.appendChild(li);
+    });
+    return ul;
+  };
+  var outline = buildOutline();
+
+  var makePageLink = function (p) {
     var a = document.createElement("a");
     a.href = p.href;
     if (p.status) a.setAttribute("data-status", p.status);
-    if (current && p.href === current.href) {
-      a.classList.add("active");
-      if (groupButton) groupButton.classList.add("has-active");
-    }
+    if (isCurrent(p)) a.classList.add("active");
     a.innerHTML = '<span class="dot" aria-hidden="true"></span>' + escapeHtml(p.title || p.href);
-    li.appendChild(a);
-    (list || toc).appendChild(li);
+    return a;
+  };
+
+  // Bucket the manifest into ordered groups (ungrouped entries — the Overview —
+  // become their own single-entry, nameless group rendered as a plain link).
+  var groups = [];
+  var byName = {};
+  pages.forEach(function (p) {
+    if (!p.group) { groups.push({ name: null, pages: [p] }); return; }
+    if (!byName[p.group]) { byName[p.group] = { name: p.group, pages: [] }; groups.push(byName[p.group]); }
+    byName[p.group].pages.push(p);
+  });
+
+  groups.forEach(function (g) {
+    // Ungrouped (Overview): a plain top-level link, with its outline when open.
+    if (g.name === null) {
+      var top = makePageLink(g.pages[0]);
+      top.classList.add("toc-top");
+      toc.appendChild(top);
+      if (isCurrent(g.pages[0]) && outline) toc.appendChild(outline);
+      return;
+    }
+
+    // Single page named after its group → the header itself is the link.
+    if (g.pages.length === 1 && g.pages[0].title === g.name) {
+      var p = g.pages[0];
+      var link = document.createElement("a");
+      link.href = p.href;
+      link.className = "toc-group toc-group-link";
+      if (p.status) link.setAttribute("data-status", p.status);
+      if (isCurrent(p)) link.classList.add("active", "has-active");
+      link.innerHTML = '<span class="toc-group-label">' + escapeHtml(g.name) + "</span>";
+      toc.appendChild(link);
+      if (isCurrent(p) && outline) toc.appendChild(outline);
+      return;
+    }
+
+    // Otherwise a foldable group of page links.
+    var hasActive = g.pages.some(isCurrent);
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "toc-group" + (hasActive ? " has-active" : "");
+    btn.setAttribute("aria-expanded", String(hasActive));
+    btn.innerHTML =
+      '<span class="toc-group-label">' + escapeHtml(g.name) + "</span>" +
+      '<span class="toc-group-caret" aria-hidden="true"></span>';
+    var ul = document.createElement("ul");
+    ul.hidden = !hasActive;
+    g.pages.forEach(function (p) {
+      var li = document.createElement("li");
+      li.appendChild(makePageLink(p));
+      if (isCurrent(p) && outline) li.appendChild(outline); // outline nested under the active page
+      ul.appendChild(li);
+    });
+    toc.appendChild(btn);
+    toc.appendChild(ul);
   });
 
   toc.addEventListener("click", function (e) {
-    var groupBtn = e.target.closest(".toc-group");
+    var groupBtn = e.target.closest("button.toc-group");
     if (groupBtn) {
       var isExpanded = groupBtn.getAttribute("aria-expanded") === "true";
       groupBtn.setAttribute("aria-expanded", String(!isExpanded));
