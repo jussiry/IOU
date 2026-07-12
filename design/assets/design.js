@@ -88,7 +88,11 @@
     a.href = p.href;
     if (p.status) a.setAttribute("data-status", p.status);
     if (isCurrent(p)) a.classList.add("active");
-    a.innerHTML = '<span class="dot" aria-hidden="true"></span>' + escapeHtml(p.title || p.href);
+    // The title lives in its own <span> (not a bare text node) so it — not the
+    // whole flex row — is what shrinks and truncates; the dot stays fixed-size.
+    a.innerHTML =
+      '<span class="dot" aria-hidden="true"></span>' +
+      '<span class="label">' + escapeHtml(p.title || p.href) + "</span>";
     return a;
   };
 

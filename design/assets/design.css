@@ -128,6 +128,7 @@ body.enhanced > main.page { grid-area: content; overflow-y: auto; min-width: 0; 
 #toc .toc-group:hover { color: var(--text); }
 #toc .toc-group:first-of-type { margin-top: 4px; }
 #toc .toc-group.has-active { color: var(--text); }
+#toc .toc-group-label { min-width: 0; }
 #toc .toc-group-caret {
   width: 8px;
   height: 8px;
@@ -139,6 +140,10 @@ body.enhanced > main.page { grid-area: content; overflow-y: auto; min-width: 0; 
 }
 #toc .toc-group[aria-expanded="true"] .toc-group-caret { transform: rotate(45deg); }
 #toc ul { list-style: none; margin: 0; padding: 0; }
+/* One line per link, truncated with an ellipsis rather than wrapping — the
+   status dot (and the group caret, on group headers) must stay put regardless
+   of how long the title is. min-width:0 lets the flex child actually shrink
+   below its text's natural width so overflow:hidden can kick in. */
 #toc a {
   display: flex;
   align-items: center;
@@ -148,6 +153,7 @@ body.enhanced > main.page { grid-area: content; overflow-y: auto; min-width: 0; 
   color: var(--text);
   text-decoration: none;
   font-size: 14px;
+  min-width: 0;
 }
 #toc a:hover { background: var(--panel-2); }
 #toc a.active { background: var(--panel-2); font-weight: 600; }
@@ -157,6 +163,19 @@ body.enhanced > main.page { grid-area: content; overflow-y: auto; min-width: 0; 
   height: 8px;
   border-radius: 50%;
   background: var(--st, var(--muted));
+}
+/* The truncation target is the label span, not the flex row itself — a flex
+   container's own text-overflow doesn't apply to a bare text node sitting next
+   to another flex item (the dot). min-width:0 lets it shrink past its text's
+   natural width so overflow:hidden + ellipsis can take effect. */
+#toc a .label,
+#toc .toc-group-label,
+#toc .outline-link {
+  display: block;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* A group whose single page is named after it: the header is a direct link
