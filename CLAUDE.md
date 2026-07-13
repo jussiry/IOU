@@ -21,18 +21,22 @@ npm run dev   # starts server at http://localhost:3000 with auto-reload
 
 ---
 
-## Glossary
+## Design
 
-[`GLOSSARY.md`](GLOSSARY.md) defines the project-specific vocabulary.
+[`Design`](/design/assets/pages.js) contains documentation of this project.
 
-**Keeping it current:**
-- Add a term only when a genuinely new, load-bearing concept is introduced — be
-  **conservative**; a bloated glossary is worse than a short one. Most changes
-  need no glossary edit.
-- If you notice the glossary no longer matches reality (a term was renamed,
-  removed, or its meaning drifted), **flag it and offer a full pass** over all
-  terms.
-- Scope excludes `GraphEditor/` and `web/` (separate projects).
+- Design is meant to be useful both for AI and humans.
+- Before making major implementations read relevant parts related to it from design.
+
+**Update design pages**
+- When you notice it to be out of sync with code.
+- After implementing a new feature or making making major change to the app.
+- Create a new page for new major features that don't yet have a page.
+- Be succint in documentation and crosslink pages heavily. Crosslinking is used to avoid repeating same information.
+
+**Glossary** contains the main concepts of the app. Keep it uptodate and link other parts of documentation to it easily.
+
+Note that Tally mainly lives is /app and /server folders. If other files require documentation this mainly goes under Tooling group.
 
 ---
 
