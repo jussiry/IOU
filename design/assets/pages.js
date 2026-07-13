@@ -33,9 +33,8 @@ window.DESIGN_PAGES = [
   { group: "P2P", href: "spec-data-storage.html", title: "Spec: Data storage", status: "reference" },
   { group: "P2P", href: "plan-data-model.html", title: "Data model", status: "reference" },
   { group: "P2P", href: "plan-architecture.html", title: "Architecture", status: "reference" },
-
-  { group: "Communication", href: "communication.html", title: "Communication", status: "reference" },
-  { group: "Communication", href: "spec-peer-communication.html", title: "Spec: Peer communication", status: "reference" },
+  { group: "P2P", href: "communication.html", title: "Communication", status: "reference" },
+  { group: "P2P", href: "spec-peer-communication.html", title: "Spec: Peer communication", status: "reference" },
 
   { group: "Security", href: "security.html", title: "Security", status: "reference" },
   { group: "Security", href: "plan-performance.html", title: "Performance", status: "reference" },

@@ -40,6 +40,12 @@ Note that Tally mainly lives is /app and /server folders. If other files require
 
 ---
 
+## Testing
+
+When developing new features 90% certainty is enough and it's not necessary to do indepth testing. This is typically slow and expensive, human can do testing faster. Exception is when fixing bugs, then make proper tests to determine if the bug is fully fixed.
+
+---
+
 ## Browser tools — which to use
 
 **Preview browser (`preview_*` tools) is the only tool for testing this app's UI.**
