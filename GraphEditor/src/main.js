@@ -43,7 +43,9 @@ async function main() {
   const graph = buildGraph(raw);
 
   renderLegend(graph);
+  setupCategoryDropdown();
   const stats = document.getElementById('stats');
+  reserveStatsWidth(stats, graph);
   const setStats = (shown) => {
     const base = `${graph.nodes.length} files · ${graph.edges.length} dependencies`;
     stats.textContent = shown < graph.nodes.length ? `${base} · ${shown} shown` : base;
@@ -138,6 +140,41 @@ function renderLegend(graph) {
       `${label || key}`;
     legend.appendChild(item);
   }
+}
+
+// Reserves a fixed width for #stats sized to the longest possible rendering
+// (every file counted as "shown"). Category toggles change the shown count,
+// but the element's own size then never changes, so it can't shift the
+// buttons that sit after it in the header.
+function reserveStatsWidth(stats, graph) {
+  const probe = `${graph.nodes.length} files · ${graph.edges.length} dependencies · ${graph.nodes.length} shown`;
+  stats.textContent = probe;
+  stats.style.minWidth = `${stats.offsetWidth}px`;
+}
+
+// The category legend shows inline when it fits next to the other header
+// controls; otherwise it collapses into a fixed-size "Categories" button that
+// opens the same toggle list as a popover. Re-checked on resize against
+// #topbar's own overflow, so it reacts to both window width and category count.
+function setupCategoryDropdown() {
+  const wrap = document.getElementById('categories');
+  const topbar = document.getElementById('topbar');
+  const toggle = document.getElementById('categories-toggle');
+
+  const updateLayout = () => {
+    wrap.classList.remove('collapsed'); // lay out inline first to measure it
+    const overflowing = topbar.scrollWidth > topbar.clientWidth + 1;
+    wrap.classList.toggle('collapsed', overflowing);
+    if (!overflowing) wrap.classList.remove('open');
+  };
+
+  toggle.addEventListener('click', () => wrap.classList.toggle('open'));
+  document.addEventListener('click', (e) => {
+    if (wrap.classList.contains('open') && !wrap.contains(e.target)) wrap.classList.remove('open');
+  });
+
+  updateLayout();
+  new ResizeObserver(updateLayout).observe(topbar);
 }
 
 main().catch((e) => console.error('GraphEditor failed to start:', e));

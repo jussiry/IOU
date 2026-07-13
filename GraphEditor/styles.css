@@ -44,11 +44,24 @@ html, body {
   z-index: 10;
 }
 
-.brand { font-weight: 600; letter-spacing: 0.2px; }
-.stats { color: var(--muted); font-size: 12px; }
+.brand { flex-shrink: 0; font-weight: 600; letter-spacing: 0.2px; }
 
-/* Size filter — segmented control in the top bar. */
+/* Fixed-width reservation (set in JS from the longest possible stats string)
+   keeps this element's size constant, so toggling categories never shifts the
+   buttons that follow it in the header. */
+.stats {
+  flex-shrink: 0;
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Size filter — segmented control in the top bar. Fixed shrink/wrap so a
+   crowded header never squeezes or wraps its button labels. */
 .size-filter {
+  flex-shrink: 0;
   display: inline-flex;
   border: 1px solid #2c3540;
   border-radius: 6px;
@@ -63,6 +76,7 @@ html, body {
   font: inherit;
   font-size: 12px;
   padding: 4px 10px;
+  white-space: nowrap;
   cursor: pointer;
   transition: background 0.12s ease, color 0.12s ease;
 }
@@ -70,7 +84,51 @@ html, body {
 .size-filter button:hover { color: var(--text); background: rgba(255,255,255,0.04); }
 .size-filter button.active { color: var(--text); background: rgba(255,255,255,0.1); }
 
-.legend { display: flex; gap: 14px; margin-left: auto; flex-wrap: wrap; }
+/* Categories — inline row of toggles by default. When the row doesn't fit
+   the header (checked in JS against #topbar's overflow), main.js adds
+   .collapsed, which hides the inline row and turns #legend into a popover
+   opened by the fixed-size .categories-toggle button instead. */
+.categories { position: relative; flex-shrink: 0; margin-left: auto; }
+
+.categories-toggle {
+  display: none;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  font: inherit;
+  font-size: 12px;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid #2c3540;
+  border-radius: 6px;
+  padding: 4px 10px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.categories-toggle:hover { color: var(--text); background: rgba(255,255,255,0.04); }
+.categories.collapsed .categories-toggle { display: inline-flex; }
+
+.legend { display: flex; align-items: center; gap: 14px; flex-wrap: nowrap; }
+.categories.collapsed .legend {
+  display: none;
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 8px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  background: var(--panel);
+  border: 1px solid #2c3540;
+  border-radius: 8px;
+  padding: 12px 16px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  z-index: 30;
+  min-width: 180px;
+}
+.categories.collapsed.open .legend { display: flex; }
+
 .legend-item {
   display: inline-flex;
   align-items: center;
@@ -79,6 +137,7 @@ html, body {
   color: var(--muted);
   cursor: pointer;
   user-select: none;
+  white-space: nowrap;
   transition: opacity 0.12s ease;
 }
 /* Toggled off: category hidden in the graph. */
@@ -96,6 +155,13 @@ html, body {
   transition: color 0.12s ease;
 }
 .legend-toggle-all:hover { color: var(--text); }
+.categories.collapsed .legend-toggle-all {
+  border-right: 0;
+  padding-right: 0;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #2c3540;
+  align-self: stretch;
+}
 
 #viewport {
   position: absolute;
