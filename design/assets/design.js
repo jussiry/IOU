@@ -29,6 +29,7 @@
   })[0];
 
   document.body.classList.add("enhanced");
+  applyStoredLayoutSize("sidebar");
 
   // ---- Top bar ----------------------------------------------------------
   var topbar = document.createElement("header");
@@ -164,6 +165,7 @@
 
   document.body.insertBefore(toc, main);
   document.body.insertBefore(topbar, toc);
+  document.body.insertBefore(makeSplitter("sidebar"), main);
 
   // Mobile drawer toggle
   topbar.querySelector(".nav-toggle").addEventListener("click", function () {
@@ -177,5 +179,105 @@
     return String(s).replace(/[&<>"]/g, function (c) {
       return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
     });
+  }
+
+  function makeSplitter(name) {
+    var splitter = document.createElement("div");
+    splitter.className = "layout-splitter";
+    splitter.setAttribute("data-splitter", name);
+    splitter.setAttribute("role", "separator");
+    splitter.setAttribute("aria-orientation", "vertical");
+    splitter.setAttribute("aria-label", name === "sidebar" ? "Resize navigation" : "Resize graph editor");
+    splitter.tabIndex = 0;
+
+    var config = getSplitterConfig(name);
+    var updateValue = function (value) {
+      var clamped = clamp(value, config.min, getMaxWidth(config));
+      document.documentElement.style.setProperty(config.variable, Math.round(clamped) + "px");
+      splitter.setAttribute("aria-valuenow", String(Math.round(clamped)));
+      storeLayoutSize(name, clamped);
+    };
+    var currentValue = function () {
+      return parseFloat(getComputedStyle(document.documentElement).getPropertyValue(config.variable)) || config.defaultValue;
+    };
+
+    splitter.setAttribute("aria-valuemin", String(config.min));
+    splitter.setAttribute("aria-valuemax", String(getMaxWidth(config)));
+    splitter.setAttribute("aria-valuenow", String(Math.round(currentValue())));
+
+    splitter.addEventListener("pointerdown", function (e) {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      splitter.setPointerCapture(e.pointerId);
+      document.body.classList.add("is-resizing-layout");
+      var startX = e.clientX;
+      var startWidth = currentValue();
+      var direction = config.side === "right" ? -1 : 1;
+
+      var move = function (moveEvent) {
+        updateValue(startWidth + (moveEvent.clientX - startX) * direction);
+      };
+      var stop = function () {
+        document.body.classList.remove("is-resizing-layout");
+        window.removeEventListener("pointermove", move);
+        window.removeEventListener("pointerup", stop);
+        window.removeEventListener("pointercancel", stop);
+        splitter.removeEventListener("lostpointercapture", stop);
+      };
+
+      window.addEventListener("pointermove", move);
+      window.addEventListener("pointerup", stop);
+      window.addEventListener("pointercancel", stop);
+      splitter.addEventListener("lostpointercapture", stop);
+    });
+
+    splitter.addEventListener("keydown", function (e) {
+      var step = e.shiftKey ? 40 : 16;
+      if (e.key === "ArrowLeft") { e.preventDefault(); updateValue(currentValue() - step); }
+      if (e.key === "ArrowRight") { e.preventDefault(); updateValue(currentValue() + step); }
+      if (e.key === "Home") { e.preventDefault(); updateValue(config.min); }
+      if (e.key === "End") { e.preventDefault(); updateValue(getMaxWidth(config)); }
+    });
+
+    splitter.addEventListener("dblclick", function () {
+      updateValue(config.defaultValue);
+    });
+
+    return splitter;
+  }
+
+  function getSplitterConfig(name) {
+    if (name === "graph") {
+      return { variable: "--graph-w", storageKey: "design.graphWidth", min: 260, maxRatio: 0.5, defaultValue: 380, side: "right" };
+    }
+    return { variable: "--sidebar-w", storageKey: "design.sidebarWidth", min: 200, maxRatio: 0.45, defaultValue: 272, side: "left" };
+  }
+
+  function applyStoredLayoutSize(name) {
+    var config = getSplitterConfig(name);
+    try {
+      var stored = Number(localStorage.getItem(config.storageKey));
+      if (Number.isFinite(stored)) {
+        document.documentElement.style.setProperty(config.variable, Math.round(clamp(stored, config.min, getMaxWidth(config))) + "px");
+      }
+    } catch (e) {
+      // Storage is optional; direct file access and strict privacy modes still work.
+    }
+  }
+
+  function storeLayoutSize(name, value) {
+    try {
+      localStorage.setItem(getSplitterConfig(name).storageKey, String(Math.round(value)));
+    } catch (e) {
+      // Ignore storage failures; the live resize has already been applied.
+    }
+  }
+
+  function getMaxWidth(config) {
+    return Math.max(config.min, Math.round(window.innerWidth * config.maxRatio));
+  }
+
+  function clamp(value, min, max) {
+    return Math.min(max, Math.max(min, value));
   }
 })();
