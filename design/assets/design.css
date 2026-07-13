@@ -30,6 +30,8 @@
   --st-reference: #8a93a0;
 
   --sidebar-w: 272px;
+  --graph-w: 380px;
+  --splitter-w: 6px;
   --measure: 74ch;
 }
 
@@ -59,11 +61,11 @@ main.page {
    below are what pin the nav in place as you scroll long pages. */
 body.enhanced {
   display: grid;
-  grid-template-columns: var(--sidebar-w) 1fr;
+  grid-template-columns: var(--sidebar-w) var(--splitter-w) minmax(0, 1fr);
   grid-template-rows: auto 1fr;
   grid-template-areas:
-    "topbar topbar"
-    "toc    content";
+    "topbar topbar   topbar"
+    "toc    splitter content";
   height: 100vh;
   height: 100dvh;
   overflow: hidden;
@@ -71,7 +73,25 @@ body.enhanced {
 /* min-width:0 lets the content column shrink below the intrinsic width of a
    wide child (e.g. a long code line) instead of overflowing the viewport; the
    wide child then scrolls within itself (see pre/table rules below). */
-body.enhanced > main.page { grid-area: content; overflow-y: auto; min-width: 0; }
+body.enhanced > main.page {
+  grid-area: content;
+  overflow-y: auto;
+  min-width: 0;
+  max-width: none;
+  margin: 0;
+  padding-inline: max(22px, calc((100% - var(--measure)) / 2));
+}
+
+/* Future graph-editor layouts can add a right column without changing the page
+   content's scroll ownership: the main column remains the scroll container. */
+body.enhanced.graph-open {
+  grid-template-columns:
+    var(--sidebar-w) var(--splitter-w) minmax(0, 1fr)
+    var(--splitter-w) minmax(260px, var(--graph-w));
+  grid-template-areas:
+    "topbar topbar   topbar  topbar         topbar"
+    "toc    splitter content graph-splitter graph";
+}
 
 #topbar {
   grid-area: topbar;
@@ -101,11 +121,35 @@ body.enhanced > main.page { grid-area: content; overflow-y: auto; min-width: 0; 
 
 #toc {
   grid-area: toc;
-  border-right: 1px solid var(--border);
   background: var(--panel);
   padding: 16px 12px;
   overflow: auto;
 }
+
+.layout-splitter {
+  position: relative;
+  z-index: 10;
+  width: var(--splitter-w);
+  min-width: var(--splitter-w);
+  background: var(--panel);
+  border-inline: 1px solid var(--border);
+  cursor: col-resize;
+  touch-action: none;
+}
+.layout-splitter::before {
+  content: "";
+  position: absolute;
+  inset: 0 -4px;
+}
+.layout-splitter:hover,
+.layout-splitter:focus-visible,
+body.is-resizing-layout .layout-splitter {
+  background: var(--panel-2);
+  border-color: var(--border-2);
+}
+.layout-splitter:focus-visible { outline: 2px solid var(--link); outline-offset: -2px; }
+.layout-splitter[data-splitter="sidebar"] { grid-area: splitter; }
+.layout-splitter[data-splitter="graph"] { grid-area: graph-splitter; }
 /* Group headers are buttons that fold/unfold their <ul>. Only the group
    containing the current page (or one the user opened) shows its links. */
 #toc .toc-group {
@@ -344,6 +388,7 @@ a {
     transition: transform 0.18s ease;
     z-index: 30;
   }
+  body.enhanced .layout-splitter { display: none; }
   body.enhanced.nav-open #toc { transform: none; }
 }
 
