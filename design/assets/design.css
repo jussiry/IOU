@@ -244,6 +244,11 @@ body.is-resizing-layout .layout-splitter {
   border-radius: 6px;
 }
 #toc .outline-link:hover { background: var(--panel-2); color: var(--text); }
+#toc .outline-link.active {
+  background: color-mix(in srgb, var(--link) 18%, transparent);
+  color: var(--text);
+  font-weight: 600;
+}
 #toc .outline-link[data-depth="1"] { padding-left: 40px; }
 #toc .outline-link[data-depth="2"] { padding-left: 54px; }
 

@@ -55,6 +55,7 @@
 
   // Build a nested outline of the current page's headings, giving each a stable
   // id (slugified) so the links resolve. Returns a <ul> or null if no headings.
+  var outlineHeadings = [];
   var buildOutline = function () {
     var headings = main.querySelectorAll("h2, h3, h4");
     if (!headings.length) return null;
@@ -71,10 +72,12 @@
     ul.className = "page-outline";
     headings.forEach(function (h) {
       if (!h.id) h.id = slugify(h.textContent);
+      outlineHeadings.push(h);
       var li = document.createElement("li");
       var a = document.createElement("a");
       a.href = "#" + h.id;
       a.className = "outline-link";
+      a.setAttribute("data-outline-id", h.id);
       a.setAttribute("data-depth", String(Number(h.tagName.slice(1)) - 2)); // h2->0
       a.textContent = h.textContent;
       li.appendChild(a);
@@ -160,12 +163,24 @@
       groupBtn.nextElementSibling.hidden = isExpanded;
       return;
     }
+    var outlineLink = e.target.closest("a.outline-link");
+    if (outlineLink) {
+      var id = outlineLink.getAttribute("data-outline-id");
+      var heading = id && document.getElementById(id);
+      if (heading) {
+        e.preventDefault();
+        history.pushState(history.state, "", location.pathname + location.search + "#" + id);
+        scrollHeadingIntoView(heading);
+        updateActiveOutlineLink(id);
+      }
+    }
     if (e.target.closest("a")) document.body.classList.remove("nav-open");
   });
 
   document.body.insertBefore(toc, main);
   document.body.insertBefore(topbar, toc);
   document.body.insertBefore(makeSplitter("sidebar"), main);
+  setupHeadingScrollSpy(outlineHeadings);
 
   // Mobile drawer toggle
   topbar.querySelector(".nav-toggle").addEventListener("click", function () {
@@ -179,6 +194,91 @@
     return String(s).replace(/[&<>"]/g, function (c) {
       return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
     });
+  }
+
+  function setupHeadingScrollSpy(headings) {
+    if (!headings.length || !history.replaceState) {
+      updateActiveOutlineLink(location.hash.replace(/^#/, ""));
+      return;
+    }
+
+    var ticking = false;
+    var lastActiveId = location.hash.replace(/^#/, "");
+    var suppressScrollSpy = false;
+    var scrollContainer = main;
+    var topSlack = 32;
+
+    var update = function () {
+      ticking = false;
+      var active = headings[0];
+      var containerTop = scrollContainer.getBoundingClientRect().top;
+
+      headings.forEach(function (h) {
+        if (h.getBoundingClientRect().top - containerTop <= topSlack) active = h;
+      });
+
+      if (!active || active.id === lastActiveId) return;
+      lastActiveId = active.id;
+      var nextUrl = location.pathname + location.search + "#" + active.id;
+      history.replaceState(history.state, "", nextUrl);
+      updateActiveOutlineLink(active.id);
+    };
+
+    var schedule = function () {
+      if (suppressScrollSpy) return;
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(update);
+    };
+
+    scrollContainer.addEventListener("scroll", schedule, { passive: true });
+    window.addEventListener("resize", schedule);
+    window.addEventListener("hashchange", function () {
+      lastActiveId = location.hash.replace(/^#/, "");
+      updateActiveOutlineLink(lastActiveId);
+      var heading = lastActiveId && document.getElementById(lastActiveId);
+      if (heading) scrollHeadingIntoView(heading);
+      schedule();
+    });
+
+    if (lastActiveId) {
+      updateActiveOutlineLink(lastActiveId);
+      var initialHeading = document.getElementById(lastActiveId);
+      if (initialHeading) {
+        suppressScrollSpy = true;
+        requestAnimationFrame(function () {
+          scrollHeadingIntoView(initialHeading);
+          requestAnimationFrame(function () {
+            suppressScrollSpy = false;
+            schedule();
+          });
+        });
+        return;
+      }
+    }
+    requestAnimationFrame(update);
+  }
+
+  function scrollHeadingIntoView(heading) {
+    main.scrollTo({
+      top: main.scrollTop + heading.getBoundingClientRect().top - main.getBoundingClientRect().top,
+      left: main.scrollLeft,
+      behavior: "auto",
+    });
+  }
+
+  function updateActiveOutlineLink(id) {
+    toc.querySelectorAll(".outline-link.active").forEach(function (a) {
+      a.classList.remove("active");
+      a.removeAttribute("aria-current");
+    });
+    if (!id) return;
+    var active = Array.from(toc.querySelectorAll(".outline-link")).filter(function (a) {
+      return a.getAttribute("data-outline-id") === id;
+    })[0];
+    if (!active) return;
+    active.classList.add("active");
+    active.setAttribute("aria-current", "location");
   }
 
   function makeSplitter(name) {
