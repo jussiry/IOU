@@ -1,5 +1,6 @@
 /**
- * categories.js — the category → colour/symbol mapping for nodes.
+ * categories.js — the category → colour/symbol mapping for nodes, plus the
+ * shared markup for a legend toggle button.
  *
  * A file's category is declared verbatim in its leading description comment
  * (`@category <name>`); this module just turns that string into a colour and a
@@ -8,6 +9,11 @@
  * Forward-compatible with the planned shift from a single `category` to an
  * ordered `tags[]` list: `primaryCategory()` reads `node.category`, or the
  * first element of `node.tags`, so adding tags later is additive.
+ *
+ * CUSTOM_KEY/CUSTOM_STYLE back the "custom" category that the embed API
+ * (see filters.js `applyCustom`) populates from outside — e.g. the Design
+ * site's graph column shows one, labelled after the doc heading it was opened
+ * from. It is otherwise an ordinary category: same toggle, same legend markup.
  */
 
 export const CATEGORIES = {
@@ -24,6 +30,9 @@ export const CATEGORIES = {
 
 export const FALLBACK = { color: '#94A3B8', symbol: '•', label: 'Uncategorised' };
 
+export const CUSTOM_KEY = 'custom';
+export const CUSTOM_STYLE = { color: '#46b3ff', symbol: '✦', label: 'Custom' };
+
 /** The primary category string for a node, or null. */
 export function primaryCategory(node) {
   if (node.category) return node.category;
@@ -34,4 +43,22 @@ export function primaryCategory(node) {
 /** Resolve a node's category to its visual descriptor (never null). */
 export function styleFor(node) {
   return CATEGORIES[primaryCategory(node)] || FALLBACK;
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+/** Builds one legend toggle button (swatch + label) — the shared markup for
+ *  both the static category legend and the dynamically-added "custom" entry. */
+export function legendItemEl(key, { color, symbol, label }) {
+  const item = document.createElement('span');
+  item.className = 'legend-item';
+  item.dataset.category = key;
+  item.setAttribute('role', 'button');
+  item.title = `Toggle ${label || key}`;
+  item.innerHTML =
+    `<span class="legend-swatch" style="color:${color}">${symbol}</span>` +
+    escapeHtml(label || key);
+  return item;
 }

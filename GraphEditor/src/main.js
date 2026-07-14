@@ -17,7 +17,7 @@ import { createOverviewNode } from './ui/overview-node.js';
 import { setupZoom } from './graph/zoom.js';
 import { setupInteractions } from './graph/interactions.js';
 import { setupFilters, UNCATEGORISED } from './graph/filters.js';
-import { CATEGORIES, FALLBACK } from './graph/categories.js';
+import { CATEGORIES, FALLBACK, legendItemEl } from './graph/categories.js';
 
 // Prefer the analyser output; fall back to the hand-written dummy.
 const DATA_URLS = ['./data/graph.json', './data/graph.sample.json'];
@@ -43,7 +43,7 @@ async function main() {
   const graph = buildGraph(raw);
 
   renderLegend(graph);
-  setupCategoryDropdown();
+  const categoryDropdown = setupCategoryDropdown();
   const stats = document.getElementById('stats');
   reserveStatsWidth(stats, graph);
   const setStats = (shown) => {
@@ -104,13 +104,63 @@ async function main() {
 
   setupInteractions({ nodes: graph.nodes, edges: graph.edges, sim, zoom, viewport, render });
 
-  setupFilters({
+  const filters = setupFilters({
     nodes: graph.nodes,
     edges: graph.edges,
     sizeContainer: document.getElementById('size-filter'),
     legendContainer: document.getElementById('legend'),
     onChange: setStats,
+    // The "custom" entry can appear/disappear at runtime (via the embed API),
+    // which changes how much room the legend needs — recheck the collapse
+    // threshold whenever that happens.
+    onLegendChange: categoryDropdown.updateLayout,
   });
+
+  setupEmbedBridge({ graph, zoom, filters });
+}
+
+// Embed bridge — lets a host page (e.g. the Design site's graph column) drive
+// this standalone app through an iframe + postMessage API, without any shared
+// code. Protocol:
+//   host → editor : { type: 'showNodes', ids: [...], name?: string } | { type: 'clearFilter' }
+//   editor → host : { source: 'graph-editor', type: 'ready' | 'close' }
+// `showNodes` populates the "custom" category (see filters.js `applyCustom`)
+// with the given node ids, labelled `name` if given (defaults to "Custom").
+// `?embed=1` reveals the close button; `?nodes=a,b&name=...` applies an initial
+// custom set on load so the first paint is already filtered (no round-trip
+// needed).
+function setupEmbedBridge({ graph, zoom, filters }) {
+  const params = new URLSearchParams(location.search);
+  const embedded = window.parent && window.parent !== window;
+  const post = (msg) => embedded && window.parent.postMessage(msg, '*');
+
+  const fitVisible = () => {
+    const vis = graph.nodes.filter((n) => !n._hidden);
+    zoom.fit(vis.length ? vis : graph.nodes);
+  };
+
+  const showNodes = (ids, name) => { filters.applyCustom(ids || [], name); fitVisible(); };
+  const clearFilter = () => { filters.clearCustom(); zoom.fit(graph.nodes); };
+
+  if (params.has('embed')) document.body.classList.add('embed');
+  const closeBtn = document.getElementById('embed-close');
+  if (closeBtn && params.has('embed')) {
+    closeBtn.hidden = false;
+    closeBtn.addEventListener('click', () => post({ source: 'graph-editor', type: 'close' }));
+  }
+
+  window.addEventListener('message', (event) => {
+    const d = event.data;
+    if (!d || typeof d !== 'object') return;
+    if (d.type === 'showNodes') showNodes(d.ids, d.name);
+    else if (d.type === 'clearFilter') clearFilter();
+  });
+
+  // Initial custom set straight from the URL, then announce readiness so a host
+  // that prefers the message API can (re)send once the iframe is live.
+  const initial = params.get('nodes');
+  if (initial) showNodes(initial.split(/[\s,]+/).filter(Boolean), params.get('name'));
+  post({ source: 'graph-editor', type: 'ready' });
 }
 
 function renderLegend(graph) {
@@ -129,16 +179,8 @@ function renderLegend(graph) {
   toggleAll.setAttribute('role', 'button');
   legend.appendChild(toggleAll);
 
-  for (const [key, { color, symbol, label }] of entries) {
-    const item = document.createElement('span');
-    item.className = 'legend-item';
-    item.dataset.category = key; // makes it a toggle (see filters.js)
-    item.setAttribute('role', 'button');
-    item.title = `Toggle ${label || key}`;
-    item.innerHTML =
-      `<span class="legend-swatch" style="color:${color}">${symbol}</span>` +
-      `${label || key}`;
-    legend.appendChild(item);
+  for (const [key, style] of entries) {
+    legend.appendChild(legendItemEl(key, style)); // dataset.category makes it a toggle (see filters.js)
   }
 }
 
@@ -175,6 +217,7 @@ function setupCategoryDropdown() {
 
   updateLayout();
   new ResizeObserver(updateLayout).observe(topbar);
+  return { updateLayout };
 }
 
 main().catch((e) => console.error('GraphEditor failed to start:', e));

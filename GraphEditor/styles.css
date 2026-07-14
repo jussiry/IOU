@@ -163,6 +163,28 @@ html, body {
   align-self: stretch;
 }
 
+/* Embed mode — shown when GraphEditor is hosted in an iframe (?embed=1), e.g.
+   the Design site's graph column. Only difference is a close button that asks
+   the host to close the column (see main.js). */
+.embed-close {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  margin-left: 4px;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid #2c3540;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.embed-close:hover { color: var(--text); background: rgba(255,255,255,0.06); }
+
 #viewport {
   position: absolute;
   inset: 48px 0 0 0;
