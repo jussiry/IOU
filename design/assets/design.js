@@ -604,8 +604,14 @@
         tocResults.innerHTML = "";
         var summary = document.createElement("div");
         summary.className = "search-summary";
+        // Cross-document search reads each page over HTTP; on the file:// origin
+        // those fetches are blocked, so every doc comes back empty. Say so
+        // rather than showing a bare "No matches".
+        var noneLoaded = docs.every(function (d) { return !d.text; });
         summary.textContent = hits.length
           ? hits.length + " document" + (hits.length > 1 ? "s" : "")
+          : (noneLoaded && location.protocol === "file:")
+          ? "Search needs the dev server (npm run dev:design)"
           : "No matches";
         tocResults.appendChild(summary);
 
