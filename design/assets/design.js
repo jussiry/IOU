@@ -110,13 +110,18 @@
     byName[p.group].pages.push(p);
   });
 
+  // The normal grouped navigation lives in its own wrapper so search can hide
+  // it as a unit and show a flat results list in its place (see setupSearch).
+  var tocNav = document.createElement("div");
+  tocNav.id = "toc-nav";
+
   groups.forEach(function (g) {
     // Ungrouped (Overview): a plain top-level link, with its outline when open.
     if (g.name === null) {
       var top = makePageLink(g.pages[0]);
       top.classList.add("toc-top");
-      toc.appendChild(top);
-      if (isCurrent(g.pages[0]) && outline) toc.appendChild(outline);
+      tocNav.appendChild(top);
+      if (isCurrent(g.pages[0]) && outline) tocNav.appendChild(outline);
       return;
     }
 
@@ -129,8 +134,8 @@
       if (p.status) link.setAttribute("data-status", p.status);
       if (isCurrent(p)) link.classList.add("active", "has-active");
       link.innerHTML = '<span class="toc-group-label">' + escapeHtml(g.name) + "</span>";
-      toc.appendChild(link);
-      if (isCurrent(p) && outline) toc.appendChild(outline);
+      tocNav.appendChild(link);
+      if (isCurrent(p) && outline) tocNav.appendChild(outline);
       return;
     }
 
@@ -151,8 +156,8 @@
       if (isCurrent(p) && outline) li.appendChild(outline); // outline nested under the active page
       ul.appendChild(li);
     });
-    toc.appendChild(btn);
-    toc.appendChild(ul);
+    tocNav.appendChild(btn);
+    tocNav.appendChild(ul);
   });
 
   toc.addEventListener("click", function (e) {
@@ -177,10 +182,20 @@
     if (e.target.closest("a")) document.body.classList.remove("nav-open");
   });
 
+  // Search box (top) + the grouped nav + an (initially empty) results list.
+  var search = buildSearchBox();
+  toc.appendChild(search.box);
+  toc.appendChild(tocNav);
+  var tocResults = document.createElement("div");
+  tocResults.id = "toc-results";
+  tocResults.hidden = true;
+  toc.appendChild(tocResults);
+
   document.body.insertBefore(toc, main);
   document.body.insertBefore(topbar, toc);
   document.body.insertBefore(makeSplitter("sidebar"), main);
   setupHeadingScrollSpy(outlineHeadings);
+  setupSearch({ input: search.input, clearBtn: search.clearBtn, tocNav: tocNav, tocResults: tocResults });
 
   // Mobile drawer toggle
   topbar.querySelector(".nav-toggle").addEventListener("click", function () {
@@ -500,5 +515,205 @@
       '<circle cx="5" cy="14.5" r="2.4"/><circle cx="14.5" cy="5.2" r="2.4"/><circle cx="15" cy="14.8" r="2.1"/>' +
       "</svg>"
     );
+  }
+
+  // ---- Sidebar search ---------------------------------------------------
+  // A search box at the top of the sidebar searches the full text of *every*
+  // page (fetched lazily and cached on first use — needs HTTP, degrades to no
+  // results on file://). Matches replace the grouped nav with a flat list of
+  // matching documents. Opening a result carries the query in `?q=`, and on the
+  // next page load we highlight every match in the document and scroll to the
+  // first — so the search box stays populated and results stay listed, letting
+  // you hop between matching documents.
+  function buildSearchBox() {
+    var box = document.createElement("div");
+    box.id = "toc-search";
+    var input = document.createElement("input");
+    input.type = "text";
+    input.id = "toc-search-input";
+    input.placeholder = "Search docs…";
+    input.setAttribute("aria-label", "Search documentation");
+    input.autocomplete = "off";
+    input.spellcheck = false;
+    var clearBtn = document.createElement("button");
+    clearBtn.type = "button";
+    clearBtn.id = "toc-search-icon";
+    clearBtn.tabIndex = -1;
+    clearBtn.setAttribute("aria-label", "Clear search");
+    clearBtn.innerHTML =
+      '<svg class="icon-search" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">' +
+      '<circle cx="8.5" cy="8.5" r="5.5"/><path d="M13 13 L17.5 17.5" stroke-linecap="round"/></svg>' +
+      '<svg class="icon-clear" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">' +
+      '<path d="M5 5 L15 15 M15 5 L5 15" stroke-linecap="round"/></svg>';
+    box.appendChild(input);
+    box.appendChild(clearBtn);
+    return { box: box, input: input, clearBtn: clearBtn };
+  }
+
+  function setupSearch(opts) {
+    var input = opts.input, clearBtn = opts.clearBtn, tocNav = opts.tocNav, tocResults = opts.tocResults;
+    var box = input.parentNode;
+    var docsCache = null; // Promise<[{href,title,text}]> — built once, reused
+    // The active query is carried across page loads in sessionStorage rather
+    // than the URL: clean-URL static hosts (e.g. `serve`) 301-redirect
+    // page.html → /page and drop the query string, which would lose it.
+    var SEARCH_KEY = "design.searchQuery";
+    var readStored = function () { try { return sessionStorage.getItem(SEARCH_KEY) || ""; } catch (e) { return ""; } };
+    var writeStored = function (v) { try { if (v) sessionStorage.setItem(SEARCH_KEY, v); else sessionStorage.removeItem(SEARCH_KEY); } catch (e) {} };
+
+    function loadDocs() {
+      if (docsCache) return docsCache;
+      docsCache = Promise.all(pages.map(function (p) {
+        return fetch(p.href)
+          .then(function (r) { return r.ok ? r.text() : ""; })
+          .then(function (html) {
+            var text = "";
+            try {
+              var doc = new DOMParser().parseFromString(html, "text/html");
+              var m = doc.querySelector("main.page");
+              text = (m ? m.textContent : "").replace(/\s+/g, " ").trim();
+            } catch (e) { /* ignore parse errors */ }
+            return { href: p.href, title: p.title || p.href, text: text };
+          })
+          .catch(function () { return { href: p.href, title: p.title || p.href, text: "" }; });
+      }));
+      return docsCache;
+    }
+
+    function countMatches(haystack, needle) {
+      var count = 0, idx = haystack.indexOf(needle);
+      while (idx !== -1) { count++; idx = haystack.indexOf(needle, idx + needle.length); }
+      return count;
+    }
+
+    function renderResults(query) {
+      var q = query.toLowerCase();
+      loadDocs().then(function (docs) {
+        if (input.value.trim().toLowerCase() !== q) return; // superseded while fetching
+        var hits = [];
+        docs.forEach(function (d) {
+          var c = countMatches(d.text.toLowerCase(), q);
+          if (c) hits.push({ doc: d, count: c });
+        });
+        hits.sort(function (a, b) { return b.count - a.count; });
+
+        tocResults.innerHTML = "";
+        var summary = document.createElement("div");
+        summary.className = "search-summary";
+        summary.textContent = hits.length
+          ? hits.length + " document" + (hits.length > 1 ? "s" : "")
+          : "No matches";
+        tocResults.appendChild(summary);
+
+        hits.forEach(function (h) {
+          var a = document.createElement("a");
+          a.className = "search-result";
+          a.href = h.doc.href; // query travels in sessionStorage, not the URL
+          if (slug(h.doc.href) === here) a.classList.add("active");
+          a.innerHTML =
+            '<span class="search-result-title">' + escapeHtml(h.doc.title) + "</span>" +
+            '<span class="search-result-count">' + h.count + "</span>";
+          tocResults.appendChild(a);
+        });
+      });
+    }
+
+    function enterSearch(query) {
+      box.classList.add("has-text");
+      tocNav.hidden = true;
+      tocResults.hidden = false;
+      writeStored(query);
+      renderResults(query);
+    }
+    function exitSearch() {
+      box.classList.remove("has-text");
+      tocResults.hidden = true;
+      tocResults.innerHTML = "";
+      tocNav.hidden = false;
+      unhighlightMatches(); // drop any highlights on the current page
+      writeStored(""); // so a reload / next page returns to the normal sidebar
+    }
+
+    var timer = null;
+    input.addEventListener("input", function () {
+      clearTimeout(timer);
+      var v = input.value.trim();
+      if (!v) { exitSearch(); return; }
+      box.classList.add("has-text"); // flip icon immediately; results after the debounce
+      timer = setTimeout(function () { enterSearch(v); }, 150);
+    });
+
+    input.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && input.value) { input.value = ""; exitSearch(); }
+      if (e.key === "Enter") {
+        var first = tocResults.querySelector("a.search-result");
+        if (first) { e.preventDefault(); window.location.href = first.href; }
+      }
+    });
+
+    clearBtn.addEventListener("click", function () {
+      if (input.value) { input.value = ""; exitSearch(); }
+      input.focus();
+    });
+
+    // Restore an in-progress search on load, and highlight this page's matches.
+    var initialQ = readStored();
+    if (initialQ && initialQ.trim()) {
+      input.value = initialQ;
+      enterSearch(initialQ.trim());
+      highlightMatches(initialQ.trim());
+    }
+  }
+
+  // Wrap every occurrence of `query` in the current page's <main> with a
+  // <mark>, then scroll the first one near the top. Text nodes are collected
+  // before any mutation so the walk isn't disturbed by the wrapping.
+  function highlightMatches(query) {
+    var needle = String(query).toLowerCase();
+    if (!needle) return;
+    var walker = document.createTreeWalker(main, NodeFilter.SHOW_TEXT, {
+      acceptNode: function (node) {
+        if (!node.nodeValue || node.nodeValue.toLowerCase().indexOf(needle) === -1) return NodeFilter.FILTER_REJECT;
+        return NodeFilter.FILTER_ACCEPT;
+      },
+    });
+    var nodes = [], n;
+    while ((n = walker.nextNode())) nodes.push(n);
+
+    var first = null;
+    nodes.forEach(function (node) {
+      var text = node.nodeValue, lower = text.toLowerCase();
+      var frag = document.createDocumentFragment();
+      var i = 0, idx;
+      while ((idx = lower.indexOf(needle, i)) !== -1) {
+        if (idx > i) frag.appendChild(document.createTextNode(text.slice(i, idx)));
+        var mark = document.createElement("mark");
+        mark.className = "search-hit";
+        mark.textContent = text.slice(idx, idx + needle.length);
+        frag.appendChild(mark);
+        if (!first) first = mark;
+        i = idx + needle.length;
+      }
+      if (i < text.length) frag.appendChild(document.createTextNode(text.slice(i)));
+      node.parentNode.replaceChild(frag, node);
+    });
+
+    if (first) {
+      first.classList.add("search-hit-first");
+      requestAnimationFrame(function () {
+        var top = main.scrollTop + first.getBoundingClientRect().top - main.getBoundingClientRect().top - 48;
+        main.scrollTo({ top: Math.max(0, top), behavior: "auto" });
+      });
+    }
+  }
+
+  // Reverse highlightMatches: unwrap each <mark> back to plain text.
+  function unhighlightMatches() {
+    var marks = main.querySelectorAll("mark.search-hit");
+    if (!marks.length) return;
+    marks.forEach(function (m) {
+      m.parentNode.replaceChild(document.createTextNode(m.textContent), m);
+    });
+    main.normalize(); // merge the text nodes back together
   }
 })();

@@ -305,6 +305,93 @@ body.is-resizing-layout .layout-splitter {
 #toc .outline-link[data-depth="1"] { padding-left: 40px; }
 #toc .outline-link[data-depth="2"] { padding-left: 54px; }
 
+/* ---- Sidebar search --------------------------------------------------- */
+#toc-search {
+  position: sticky;
+  top: -16px; /* cancel #toc's top padding so it pins flush */
+  z-index: 2;
+  margin: -4px 2px 12px;
+  padding: 4px 2px 8px;
+  background: var(--panel);
+}
+#toc-search-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 7px 30px 7px 10px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--panel-2);
+  border: 1px solid var(--border-2);
+  border-radius: 8px;
+  outline: none;
+}
+#toc-search-input:focus { border-color: var(--link); }
+#toc-search-input::placeholder { color: var(--muted); }
+#toc-search-icon {
+  position: absolute;
+  right: 6px;
+  top: 8px;
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  color: var(--muted);
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+#toc-search-icon:hover { color: var(--text); }
+#toc-search-icon svg { width: 15px; height: 15px; display: block; }
+#toc-search .icon-clear { display: none; }
+#toc-search.has-text .icon-search { display: none; }
+#toc-search.has-text .icon-clear { display: block; }
+
+#toc-results .search-summary {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  padding: 2px 8px 8px;
+}
+a.search-result {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 13px;
+}
+a.search-result:hover { color: var(--text); background: var(--panel-2); }
+a.search-result.active { color: var(--text); background: var(--panel-2); font-weight: 600; }
+.search-result-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.search-result-count {
+  flex: 0 0 auto;
+  font-size: 11px;
+  color: var(--muted);
+  background: var(--panel);
+  border: 1px solid var(--border-2);
+  border-radius: 999px;
+  padding: 0 7px;
+}
+
+/* Matches highlighted in an opened document (search hit). */
+mark.search-hit {
+  background: color-mix(in srgb, var(--st-proposal) 42%, transparent);
+  color: inherit;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+mark.search-hit.search-hit-first {
+  background: color-mix(in srgb, var(--st-proposal) 70%, transparent);
+  outline: 1px solid var(--st-proposal);
+}
+
 /* Status token mapping — usable on any element via [data-status]. */
 [data-status="implemented"] { --st: var(--st-implemented); }
 [data-status="planned"]     { --st: var(--st-planned); }
