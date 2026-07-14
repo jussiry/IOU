@@ -86,6 +86,14 @@ async function main() {
   const ticks = Math.ceil(Math.log(sim.alphaMin()) / Math.log(1 - sim.alphaDecay()));
   for (let i = 0; i < ticks; i++) sim.tick();
   render();
+  // What the automatic fit frames. Normally the whole graph, but the embed API
+  // narrows it to a custom subset (see setupEmbedBridge) so the graph zooms in
+  // on the documented files — and *stays* framed on them through the graph
+  // column's open/resize, instead of the ResizeObserver below snapping back to
+  // the whole graph and clobbering that zoom.
+  let fitTargetNodes = () => graph.nodes;
+  const setFitTarget = (fn) => { fitTargetNodes = fn; };
+
   // The viewport may report a zero/tentative size for the first frames (an
   // iframe/preview settles its dimensions late), which makes fit() clamp to a
   // tiny scale. So fit only when the viewport has a real size, and keep
@@ -93,14 +101,14 @@ async function main() {
   // panned/zoomed, so we don't yank the view out from under them.
   const tryFit = () => {
     if (zoom.userMoved()) return true;
-    if (viewport.clientWidth > 0 && viewport.clientHeight > 0) { zoom.fit(graph.nodes); return true; }
+    if (viewport.clientWidth > 0 && viewport.clientHeight > 0) { zoom.fit(fitTargetNodes()); return true; }
     return false;
   };
   tryFit();
   let attempts = 0;
   const poll = setInterval(() => { if (tryFit() && ++attempts > 8) clearInterval(poll); }, 120);
   // Genuine later resizes (real browser): re-fit until the user takes over.
-  new ResizeObserver(() => { if (!zoom.userMoved()) zoom.fit(graph.nodes); }).observe(viewport);
+  new ResizeObserver(() => { if (!zoom.userMoved()) zoom.fit(fitTargetNodes()); }).observe(viewport);
 
   setupInteractions({ nodes: graph.nodes, edges: graph.edges, sim, zoom, viewport, render });
 
@@ -116,7 +124,7 @@ async function main() {
     onLegendChange: categoryDropdown.updateLayout,
   });
 
-  setupEmbedBridge({ graph, zoom, filters });
+  setupEmbedBridge({ graph, zoom, filters, setFitTarget });
 }
 
 // Embed bridge — lets a host page (e.g. the Design site's graph column) drive
@@ -129,18 +137,27 @@ async function main() {
 // `?embed=1` reveals the close button; `?nodes=a,b&name=...` applies an initial
 // custom set on load so the first paint is already filtered (no round-trip
 // needed).
-function setupEmbedBridge({ graph, zoom, filters }) {
+function setupEmbedBridge({ graph, zoom, filters, setFitTarget }) {
   const params = new URLSearchParams(location.search);
   const embedded = window.parent && window.parent !== window;
   const post = (msg) => embedded && window.parent.postMessage(msg, '*');
 
-  const fitVisible = () => {
-    const vis = graph.nodes.filter((n) => !n._hidden);
-    zoom.fit(vis.length ? vis : graph.nodes);
+  // Applying a custom set zooms in to frame exactly those files, and locks the
+  // auto-fit onto them (captured here, so later legend toggles don't change
+  // what's framed) so the column's open/resize keeps them in view. This tight
+  // zoom happens only on this API call — never on ordinary category clicks.
+  const showNodes = (ids, name) => {
+    filters.applyCustom(ids || [], name);
+    const framed = graph.nodes.filter((n) => !n._hidden);
+    const target = framed.length ? framed : graph.nodes;
+    setFitTarget(() => target);
+    zoom.fit(target);
   };
-
-  const showNodes = (ids, name) => { filters.applyCustom(ids || [], name); fitVisible(); };
-  const clearFilter = () => { filters.clearCustom(); zoom.fit(graph.nodes); };
+  const clearFilter = () => {
+    filters.clearCustom();
+    setFitTarget(() => graph.nodes);
+    zoom.fit(graph.nodes);
+  };
 
   if (params.has('embed')) document.body.classList.add('embed');
   const closeBtn = document.getElementById('embed-close');
