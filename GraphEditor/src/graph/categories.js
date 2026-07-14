@@ -33,6 +33,13 @@ export const FALLBACK = { color: '#94A3B8', symbol: '•', label: 'Uncategorised
 export const CUSTOM_KEY = 'custom';
 export const CUSTOM_STYLE = { color: '#46b3ff', symbol: '✦', label: 'Custom' };
 
+// "modified" is another externally-populated category (from `git status` via the
+// dev server — see filters.js `setModified`). Like custom, it's an ordinary
+// toggleable legend entry; it takes priority over a node's real category so
+// changed files stand out and can be isolated.
+export const MODIFIED_KEY = 'modified';
+export const MODIFIED_STYLE = { color: '#F97316', symbol: '✎', label: 'Modified' };
+
 /** The primary category string for a node, or null. */
 export function primaryCategory(node) {
   if (node.category) return node.category;

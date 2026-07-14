@@ -18,9 +18,46 @@ import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { join, normalize, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 
+const execFileP = promisify(execFile);
 const ROOT = join(fileURLToPath(import.meta.url), '..', '..'); // GraphEditor/
 const PORT = Number(process.env.PORT) || Number(process.argv[2]) || 8088;
+
+// The analysed codebase relative to GraphEditor/: `../<root>`, where <root> is
+// the label the analyser wrote into graph.json (default "app").
+async function analysedRoot() {
+  for (const f of ['data/graph.json', 'data/graph.sample.json']) {
+    try {
+      const root = JSON.parse(await readFile(join(ROOT, f), 'utf8')).root;
+      if (root) return join(ROOT, '..', root);
+    } catch { /* try next */ }
+  }
+  return join(ROOT, '..', 'app');
+}
+
+// Files changed since the last commit (working tree + untracked), as paths
+// relative to the analysed root — i.e. the same form as graph node ids. Runs
+// `git status` in the analysed codebase; returns [] if it isn't a git repo.
+async function gitModifiedFiles() {
+  const dir = await analysedRoot();
+  const [{ stdout: prefixOut }, { stdout: statusOut }] = await Promise.all([
+    execFileP('git', ['-C', dir, 'rev-parse', '--show-prefix']),
+    execFileP('git', ['-C', dir, 'status', '--porcelain', '--untracked-files=all']),
+  ]);
+  const prefix = prefixOut.trim(); // repo-root → analysed-root, e.g. "app/"
+  const files = [];
+  for (const line of statusOut.split('\n')) {
+    if (!line.trim()) continue;
+    let p = line.slice(3); // strip the two-char status code + space
+    if (p.includes(' -> ')) p = p.split(' -> ')[1]; // rename: take the new path
+    p = p.replace(/^"|"$/g, ''); // git quotes paths containing special chars
+    if (!prefix) files.push(p);
+    else if (p.startsWith(prefix)) files.push(p.slice(prefix.length)); // drop others
+  }
+  return files;
+}
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -34,6 +71,17 @@ const TYPES = {
 createServer(async (req, res) => {
   // Strip query string, prevent path traversal, default to index.html.
   let path = decodeURIComponent(req.url.split('?')[0]);
+
+  // API: the set of files modified since the last commit (git status). Always
+  // 200 with JSON — an empty list on any failure so the app degrades quietly.
+  if (path === '/api/git-modified') {
+    let files = [];
+    try { files = await gitModifiedFiles(); } catch { /* not a git repo / no git */ }
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+    res.end(JSON.stringify({ files }));
+    return;
+  }
+
   if (path.endsWith('/')) path += 'index.html';
   const abs = join(ROOT, normalize(path).replace(/^(\.\.[/\\])+/, ''));
 

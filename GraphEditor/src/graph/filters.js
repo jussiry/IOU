@@ -20,7 +20,7 @@
  * the user last saw it.
  */
 
-import { CUSTOM_KEY, CUSTOM_STYLE, legendItemEl } from './categories.js';
+import { CUSTOM_KEY, CUSTOM_STYLE, MODIFIED_KEY, MODIFIED_STYLE, legendItemEl } from './categories.js';
 
 const SIZE_VISIBLE = {
   all: new Set(['small', 'medium', 'large']),
@@ -41,13 +41,16 @@ function normaliseRef(s) {
 export function setupFilters({ nodes, edges, sizeContainer, legendContainer, onChange, onLegendChange }) {
   let sizeMode = 'all';
   const disabledCategories = new Set();
-  let customIds = null; // Set<normalised ref> | null — populated by applyCustom()
+  let customIds = null;   // Set<normalised ref> | null — populated by applyCustom()
+  let modifiedIds = null; // Set<normalised ref> | null — populated by setModified()
+  let customBtn = null;   // the legend entries for the two synthetic categories,
+  let modifiedBtn = null; // added/removed as their sets come and go
 
+  const inSet = (n, set) => set.has(normaliseRef(n.id)) || (n.path && set.has(normaliseRef(n.path)));
   const categoryKey = (n) => {
-    if (customIds && (customIds.has(normaliseRef(n.id)) || (n.path && customIds.has(normaliseRef(n.path))))) {
-      return CUSTOM_KEY;
-    }
-    return n.category || UNCATEGORISED;
+    if (customIds && inSet(n, customIds)) return CUSTOM_KEY;      // custom wins over
+    if (modifiedIds && inSet(n, modifiedIds)) return MODIFIED_KEY; // modified wins over
+    return n.category || UNCATEGORISED;                            // the real category
   };
 
   function recompute() {
@@ -116,21 +119,19 @@ export function setupFilters({ nodes, edges, sizeContainer, legendContainer, onC
     syncToggleAll();
   }
 
-  // --- Custom category (populated from outside) -----------------------------
-  let customBtn = null;
-  function removeCustomButton() {
-    if (!customBtn) return;
-    const idx = catButtons.indexOf(customBtn);
+  // --- Synthetic categories (populated from outside) ------------------------
+  function removeButton(btn) {
+    if (!btn) return;
+    const idx = catButtons.indexOf(btn);
     if (idx >= 0) catButtons.splice(idx, 1);
-    customBtn.remove();
-    customBtn = null;
+    btn.remove();
   }
 
   function applyCustom(refs, label) {
     const list = Array.isArray(refs) ? refs : String(refs || '').split(/[\s,]+/);
     customIds = new Set(list.map(normaliseRef).filter(Boolean));
 
-    removeCustomButton();
+    removeButton(customBtn);
     customBtn = legendItemEl(CUSTOM_KEY, { ...CUSTOM_STYLE, label: (label && String(label).trim()) || CUSTOM_STYLE.label });
     legendContainer.appendChild(customBtn); // same position any new category would take: after the rest
     wireCategoryButton(customBtn);
@@ -150,7 +151,8 @@ export function setupFilters({ nodes, edges, sizeContainer, legendContainer, onC
   function clearCustom() {
     if (!customIds) return;
     customIds = null;
-    removeCustomButton();
+    removeButton(customBtn);
+    customBtn = null;
     disabledCategories.clear(); // back to showing everything
     for (const b of catButtons) b.classList.remove('legend-off');
     syncToggleAll();
@@ -158,6 +160,29 @@ export function setupFilters({ nodes, edges, sizeContainer, legendContainer, onC
     recompute();
   }
 
+  // The "modified" category: the set of files changed since the last commit,
+  // pushed in from the dev server's git status (see main.js). Added to the
+  // legend as an ordinary, on-by-default toggle; passing an empty list removes
+  // it. Its enabled/disabled state is preserved across refreshes.
+  function setModified(refs) {
+    const list = (Array.isArray(refs) ? refs : String(refs || '').split(/[\s,]+/)).map(normaliseRef).filter(Boolean);
+    modifiedIds = list.length ? new Set(list) : null;
+
+    if (!modifiedIds) {
+      removeButton(modifiedBtn);
+      modifiedBtn = null;
+    } else if (!modifiedBtn) {
+      modifiedBtn = legendItemEl(MODIFIED_KEY, MODIFIED_STYLE);
+      // Sit before the custom entry (if any) so custom stays last.
+      if (customBtn) legendContainer.insertBefore(modifiedBtn, customBtn);
+      else legendContainer.appendChild(modifiedBtn);
+      wireCategoryButton(modifiedBtn);
+    }
+    syncToggleAll();
+    onLegendChange && onLegendChange();
+    recompute();
+  }
+
   recompute();
-  return { recompute, applyCustom, clearCustom, hasCustom: () => !!customIds };
+  return { recompute, applyCustom, clearCustom, hasCustom: () => !!customIds, setModified, hasModified: () => !!modifiedIds };
 }

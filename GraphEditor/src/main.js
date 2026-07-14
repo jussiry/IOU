@@ -125,6 +125,26 @@ async function main() {
   });
 
   setupEmbedBridge({ graph, zoom, filters, setFitTarget });
+  setupGitModified(filters);
+}
+
+// Populate the "modified" category from the dev server's `git status` (see
+// scripts/serve.mjs → /api/git-modified). Refreshed when the window regains
+// focus, so switching back from an editor reflects new edits. Fails silently
+// when there's no server/git (e.g. opened from disk), leaving the category off.
+function setupGitModified(filters) {
+  let inFlight = false;
+  const refresh = () => {
+    if (inFlight) return;
+    inFlight = true;
+    fetch('./api/git-modified')
+      .then((r) => (r.ok ? r.json() : { files: [] }))
+      .then((d) => filters.setModified(d.files || []))
+      .catch(() => { /* no server / not a git repo — leave it off */ })
+      .finally(() => { inFlight = false; });
+  };
+  refresh();
+  window.addEventListener('focus', refresh);
 }
 
 // Embed bridge — lets a host page (e.g. the Design site's graph column) drive
