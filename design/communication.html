@@ -2,6 +2,12 @@
   communication.html — orientation for how peers connect and exchange data.
   Written from app/js/peer/, app/js/signaling/, and server/. Links the imported
   peer-communication spec for depth.
+
+  data-files (below) is hidden metadata: the code files this page documents, as
+  GraphEditor node ids. design.js reads it and adds a graph icon by the heading
+  that opens the graph filtered to just these files. A short page like this uses
+  one list on <main>; longer pages can instead put a data-files list on each
+  root-level <h2>.
 -->
 <!doctype html>
 <html lang="en">
@@ -12,7 +18,14 @@
   <link rel="stylesheet" href="assets/design.css" />
 </head>
 <body>
-  <main class="page" data-status="reference">
+  <main class="page" data-status="reference" data-files="
+    js/peer/mesh.js js/peer/client.js js/peer/bridge.js
+    js/peer/envelope.js js/peer/outbox.js js/peer/messages.js
+    js/peer/handlers.js js/peer/status.ts js/peer/authorship.js
+    js/signaling/relay-pool.js js/signaling/socket-client.js
+    js/signaling/relay-status-registry.js
+    js/commands/stun.js js/utils/stun-url.js js/push/push-subscribe.js
+  ">
     <h1>Communication</h1>
 
     <p class="lede">

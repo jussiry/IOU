@@ -22,7 +22,10 @@
       <code>app/js/crypto/</code>.
     </p>
 
-    <h2>Identity &amp; keys</h2>
+    <h2 data-files="
+      js/crypto/key-provider.js js/utils/nostr-keys.js js/crypto/nip49.js
+      js/crypto/secp256k1.js
+    ">Identity &amp; keys</h2>
     <p>
       A user <em>is</em> a Nostr keypair (<code>npub</code> public id,
       <code>nsec</code> secret). All signing and encryption flow through one
@@ -31,7 +34,10 @@
       of the code touching raw key material.
     </p>
 
-    <h2>Encryption &amp; authorship</h2>
+    <h2 data-files="
+      js/crypto/nip44.js js/peer/envelope.js js/peer/authorship.js
+      js/crypto/nostr-event.js js/crypto/canonical.js js/crypto/peer-crypto.js
+    ">Encryption &amp; authorship</h2>
     <ul>
       <li><strong>Confidentiality.</strong> Messages travel as
         <a href="glossary.html#envelope">envelopes</a> encrypted with NIP-44;

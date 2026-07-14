@@ -21,7 +21,12 @@
       <code>app/js/ui/</code>.
     </p>
 
-    <h2>Main pages</h2>
+    <h2 data-files="
+      ui-modules/tally-page/index.js ui-modules/friends-page/index.js
+      ui-modules/logs-page/index.js ui-modules/settings-page/index.js
+      ui-modules/welcome-page/index.js ui-modules/components/friend-icon.js
+      ui-modules/components/owes-sentence.js ui-modules/components/tally-actions.js
+    ">Main pages</h2>
     <ul>
       <li><strong>Tally</strong> — the home view: your overall position and
         quick actions.</li>
@@ -36,14 +41,24 @@
         restore one, or connect an external signer.</li>
     </ul>
 
-    <h2>Flows (subpages)</h2>
+    <h2 data-files="
+      ui-modules/subpage/record.js ui-modules/subpage/request.js
+      ui-modules/subpage/trust.js ui-modules/subpage/add-friend.js
+      ui-modules/subpage/transfer.js ui-modules/subpage/friend.js
+      ui-modules/components/check-toggle.js ui-modules/components/confirm-modal.js
+      js/utils/qr-uri.js
+    ">Flows (subpages)</h2>
     <p>
       Task-focused subpages under <code>app/ui-modules/subpage/</code>: record a
       transaction, request a payment, set a trust limit, add a friend (QR /
       key), and transfer the account to another device.
     </p>
 
-    <h2>How it connects to the rest</h2>
+    <h2 data-files="
+      js/ui/view-model.js js/ui/nav.js js/ui/page-transitions.js js/ui/format.js
+      js/ui/infinite-list.js js/ui/notifications.js js/ui/app-update.js
+      js/ui/icons.js js/ui/swipe.js
+    ">How it connects to the rest</h2>
     <p>
       The UI is a pure read/act surface: it renders a sanitised
       <em>view</em> derived from state (never touching private keys), and user

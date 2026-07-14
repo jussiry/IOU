@@ -11,9 +11,16 @@
 <div class="import-note">Imported as-is from <code>plan/arcitecture.md</code>. It may conflict with current code or other pages — kept verbatim, pending reconciliation.</div>
 <h1>Architecture</h1>
 <p>IOU is a peer-to-peer mobile web app, that uses Node.js backend to initiate connections between clients.</p>
-<h2>Data</h2>
+<h2 data-files="
+  js/models/data-model.ts js/ledger.ts js/state-utils.ts
+  js/storage/indexeddb.ts js/storage/migrations.ts js/app-state.js
+">Data</h2>
 <p>Application data is stored in peer-to-peer network where each client keeps its own data and updates it according to messages reveived from its peers. Each node in the network only needs to know its own state in relation to its peers and thus there is no need for globally shared data (e.g. blockchain) between all participants.</p>
-<h2>Client</h2>
+<h2 data-files="
+  js/app.js js/app-state.js sw.js sw-crypto-entry.js js/push/push-subscribe.js
+  js/crypto/key-provider.js js/storage/indexeddb.ts js/ui/app-update.js
+  js/ui/view-model.js js/utils/vendor-loader.js
+">Client</h2>
 <p>Client is a modularly designed mobile web application.</p>
 <p>Technologies used:</p>
 <ul><li>IndexedDb for storing application data</li><li>SubtleCrypto Web API for security</li><li>Progressive web app tehconologies (Web application manifest, Web Workers, etc.) to allow native like features.</li></ul>

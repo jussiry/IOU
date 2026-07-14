@@ -7,7 +7,10 @@
   <link rel="stylesheet" href="assets/design.css" />
 </head>
 <body>
-  <main class="page" data-status="reference">
+  <main class="page" data-status="reference" data-files="
+    js/models/data-model.ts js/ledger.ts js/state-utils.ts
+    js/storage/indexeddb.ts js/storage/migrations.ts js/app-state.js
+  ">
 <div class="import-note">Imported as-is from <code>plan/data-model.md</code>. It may conflict with current code or other pages — kept verbatim, pending reconciliation.</div>
 <h1>Client data model (IndexedDB)</h1>
 <p>Runtime state is stored in IndexedDB (<code>iou_client_db</code>, object store <code>app_state</code>, key <code>root_state</code>).</p>

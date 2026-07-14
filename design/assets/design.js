@@ -190,6 +190,10 @@
   // Reflect the current page's status in the tab title prefix, cheap wayfinding.
   if (current && current.title) document.title = current.title + " — Design";
 
+  // Optional third column: the embedded GraphEditor, opened from documented
+  // headers. No-op on pages without graph metadata.
+  setupGraphColumn();
+
   function escapeHtml(s) {
     return String(s).replace(/[&<>"]/g, function (c) {
       return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
@@ -379,5 +383,122 @@
 
   function clamp(value, min, max) {
     return Math.min(max, Math.max(min, value));
+  }
+
+  // ---- Graph column (embedded GraphEditor) ------------------------------
+  // A page documents which code files it covers via hidden `data-files`
+  // metadata — one list for the whole document (on <main>, its icon sits by the
+  // <h1>) or one per root-level section (on each <h2>). For every such list we
+  // inject a graph icon that opens a third column hosting the standalone
+  // GraphEditor in an iframe, filtered to exactly those files (its "custom"
+  // category — an ordinary, toggleable legend entry there, named after the
+  // heading it came from). GraphEditor stays independent; we drive it purely
+  // over postMessage:
+  //   design → editor : { type:'showNodes', ids:[...], name } | { type:'clearFilter' }
+  //   editor → design : { source:'graph-editor', type:'ready' | 'close' }
+  // The editor announces `ready` after load; commands sent earlier are queued.
+  function setupGraphColumn() {
+    var sources = collectFileSources();
+    if (!sources.length) return; // page has no graph metadata → stay two-column
+
+    var GRAPH_EDITOR_URL = window.GRAPH_EDITOR_URL || "http://localhost:8088/index.html";
+
+    applyStoredLayoutSize("graph");
+
+    var splitter = makeSplitter("graph");
+    var panel = document.createElement("section");
+    panel.id = "graph-panel";
+    panel.setAttribute("aria-label", "Graph editor");
+    var iframe = document.createElement("iframe");
+    iframe.id = "graph-frame";
+    iframe.title = "Graph editor";
+    panel.appendChild(iframe);
+    document.body.appendChild(splitter);
+    document.body.appendChild(panel);
+
+    var ready = false;
+    var pending = null;   // command buffered until the iframe reports ready
+    var activeKey = null; // which header's icon is currently lit
+
+    var send = function (msg) {
+      if (ready && iframe.contentWindow) iframe.contentWindow.postMessage(msg, "*");
+      else pending = msg;
+    };
+
+    window.addEventListener("message", function (e) {
+      var d = e.data;
+      if (!d || d.source !== "graph-editor") return;
+      if (d.type === "ready") {
+        ready = true;
+        if (pending) { iframe.contentWindow.postMessage(pending, "*"); pending = null; }
+      } else if (d.type === "close") {
+        closeGraph();
+      }
+    });
+
+    var setActive = function (key) {
+      activeKey = key;
+      var btns = document.querySelectorAll(".graph-open-btn");
+      Array.prototype.forEach.call(btns, function (b) {
+        b.classList.toggle("active", b.getAttribute("data-graph-key") === key);
+      });
+    };
+    var closeGraph = function () {
+      document.body.classList.remove("graph-open");
+      setActive(null);
+    };
+    var openGraph = function (src) {
+      if (!iframe.src) {
+        iframe.src = GRAPH_EDITOR_URL + (GRAPH_EDITOR_URL.indexOf("?") < 0 ? "?" : "&") + "embed=1";
+      }
+      document.body.classList.add("graph-open");
+      send({ type: "showNodes", ids: src.files, name: src.name });
+      setActive(src.key);
+    };
+
+    sources.forEach(function (src) {
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "graph-open-btn";
+      btn.setAttribute("data-graph-key", src.key);
+      btn.title = "Show this section's files in the graph (" + src.files.length + ")";
+      btn.setAttribute("aria-label", btn.title);
+      btn.innerHTML = graphIcon();
+      btn.addEventListener("click", function () {
+        if (activeKey === src.key && document.body.classList.contains("graph-open")) closeGraph();
+        else openGraph(src);
+      });
+      src.headingEl.appendChild(btn);
+    });
+  }
+
+  // Gather the page's documented file lists. `<main data-files>` is the whole
+  // document (icon anchored to its <h1>); each `<h2 data-files>` is one section.
+  // `name` (the heading's own text, read before the icon button is appended
+  // into it) becomes the custom category's label in the embedded GraphEditor.
+  function collectFileSources() {
+    var out = [];
+    var wholeAttr = main.getAttribute("data-files");
+    var h1 = main.querySelector("h1");
+    if (wholeAttr && h1) out.push({ headingEl: h1, files: parseFiles(wholeAttr), key: "whole", name: h1.textContent.trim() });
+    var sections = main.querySelectorAll("h2[data-files]");
+    Array.prototype.forEach.call(sections, function (h, i) {
+      if (!h.id) h.id = "graph-section-" + i;
+      out.push({ headingEl: h, files: parseFiles(h.getAttribute("data-files")), key: h.id, name: h.textContent.trim() });
+    });
+    return out.filter(function (s) { return s.files.length; });
+  }
+
+  function parseFiles(s) {
+    return String(s).split(/[\s,]+/).map(function (x) { return x.trim(); }).filter(Boolean);
+  }
+
+  function graphIcon() {
+    return (
+      '<svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">' +
+      '<path d="M6 13.2 L13 6.2 M6.6 13.8 L14 14.4" stroke="currentColor" stroke-width="1.3" fill="none"/>' +
+      '<circle cx="5" cy="14.5" r="2.4"/><circle cx="14.5" cy="5.2" r="2.4"/><circle cx="15" cy="14.8" r="2.1"/>' +
+      "</svg>"
+    );
   }
 })();

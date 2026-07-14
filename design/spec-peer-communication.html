@@ -7,7 +7,13 @@
   <link rel="stylesheet" href="assets/design.css" />
 </head>
 <body>
-  <main class="page" data-status="reference">
+  <main class="page" data-status="reference" data-files="
+    js/peer/mesh.js js/peer/client.js js/peer/bridge.js js/peer/envelope.js
+    js/peer/outbox.js js/peer/messages.js js/peer/handlers.js js/peer/status.ts
+    js/peer/authorship.js js/signaling/relay-pool.js js/signaling/socket-client.js
+    js/signaling/relay-status-registry.js js/crypto/nip44.js js/crypto/peer-crypto.js
+    js/crypto/nostr-event.js js/crypto/canonical.js js/push/push-subscribe.js
+  ">
 <div class="import-note">Imported as-is from <code>specs/peer-communication.md</code>. It may conflict with current code or other pages — kept verbatim, pending reconciliation.</div>
 <h1>Peer communication protocol</h1>
 <p>This document specifies how IOU clients exchange application messages with each other. It is written as a protocol-level spec so the same rules can be implemented on any transport, by any client, and against any compatible relay server.</p>

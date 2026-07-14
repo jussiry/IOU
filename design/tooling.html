@@ -36,6 +36,32 @@
       candidate to fold in here later so documentation flows into visualising.
     </p>
 
+    <h3>Opening it from the docs</h3>
+    <p>
+      A documentation page can name the code files it covers, and Design will
+      show a graph icon by the relevant heading. Clicking it opens GraphEditor in
+      a third column, filtered to just those files. Design names the set after
+      the heading it came from (e.g. "Encryption &amp; authorship"); GraphEditor
+      adds it to its own legend as an ordinary "custom" category — same swatch,
+      same toggle, no special styling or fixed position — so it can be switched
+      on/off, or other categories re-enabled alongside it, exactly like any
+      built-in one. Closing the column returns to the two-column layout.
+      GraphEditor stays independent — Design drives it purely through a small
+      <code>postMessage</code> API on the embedded iframe
+      (<code>showNodes</code> with the file list and a display name /
+      <code>clearFilter</code>), so the tool still runs on its own.
+    </p>
+    <p>
+      The file list is hidden <code>data-files</code> metadata holding
+      GraphEditor node ids (repo paths under the analysed root, e.g.
+      <code>js/peer/mesh.js</code>; a leading <code>app/</code> is tolerated). A
+      short page carries one list on its <code>&lt;main&gt;</code> (the icon sits
+      by the <code>&lt;h1&gt;</code>); a long page can instead put a list on each
+      root-level <code>&lt;h2&gt;</code>.
+      <a href="communication.html">Communication</a> is the first page wired up;
+      the rest gain metadata as they're reconciled.
+    </p>
+
     <h2>Dev &amp; test</h2>
     <p>
       Seeded dev identities (Alice/Bob/Carol) for local multi-user testing, a
