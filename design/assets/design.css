@@ -417,6 +417,30 @@ mark.search-hit.search-hit-first {
   background: var(--st, var(--muted));
 }
 
+/* ---- Inline editing --------------------------------------------------- */
+/* The textarea that replaces a block while it's being edited (see design.js).
+   Sized to roughly match the surrounding text so editing feels in-place. */
+.doc-edit {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 6px 0;
+  padding: 8px 10px;
+  font: inherit;
+  line-height: 1.55;
+  color: var(--text);
+  background: var(--panel-2);
+  border: 1px solid var(--link);
+  border-radius: 8px;
+  outline: none;
+  resize: vertical;
+  overflow: hidden;
+  white-space: pre-wrap;
+}
+main.page :where(p, li, h1, h2, h3, h4, h5, h6, blockquote):hover {
+  cursor: text;
+}
+
 /* ---- Page content typography ------------------------------------------ */
 main.page > h1 {
   display: flex;

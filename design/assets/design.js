@@ -196,6 +196,7 @@
   document.body.insertBefore(makeSplitter("sidebar"), main);
   setupHeadingScrollSpy(outlineHeadings);
   setupSearch({ input: search.input, clearBtn: search.clearBtn, tocNav: tocNav, tocResults: tocResults });
+  setupEditing();
 
   // Mobile drawer toggle
   topbar.querySelector(".nav-toggle").addEventListener("click", function () {
@@ -725,5 +726,180 @@
       m.parentNode.replaceChild(document.createTextNode(m.textContent), m);
     });
     main.normalize(); // merge the text nodes back together
+  }
+
+  // ---- Inline editing ---------------------------------------------------
+  // Click a block of text to edit it: it turns into a textarea holding the
+  // block's markdown. Enter commits (markdown → HTML, applied both to the live
+  // page and, via the dev server's /api/save, to the source .html file);
+  // Shift+Enter inserts a newline; Esc cancels. Needs the dev server (see
+  // design/scripts/serve.mjs) — a no-op when the save request can't be made.
+  //
+  // Only prose blocks are editable; dt/dd (glossary) are left out because their
+  // term-self links and graph icons don't round-trip through plain markdown.
+  var EDIT_BLOCK_SELECTOR = "p, h1, h2, h3, h4, h5, h6, ul, ol, blockquote";
+  var pageFile = here + ".html";
+
+  function setupEditing() {
+    var active = null; // { el, textarea, index }
+
+    main.addEventListener("click", function (e) {
+      if (active) return;
+      if (e.target.closest("a, button, input, textarea, select, summary, label, .graph-open-btn")) return;
+      var sel = window.getSelection && window.getSelection();
+      if (sel && String(sel).length) return; // don't hijack a text selection
+      var block = e.target.closest(EDIT_BLOCK_SELECTOR);
+      if (!block || !main.contains(block)) return;
+      if ((block.tagName === "UL" || block.tagName === "OL") && block.querySelector("ul, ol")) return; // skip nested lists
+      beginEdit(block);
+    });
+
+    function beginEdit(el) {
+      var blocks = Array.prototype.slice.call(main.querySelectorAll(EDIT_BLOCK_SELECTOR));
+      var index = blocks.indexOf(el);
+      if (index < 0) return;
+      var ta = document.createElement("textarea");
+      ta.className = "doc-edit";
+      ta.value = blockToMarkdown(el);
+      ta.setAttribute("aria-label", "Edit content");
+      el.style.display = "none";
+      el.parentNode.insertBefore(ta, el);
+      autosize(ta);
+      ta.focus();
+      ta.setSelectionRange(ta.value.length, ta.value.length);
+      active = { el: el, textarea: ta, index: index };
+
+      ta.addEventListener("input", function () { autosize(ta); });
+      ta.addEventListener("keydown", function (ev) {
+        if (ev.key === "Escape") { ev.preventDefault(); cleanup(); }
+        else if (ev.key === "Enter" && !ev.shiftKey) { ev.preventDefault(); commit(); }
+        // Shift+Enter falls through to the textarea's default newline.
+      });
+    }
+
+    function cleanup() {
+      if (!active) return;
+      active.textarea.remove();
+      active.el.style.display = "";
+      active = null;
+    }
+
+    function commit() {
+      var ed = active;
+      var newMd = ed.textarea.value;
+      // Update the live block, preserving an injected graph icon if present.
+      var injected = ed.el.querySelector(":scope > .graph-open-btn");
+      applyMarkdown(ed.el, newMd);
+      if (injected) ed.el.appendChild(injected);
+      cleanup();
+      saveToSource(ed.index, newMd).catch(function (err) {
+        console.error("[design] inline-edit save failed:", err);
+      });
+    }
+
+    // Write the edited block back to the source file. The block is located by
+    // its index among EDIT_BLOCK_SELECTOR matches, which is identical in the
+    // (clean) source and the live DOM — the injected chrome lives outside
+    // <main> and the graph icons aren't block-level, so neither shifts the
+    // indexing. Only <main>'s inner HTML is spliced back into the original text,
+    // so everything else (authored comment, doctype, <head>, <main>'s own
+    // attributes, scripts) stays byte-for-byte unchanged.
+    function saveToSource(index, newMd) {
+      return fetch(pageFile).then(function (res) {
+        if (!res.ok) throw new Error("could not read source (" + res.status + ")");
+        return res.text();
+      }).then(function (text) {
+        var doc = new DOMParser().parseFromString(text, "text/html");
+        var srcMain = doc.querySelector("main.page");
+        if (!srcMain) throw new Error("no <main class=page> in source");
+        var target = srcMain.querySelectorAll(EDIT_BLOCK_SELECTOR)[index];
+        if (!target) throw new Error("block " + index + " not found in source");
+        applyMarkdown(target, newMd);
+
+        var open = text.search(/<main[\s>]/i);
+        var openEnd = open >= 0 ? text.indexOf(">", open) : -1;
+        var close = text.lastIndexOf("</main>");
+        if (open < 0 || openEnd < 0 || close < 0 || close < openEnd) {
+          throw new Error("could not locate <main> in source");
+        }
+        var out = text.slice(0, openEnd + 1) + srcMain.innerHTML + text.slice(close);
+        return fetch("/api/save", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ file: pageFile, html: out }),
+        });
+      }).then(function (res) {
+        return res.json().catch(function () { return {}; }).then(function (data) {
+          if (!res.ok || !data.ok) throw new Error((data && data.error) || ("save failed (" + res.status + ")"));
+        });
+      });
+    }
+  }
+
+  function autosize(ta) {
+    ta.style.height = "auto";
+    ta.style.height = ta.scrollHeight + "px";
+  }
+
+  // ---- Minimal HTML ⇄ markdown for the editable inline subset -----------
+  // Supported inline grammar: **bold**, *italic*, `code`, [text](url). Blocks:
+  // paragraphs/headings/blockquotes (inline content) and ul/ol (one item per
+  // line). Enough for how these docs are authored; anything richer is left as-is.
+  function collapseWs(s) { return String(s).replace(/\s+/g, " ").trim(); }
+
+  function inlineToMarkdown(node) {
+    var out = "";
+    Array.prototype.forEach.call(node.childNodes, function (child) {
+      if (child.nodeType === 3) { out += child.nodeValue; return; }
+      if (child.nodeType !== 1) return;
+      if (child.classList && child.classList.contains("graph-open-btn")) return;
+      var tag = child.tagName.toLowerCase();
+      if (tag === "br") { out += "\n"; return; }
+      if (tag === "code") { out += "`" + child.textContent + "`"; return; }
+      var inner = inlineToMarkdown(child);
+      if (tag === "strong" || tag === "b") out += "**" + inner + "**";
+      else if (tag === "em" || tag === "i") out += "*" + inner + "*";
+      else if (tag === "a") out += "[" + inner + "](" + (child.getAttribute("href") || "") + ")";
+      else out += inner; // span, mark (search), etc. — keep the text
+    });
+    return out;
+  }
+
+  function blockToMarkdown(el) {
+    var tag = el.tagName.toLowerCase();
+    if (tag === "ul" || tag === "ol") {
+      var items = Array.prototype.filter.call(el.children, function (c) { return c.tagName === "LI"; });
+      return items.map(function (li, i) {
+        return (tag === "ol" ? (i + 1) + ". " : "- ") + collapseWs(inlineToMarkdown(li));
+      }).join("\n");
+    }
+    return collapseWs(inlineToMarkdown(el));
+  }
+
+  function inlineMarkdownToHtml(md) {
+    var s = String(md).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    var codes = [];
+    s = s.replace(/`([^`]+)`/g, function (_, c) { codes.push(c); return "\u0000" + (codes.length - 1) + "\u0000"; });
+    s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, function (_, t, u) {
+      return '<a href="' + u.replace(/"/g, "&quot;") + '">' + t + "</a>";
+    });
+    s = s.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+    s = s.replace(/\*([^*]+)\*/g, "<em>$1</em>");
+    s = s.replace(/\u0000(\d+)\u0000/g, function (_, i) { return "<code>" + codes[+i] + "</code>"; });
+    return s;
+  }
+
+  function applyMarkdown(el, md) {
+    var tag = el.tagName.toLowerCase();
+    if (tag === "ul" || tag === "ol") {
+      var items = String(md).split("\n").map(function (l) {
+        return l.replace(/^\s*(?:[-*]|\d+\.)\s+/, "").trim();
+      }).filter(function (l) { return l.length; });
+      el.innerHTML = items.map(function (it) { return "<li>" + inlineMarkdownToHtml(it) + "</li>"; }).join("");
+    } else {
+      el.innerHTML = String(md).split("\n").map(function (l) {
+        return inlineMarkdownToHtml(l.trim());
+      }).join("<br>");
+    }
   }
 })();
