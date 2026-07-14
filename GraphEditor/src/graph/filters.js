@@ -76,18 +76,38 @@ export function setupFilters({ nodes, edges, sizeContainer, legendContainer, onC
     });
   }
 
-  // Category toggles (legend swatches). Clicking dims the label and hides its
-  // nodes; clicking again restores them. `catButtons` stays in sync as entries
-  // are added/removed (the "custom" entry comes and goes at runtime), so both
-  // this wiring and the toggle-all button below always see the current set.
+  // Category toggles (legend swatches). Clicking behaves as an isolate/expand
+  // shortcut, falling back to a plain toggle in the middle:
+  //   - everything on            → clicking a category isolates it (hides the rest)
+  //   - only this category on     → clicking it shows all again
+  //   - some (but not all) on     → clicking toggles just that category on/off
+  // `catButtons` stays in sync as entries are added/removed (the synthetic
+  // "custom"/"modified" entries come and go at runtime), so this wiring and the
+  // toggle-all button below always see the current set.
   const catButtons = [];
+  function syncLegendOff() {
+    for (const b of catButtons) b.classList.toggle('legend-off', disabledCategories.has(b.dataset.category));
+  }
   function wireCategoryButton(btn) {
     catButtons.push(btn);
     btn.addEventListener('click', () => {
       const key = btn.dataset.category;
-      if (disabledCategories.has(key)) disabledCategories.delete(key);
-      else disabledCategories.add(key);
-      btn.classList.toggle('legend-off', disabledCategories.has(key));
+      const keys = catButtons.map((b) => b.dataset.category);
+      const enabled = keys.filter((k) => !disabledCategories.has(k));
+      const allOn = enabled.length === keys.length;
+      const onlyThisOn = enabled.length === 1 && enabled[0] === key;
+
+      if (allOn) {
+        for (const k of keys) if (k !== key) disabledCategories.add(k); // isolate this one
+      } else if (onlyThisOn) {
+        disabledCategories.clear(); // this was the only one → show all
+      } else if (disabledCategories.has(key)) {
+        disabledCategories.delete(key);
+      } else {
+        disabledCategories.add(key);
+      }
+
+      syncLegendOff();
       syncToggleAll();
       recompute();
     });
@@ -111,8 +131,8 @@ export function setupFilters({ nodes, edges, sizeContainer, legendContainer, onC
       for (const b of catButtons) {
         if (allOff) disabledCategories.delete(b.dataset.category);
         else disabledCategories.add(b.dataset.category);
-        b.classList.toggle('legend-off', disabledCategories.has(b.dataset.category));
       }
+      syncLegendOff();
       syncToggleAll();
       recompute();
     });
@@ -141,7 +161,7 @@ export function setupFilters({ nodes, edges, sizeContainer, legendContainer, onC
     // from here until the next applyCustom()/clearCustom().
     disabledCategories.clear();
     for (const b of catButtons) if (b !== customBtn) disabledCategories.add(b.dataset.category);
-    for (const b of catButtons) b.classList.toggle('legend-off', disabledCategories.has(b.dataset.category));
+    syncLegendOff();
 
     syncToggleAll();
     onLegendChange && onLegendChange();
@@ -154,7 +174,7 @@ export function setupFilters({ nodes, edges, sizeContainer, legendContainer, onC
     removeButton(customBtn);
     customBtn = null;
     disabledCategories.clear(); // back to showing everything
-    for (const b of catButtons) b.classList.remove('legend-off');
+    syncLegendOff();
     syncToggleAll();
     onLegendChange && onLegendChange();
     recompute();
