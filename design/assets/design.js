@@ -488,18 +488,22 @@
   }
 
   // Gather the page's documented file lists. `<main data-files>` is the whole
-  // document (icon anchored to its <h1>); each `<h2 data-files>` is one section.
-  // `name` (the heading's own text, read before the icon button is appended
-  // into it) becomes the custom category's label in the embedded GraphEditor.
+  // document (icon anchored to its <h1>); each `<h2 data-files>` is one section;
+  // each `<dt data-files>` is one glossary term. `name` (the element's own text,
+  // read before the icon button is appended into it) becomes the custom
+  // category's label in the embedded GraphEditor — for a term we take the first
+  // synonym (before any comma), e.g. "Record, Durable message" → "Record".
   function collectFileSources() {
     var out = [];
     var wholeAttr = main.getAttribute("data-files");
     var h1 = main.querySelector("h1");
     if (wholeAttr && h1) out.push({ headingEl: h1, files: parseFiles(wholeAttr), key: "whole", name: h1.textContent.trim() });
-    var sections = main.querySelectorAll("h2[data-files]");
-    Array.prototype.forEach.call(sections, function (h, i) {
-      if (!h.id) h.id = "graph-section-" + i;
-      out.push({ headingEl: h, files: parseFiles(h.getAttribute("data-files")), key: h.id, name: h.textContent.trim() });
+    var els = main.querySelectorAll("h2[data-files], dt[data-files]");
+    Array.prototype.forEach.call(els, function (el, i) {
+      if (!el.id) el.id = "graph-section-" + i;
+      var text = el.textContent.trim();
+      var name = el.tagName === "DT" ? text.split(",")[0].trim() : text;
+      out.push({ headingEl: el, files: parseFiles(el.getAttribute("data-files")), key: el.id, name: name });
     });
     return out.filter(function (s) { return s.files.length; });
   }

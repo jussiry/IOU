@@ -135,6 +135,7 @@ body.enhanced:not(.graph-open) .layout-splitter[data-splitter="graph"] {
 }
 .graph-open-btn svg { width: 1em; height: 1em; display: block; }
 h1 .graph-open-btn { width: 1.15em; height: 1.15em; }
+dt .graph-open-btn { width: 1.35em; height: 1.35em; margin-left: 0.4em; }
 
 #topbar {
   grid-area: topbar;
