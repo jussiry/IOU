@@ -6,6 +6,7 @@
     "build:web": "cd web && npm install && npm run build",
     "build:watch": "node scripts/build-client.cjs --watch",
     "dev": "concurrently --kill-others-on-fail --names build,server --prefix-colors blue,green \"npm:build:watch\" \"nodemon --watch server --ext js,cjs,json server/server.js\"",
+    "devAll": "concurrently --kill-others-on-fail --names app,grapheditor,web --prefix-colors blue,magenta,yellow \"npm:dev\" \"npm --prefix GraphEditor run dev\" \"npm run build:web && npx serve web -l 3001\"",
     "typecheck": "tsc --noEmit",
     "test:e2e:two-client": "node tests/two-client-e2e/run.cjs",
     "test:e2e:friend-request-online": "node tests/two-client-e2e/run.cjs --scenario friend-request-online",
