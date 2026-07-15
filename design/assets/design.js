@@ -196,7 +196,13 @@
   document.body.insertBefore(makeSplitter("sidebar"), main);
   setupHeadingScrollSpy(outlineHeadings);
   setupSearch({ input: search.input, clearBtn: search.clearBtn, tocNav: tocNav, tocResults: tocResults });
-  setupEditing();
+
+  // Third column: the embedded GraphEditor, opened from documented headers.
+  // Built on every page (inert until opened — see body.graph-open in the CSS)
+  // so that editing a page into having graph metadata for the first time works
+  // without a reload. graphColumn.rescan() re-attaches icons/wiring after edits.
+  var graphColumn = setupGraphColumn();
+  setupEditing(graphColumn);
 
   // Mobile drawer toggle
   topbar.querySelector(".nav-toggle").addEventListener("click", function () {
@@ -205,10 +211,6 @@
 
   // Reflect the current page's status in the tab title prefix, cheap wayfinding.
   if (current && current.title) document.title = current.title + " — Design";
-
-  // Optional third column: the embedded GraphEditor, opened from documented
-  // headers. No-op on pages without graph metadata.
-  setupGraphColumn();
 
   function escapeHtml(s) {
     return String(s).replace(/[&<>"]/g, function (c) {
@@ -404,19 +406,25 @@
   // ---- Graph column (embedded GraphEditor) ------------------------------
   // A page documents which code files it covers via hidden `data-files`
   // metadata — one list for the whole document (on <main>, its icon sits by the
-  // <h1>) or one per root-level section (on each <h2>). For every such list we
-  // inject a graph icon that opens a third column hosting the standalone
-  // GraphEditor in an iframe, filtered to exactly those files (its "custom"
-  // category — an ordinary, toggleable legend entry there, named after the
-  // heading it came from). GraphEditor stays independent; we drive it purely
-  // over postMessage:
+  // <h1>), one per root-level section (on each <h2>), or one per glossary term
+  // (on each <dt>). For every such element we inject a graph icon that opens a
+  // third column hosting the standalone GraphEditor in an iframe, filtered to
+  // exactly those files (its "custom" category — an ordinary, toggleable
+  // legend entry there, named after the heading/term it came from). A block can
+  // also carry a free-standing icon anywhere in its text — see the `{{graph:}}`
+  // syntax in the inline-editing section below — which is wired the same way
+  // but reads its files/name from its own attributes rather than an ancestor's.
+  //
+  // GraphEditor stays independent; driven purely over postMessage:
   //   design → editor : { type:'showNodes', ids:[...], name } | { type:'clearFilter' }
   //   editor → design : { source:'graph-editor', type:'ready' | 'close' }
   // The editor announces `ready` after load; commands sent earlier are queued.
+  //
+  // The column's DOM is always built (inert until opened — see body.graph-open
+  // in the CSS), not just on pages that start out with graph metadata, so that
+  // inline-editing a page into having its first graph link works without a
+  // reload. rescan() (returned below) re-attaches icons/wiring after an edit.
   function setupGraphColumn() {
-    var sources = collectFileSources();
-    if (!sources.length) return; // page has no graph metadata → stay two-column
-
     var GRAPH_EDITOR_URL = window.GRAPH_EDITOR_URL || "http://localhost:8088/index.html";
 
     applyStoredLayoutSize("graph");
@@ -434,7 +442,7 @@
 
     var ready = false;
     var pending = null;   // command buffered until the iframe reports ready
-    var activeKey = null; // which header's icon is currently lit
+    var activeKey = null; // which icon is currently lit
 
     var send = function (msg) {
       if (ready && iframe.contentWindow) iframe.contentWindow.postMessage(msg, "*");
@@ -454,7 +462,7 @@
 
     var setActive = function (key) {
       activeKey = key;
-      var btns = document.querySelectorAll(".graph-open-btn");
+      var btns = main.querySelectorAll(".graph-open-btn");
       Array.prototype.forEach.call(btns, function (b) {
         b.classList.toggle("active", b.getAttribute("data-graph-key") === key);
       });
@@ -472,41 +480,95 @@
       setActive(src.key);
     };
 
-    sources.forEach(function (src) {
+    var keySeq = 0;
+    var nextKey = function () { return "graph-" + Date.now().toString(36) + "-" + keySeq++; };
+
+    // Whole-document icon: data-files lives on <main> itself, icon sits on <h1>.
+    function ensureWholeDocButton() {
+      var wholeAttr = main.getAttribute("data-files");
+      var h1 = main.querySelector("h1");
+      if (!wholeAttr || !h1) return;
+      if (h1.querySelector(":scope > .graph-open-btn")) return;
+      var btn = makeIconButton();
+      btn.setAttribute("data-graph-key", "whole");
+      h1.appendChild(btn);
+    }
+
+    // One icon per data-files-bearing heading/term (h2 sections, dt glossary
+    // terms). Skips elements that already have their button (re-running this
+    // after an edit only needs to add buttons for newly-tagged elements — an
+    // edited heading is rebuilt fresh each time, so it never has a stale one).
+    function ensureOwnerButtons() {
+      var owners = main.querySelectorAll("h2[data-files], dt[data-files]");
+      Array.prototype.forEach.call(owners, function (el) {
+        if (el.querySelector(":scope > .graph-open-btn")) return;
+        if (!el.id) el.id = nextKey();
+        var btn = makeIconButton();
+        btn.setAttribute("data-graph-key", el.id);
+        el.appendChild(btn);
+      });
+    }
+
+    function makeIconButton() {
       var btn = document.createElement("button");
       btn.type = "button";
       btn.className = "graph-open-btn";
-      btn.setAttribute("data-graph-key", src.key);
-      btn.title = "Show this section's files in the graph (" + src.files.length + ")";
-      btn.setAttribute("aria-label", btn.title);
       btn.innerHTML = graphIcon();
-      btn.addEventListener("click", function () {
-        if (activeKey === src.key && document.body.classList.contains("graph-open")) closeGraph();
-        else openGraph(src);
-      });
-      src.headingEl.appendChild(btn);
-    });
-  }
+      return btn;
+    }
 
-  // Gather the page's documented file lists. `<main data-files>` is the whole
-  // document (icon anchored to its <h1>); each `<h2 data-files>` is one section;
-  // each `<dt data-files>` is one glossary term. `name` (the element's own text,
-  // read before the icon button is appended into it) becomes the custom
-  // category's label in the embedded GraphEditor — for a term we take the first
-  // synonym (before any comma), e.g. "Record, Durable message" → "Record".
-  function collectFileSources() {
-    var out = [];
-    var wholeAttr = main.getAttribute("data-files");
-    var h1 = main.querySelector("h1");
-    if (wholeAttr && h1) out.push({ headingEl: h1, files: parseFiles(wholeAttr), key: "whole", name: h1.textContent.trim() });
-    var els = main.querySelectorAll("h2[data-files], dt[data-files]");
-    Array.prototype.forEach.call(els, function (el, i) {
-      if (!el.id) el.id = "graph-section-" + i;
-      var text = el.textContent.trim();
-      var name = el.tagName === "DT" ? text.split(",")[0].trim() : text;
-      out.push({ headingEl: el, files: parseFiles(el.getAttribute("data-files")), key: el.id, name: name });
-    });
-    return out.filter(function (s) { return s.files.length; });
+    // Resolve a button (however it got there) to { files, name, key } at click
+    // time, so edits to the owning heading/term (or the button's own inline
+    // attributes) are always reflected without needing to re-wire anything.
+    function describeButton(btn) {
+      var h1 = main.querySelector("h1");
+      if (h1 && btn.parentElement === h1) {
+        // Whole-document icon: data-files lives on <main>, not the <h1> itself.
+        return { files: parseFiles(main.getAttribute("data-files") || ""), name: h1.textContent.trim(), key: "whole" };
+      }
+      var owner = btn.closest("h2[data-files], dt[data-files]");
+      if (owner) {
+        var text = owner.textContent.trim();
+        var name = owner.tagName === "DT" ? text.split(",")[0].trim() : text;
+        return { files: parseFiles(owner.getAttribute("data-files")), name: name, key: owner.id || (owner.id = nextKey()) };
+      }
+      // Free-standing inline icon: reads its own data-files/data-graph-name.
+      if (!btn.dataset.graphKey) btn.dataset.graphKey = nextKey();
+      return {
+        files: parseFiles(btn.getAttribute("data-files") || ""),
+        name: btn.getAttribute("data-graph-name") || "",
+        key: btn.dataset.graphKey,
+      };
+    }
+
+    // Attach click behaviour to any not-yet-wired .graph-open-btn in main —
+    // freshly created above, or already present in the DOM (loaded from source,
+    // or just inserted by an inline-edit commit via {{graph:}} markdown).
+    function wireButtons() {
+      var btns = main.querySelectorAll(".graph-open-btn");
+      Array.prototype.forEach.call(btns, function (btn) {
+        if (btn.dataset.wired) return;
+        btn.dataset.wired = "1";
+        btn.addEventListener("click", function () {
+          var src = describeButton(btn);
+          if (!src.files.length) return;
+          btn.setAttribute("data-graph-key", src.key);
+          btn.title = "Show these files in the graph (" + src.files.length + ")";
+          btn.setAttribute("aria-label", btn.title);
+          if (activeKey === src.key && document.body.classList.contains("graph-open")) closeGraph();
+          else openGraph(src);
+        });
+      });
+    }
+
+    function rescan() {
+      ensureWholeDocButton();
+      ensureOwnerButtons();
+      wireButtons();
+    }
+
+    rescan();
+    return { rescan: rescan };
   }
 
   function parseFiles(s) {
@@ -730,17 +792,23 @@
 
   // ---- Inline editing ---------------------------------------------------
   // Click a block of text to edit it: it turns into a textarea holding the
-  // block's markdown. Enter commits (markdown → HTML, applied both to the live
-  // page and, via the dev server's /api/save, to the source .html file);
-  // Shift+Enter inserts a newline; Esc cancels. Needs the dev server (see
-  // design/scripts/serve.mjs) — a no-op when the save request can't be made.
+  // block's markdown. Enter, or clicking/tabbing away, commits (markdown -> HTML,
+  // applied both to the live page and, via the dev server's /api/save, to the
+  // source .html file); Shift+Enter inserts a newline; Esc cancels and discards.
+  // Needs the dev server (see design/scripts/serve.mjs) -- a no-op when the save
+  // request can't be made.
   //
-  // Only prose blocks are editable; dt/dd (glossary) are left out because their
-  // term-self links and graph icons don't round-trip through plain markdown.
+  // The textarea isn't limited to producing one block: its content is split on
+  // blank lines into as many blocks as it contains, each independently typed as
+  // a heading/list/blockquote/paragraph (see parseBlocks below) -- so typing a
+  // blank line and then "## New section" splits the edited block in two and
+  // adds a heading; clearing the textarea entirely deletes the block. Only
+  // prose blocks are click-to-edit entry points; dt/dd (glossary) are left out
+  // because their term-self links don't round-trip through plain markdown.
   var EDIT_BLOCK_SELECTOR = "p, h1, h2, h3, h4, h5, h6, ul, ol, blockquote";
   var pageFile = here + ".html";
 
-  function setupEditing() {
+  function setupEditing(graphColumn) {
     var active = null; // { el, textarea, index }
 
     main.addEventListener("click", function (e) {
@@ -775,36 +843,48 @@
         else if (ev.key === "Enter" && !ev.shiftKey) { ev.preventDefault(); commit(); }
         // Shift+Enter falls through to the textarea's default newline.
       });
+      // Clicking or tabbing away from the textarea commits, same as Enter.
+      // commit()/cleanup() both null `active` before removing the textarea, so
+      // the blur this triggers (removing/hiding a focused element blurs it
+      // synchronously) sees `active` already cleared and no-ops -- no double-commit.
+      ta.addEventListener("blur", function () { commit(); });
     }
 
+    // Cancel: discard the textarea, restore the original block untouched.
     function cleanup() {
       if (!active) return;
-      active.textarea.remove();
-      active.el.style.display = "";
+      var ed = active;
       active = null;
+      ed.textarea.remove();
+      ed.el.style.display = "";
     }
 
     function commit() {
+      if (!active) return;
       var ed = active;
+      active = null;
       var newMd = ed.textarea.value;
-      // Update the live block, preserving an injected graph icon if present.
-      var injected = ed.el.querySelector(":scope > .graph-open-btn");
-      applyMarkdown(ed.el, newMd);
-      if (injected) ed.el.appendChild(injected);
-      cleanup();
-      saveToSource(ed.index, newMd).catch(function (err) {
+      ed.textarea.remove();
+
+      var wasH1 = ed.el.tagName === "H1";
+      var blocks = parseBlocks(newMd, wasH1, ed.el);
+      replaceBlockWith(ed.el, blocks, wasH1);
+      graphColumn.rescan(); // pick up any heading/inline graph tags this edit added or changed
+
+      saveToSource(ed.index, newMd, wasH1).catch(function (err) {
         console.error("[design] inline-edit save failed:", err);
       });
     }
 
-    // Write the edited block back to the source file. The block is located by
-    // its index among EDIT_BLOCK_SELECTOR matches, which is identical in the
-    // (clean) source and the live DOM — the injected chrome lives outside
-    // <main> and the graph icons aren't block-level, so neither shifts the
-    // indexing. Only <main>'s inner HTML is spliced back into the original text,
-    // so everything else (authored comment, doctype, <head>, <main>'s own
-    // attributes, scripts) stays byte-for-byte unchanged.
-    function saveToSource(index, newMd) {
+    // Write the edited block back to the source file: locate it by its index
+    // among EDIT_BLOCK_SELECTOR matches (identical in the clean source and the
+    // live DOM -- the injected chrome lives outside <main> and graph icons
+    // aren't block-level, so neither shifts the indexing), re-run the same
+    // markdown parse against the fetched source's own document, and splice only
+    // <main>'s inner HTML back into the original text -- so the authored
+    // comment, doctype, <head>, <main>'s own attributes and scripts stay
+    // byte-for-byte unchanged.
+    function saveToSource(index, newMd, wasH1) {
       return fetch(pageFile).then(function (res) {
         if (!res.ok) throw new Error("could not read source (" + res.status + ")");
         return res.text();
@@ -814,7 +894,9 @@
         if (!srcMain) throw new Error("no <main class=page> in source");
         var target = srcMain.querySelectorAll(EDIT_BLOCK_SELECTOR)[index];
         if (!target) throw new Error("block " + index + " not found in source");
-        applyMarkdown(target, newMd);
+
+        var blocks = parseBlocks(newMd, wasH1, target);
+        replaceBlockWith(target, blocks, wasH1);
 
         var open = text.search(/<main[\s>]/i);
         var openEnd = open >= 0 ? text.indexOf(">", open) : -1;
@@ -822,7 +904,15 @@
         if (open < 0 || openEnd < 0 || close < 0 || close < openEnd) {
           throw new Error("could not locate <main> in source");
         }
-        var out = text.slice(0, openEnd + 1) + srcMain.innerHTML + text.slice(close);
+        // The opening <main ...> tag is re-serialized from srcMain's live
+        // attributes rather than reused verbatim from `text` — editing the page's
+        // own <h1> can change <main data-files>, and that's the only way for
+        // that change to make it into the saved file. When nothing touched
+        // <main>'s attributes this round-trips byte-identical: DOMParser keeps
+        // attribute order and each value's exact original string untouched.
+        var openTagMatch = srcMain.outerHTML.match(/^<main[^>]*>/i);
+        var openTag = openTagMatch ? openTagMatch[0] : text.slice(open, openEnd + 1);
+        var out = text.slice(0, open) + openTag + srcMain.innerHTML + text.slice(close);
         return fetch("/api/save", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -841,65 +931,221 @@
     ta.style.height = ta.scrollHeight + "px";
   }
 
-  // ---- Minimal HTML ⇄ markdown for the editable inline subset -----------
-  // Supported inline grammar: **bold**, *italic*, `code`, [text](url). Blocks:
-  // paragraphs/headings/blockquotes (inline content) and ul/ol (one item per
-  // line). Enough for how these docs are authored; anything richer is left as-is.
+  // Replace `target` (a block matching EDIT_BLOCK_SELECTOR, live or from a
+  // freshly-parsed source document -- works either way since it inserts via
+  // HTML strings, which parse in whatever document `target` belongs to) with
+  // zero or more new blocks. Zero blocks = the edit deleted the content, so the
+  // container itself is removed -- except the page's own <h1>, which is never
+  // deleted outright (a title-less page has nowhere for the next edit's entry
+  // point to anchor), only reset to a placeholder.
+  function replaceBlockWith(target, blocks, wasH1) {
+    var parent = target.parentNode;
+    if (blocks.length) {
+      blocks.forEach(function (b) { target.insertAdjacentHTML("beforebegin", b.html); });
+    } else if (wasH1) {
+      target.insertAdjacentHTML("beforebegin", "<h1>Untitled</h1>");
+    }
+    // A level-1 heading's graph tag lives on <main data-files>, not the <h1>
+    // itself (matching the authored convention) -- only touched when editing
+    // the page's own <h1> and the result is still a level-1 heading.
+    if (wasH1 && blocks[0] && blocks[0].level === 1) {
+      var mainEl = target.closest("main.page");
+      if (blocks[0].mainFiles) mainEl.setAttribute("data-files", blocks[0].mainFiles);
+      else mainEl.removeAttribute("data-files");
+    }
+    parent.removeChild(target);
+  }
+
+  // ---- Minimal HTML <-> markdown for the editable inline subset ---------
+  // Inline grammar: **bold**, *italic*, `code`, [text](url), and the one
+  // non-standard extension -- {{graph: file1.js, file2.js}} or
+  // {{graph: file1.js, file2.js | Label}} -- a free-standing graph-editor icon
+  // link, usable anywhere inline (see graphButtonHtml). A heading can instead
+  // (or additionally) carry a *trailing* {graph: file1.js, file2.js} tag (single
+  // braces) binding the icon to that heading/section, matching the existing
+  // data-files convention -- see chunkToBlock.
+  //
+  // Block grammar, one per blank-line-separated chunk of the textarea:
+  //   heading    -- starts with 1-6 #'s + a space
+  //   list       -- every line starts with "- "/"* " (unordered) or "1. " (ordered)
+  //   blockquote -- every line starts with "> "
+  //   paragraph  -- anything else (the fallback)
+  // Enough for how these docs are authored; anything richer in the original
+  // HTML is left as-is until that block is edited.
   function collapseWs(s) { return String(s).replace(/\s+/g, " ").trim(); }
 
-  function inlineToMarkdown(node) {
+  // skipDirectIcon: true only for the outermost call over a heading's own
+  // children, so its ancestor-owned graph icon (appended as a direct child by
+  // graphColumn) is excluded -- that one is represented by the heading's
+  // trailing {graph:} tag instead, not inline {{graph:}} markdown.
+  function inlineToMarkdown(node, skipDirectIcon) {
     var out = "";
     Array.prototype.forEach.call(node.childNodes, function (child) {
       if (child.nodeType === 3) { out += child.nodeValue; return; }
       if (child.nodeType !== 1) return;
-      if (child.classList && child.classList.contains("graph-open-btn")) return;
+      if (child.classList && child.classList.contains("graph-open-btn")) {
+        if (skipDirectIcon) return;
+        var files = child.getAttribute("data-files") || "";
+        var name = child.getAttribute("data-graph-name") || "";
+        out += "{{graph: " + files + (name ? " | " + name : "") + "}}";
+        return;
+      }
       var tag = child.tagName.toLowerCase();
       if (tag === "br") { out += "\n"; return; }
       if (tag === "code") { out += "`" + child.textContent + "`"; return; }
-      var inner = inlineToMarkdown(child);
+      var inner = inlineToMarkdown(child, false);
       if (tag === "strong" || tag === "b") out += "**" + inner + "**";
       else if (tag === "em" || tag === "i") out += "*" + inner + "*";
       else if (tag === "a") out += "[" + inner + "](" + (child.getAttribute("href") || "") + ")";
-      else out += inner; // span, mark (search), etc. — keep the text
+      else out += inner; // span, mark (search), etc. -- keep the text
     });
     return out;
   }
 
   function blockToMarkdown(el) {
     var tag = el.tagName.toLowerCase();
+    var headingLevel = /^h[1-6]$/.test(tag) ? +tag.slice(1) : 0;
+    if (headingLevel) {
+      var files = headingLevel === 1 ? main.getAttribute("data-files") : el.getAttribute("data-files");
+      var text = collapseWs(inlineToMarkdown(el, true));
+      var suffix = files ? " {graph: " + collapseWs(files) + "}" : "";
+      return "#".repeat(headingLevel) + " " + text + suffix;
+    }
     if (tag === "ul" || tag === "ol") {
       var items = Array.prototype.filter.call(el.children, function (c) { return c.tagName === "LI"; });
       return items.map(function (li, i) {
-        return (tag === "ol" ? (i + 1) + ". " : "- ") + collapseWs(inlineToMarkdown(li));
+        return (tag === "ol" ? (i + 1) + ". " : "- ") + collapseWs(inlineToMarkdown(li, false));
       }).join("\n");
     }
-    return collapseWs(inlineToMarkdown(el));
+    if (tag === "blockquote") {
+      return "> " + collapseWs(inlineToMarkdown(el, false));
+    }
+    return collapseWs(inlineToMarkdown(el, false));
   }
 
   function inlineMarkdownToHtml(md) {
     var s = String(md).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    // {{graph: ...}} -- inline icon links -- before the code/bold/italic/link
+    // passes so a file list or label can't accidentally trip those up.
+    s = s.replace(/\{\{graph:\s*([^|}]+?)\s*(?:\|\s*([^}]+?)\s*)?\}\}/gi, function (_, files, name) {
+      return graphButtonHtml(files, name || "");
+    });
     var codes = [];
-    s = s.replace(/`([^`]+)`/g, function (_, c) { codes.push(c); return "\u0000" + (codes.length - 1) + "\u0000"; });
+    s = s.replace(/`([^`]+)`/g, function (_, c) { codes.push(c); return " " + (codes.length - 1) + " "; });
     s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, function (_, t, u) {
       return '<a href="' + u.replace(/"/g, "&quot;") + '">' + t + "</a>";
     });
     s = s.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
     s = s.replace(/\*([^*]+)\*/g, "<em>$1</em>");
-    s = s.replace(/\u0000(\d+)\u0000/g, function (_, i) { return "<code>" + codes[+i] + "</code>"; });
+    s = s.replace(/ (\d+) /g, function (_, i) { return "<code>" + codes[+i] + "</code>"; });
     return s;
   }
 
-  function applyMarkdown(el, md) {
-    var tag = el.tagName.toLowerCase();
-    if (tag === "ul" || tag === "ol") {
-      var items = String(md).split("\n").map(function (l) {
-        return l.replace(/^\s*(?:[-*]|\d+\.)\s+/, "").trim();
-      }).filter(function (l) { return l.length; });
-      el.innerHTML = items.map(function (it) { return "<li>" + inlineMarkdownToHtml(it) + "</li>"; }).join("");
-    } else {
-      el.innerHTML = String(md).split("\n").map(function (l) {
-        return inlineMarkdownToHtml(l.trim());
-      }).join("<br>");
+  // `filesRaw`/`nameRaw` come from already-HTML-escaped text (inlineMarkdownToHtml
+  // escapes & / < / > up front), so only the still-live `"` needs handling here
+  // -- re-escaping & would double-encode it.
+  function graphButtonHtml(filesRaw, nameRaw) {
+    var files = collapseWs(filesRaw).replace(/"/g, "&quot;");
+    var name = collapseWs(nameRaw).replace(/"/g, "&quot;");
+    return '<button type="button" class="graph-open-btn" data-files="' + files + '"' +
+      (name ? ' data-graph-name="' + name + '"' : "") + ">" + graphIcon() + "</button>";
+  }
+
+  // Raw (not-yet-HTML-escaped) text destined for an attribute value assembled
+  // by string concatenation -- unlike graphButtonHtml's inputs, this hasn't
+  // been through inlineMarkdownToHtml's escaping pass yet, so & needs handling too.
+  function escapeAttr(s) {
+    return String(s).replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+  }
+
+  function detectBlockType(chunk) {
+    var lines = chunk.split("\n").map(function (l) { return l.trim(); }).filter(Boolean);
+    if (!lines.length) return null;
+    if (/^#{1,6}\s+/.test(lines[0])) return "heading";
+    if (lines.every(function (l) { return /^(?:[-*]|\d+\.)\s+/.test(l); })) return "list";
+    if (lines.every(function (l) { return /^>\s?/.test(l); })) return "blockquote";
+    return "paragraph";
+  }
+
+  // One blank-line-delimited chunk -> { html, level, mainFiles }. `html` is the
+  // block's outerHTML as a string (inserted via insertAdjacentHTML, which is
+  // document-context-agnostic -- works whether `target` in replaceBlockWith is
+  // in the live page or a freshly-parsed source document). `level` is set only
+  // for headings (used by replaceBlockWith to decide whether this chunk still
+  // owns the page's <h1> role); `mainFiles` only for a level-1 heading, the
+  // resolved data-files value for <main> (a string, possibly "" to mean clear).
+  function chunkToBlock(chunk, allowH1) {
+    var type = detectBlockType(chunk);
+    if (type === "heading") {
+      var m = chunk.match(/^(#{1,6})\s+([\s\S]*)$/);
+      var level = m[1].length;
+      var rest = collapseWs(m[2]);
+      var graphFiles = null;
+      var tagMatch = rest.match(/\{graph:\s*([^}]*)\}\s*$/i);
+      if (tagMatch) {
+        graphFiles = tagMatch[1].trim();
+        rest = rest.slice(0, tagMatch.index).trim();
+      }
+      if (level === 1 && !allowH1) level = 2; // guard against a stray extra <h1>
+      var tag = "h" + level;
+      var attr = level !== 1 && graphFiles ? ' data-files="' + escapeAttr(collapseWs(graphFiles)) + '"' : "";
+      return {
+        html: "<" + tag + attr + ">" + inlineMarkdownToHtml(rest) + "</" + tag + ">",
+        level: level,
+        mainFiles: level === 1 ? (graphFiles || "") : undefined,
+      };
     }
+    if (type === "list") {
+      var lines = chunk.split("\n").map(function (l) { return l.trim(); }).filter(Boolean);
+      var ordered = /^\d+\./.test(lines[0]);
+      var itemsHtml = lines.map(function (l) {
+        var item = l.replace(/^(?:[-*]|\d+\.)\s+/, "");
+        return "<li>" + inlineMarkdownToHtml(collapseWs(item)) + "</li>";
+      }).join("");
+      var listTag = ordered ? "ol" : "ul";
+      return { html: "<" + listTag + ">" + itemsHtml + "</" + listTag + ">", level: 0 };
+    }
+    if (type === "blockquote") {
+      var qLines = chunk.split("\n").map(function (l) { return l.trim().replace(/^>\s?/, ""); }).filter(Boolean);
+      return { html: "<blockquote>" + qLines.map(function (l) { return inlineMarkdownToHtml(collapseWs(l)); }).join("<br>") + "</blockquote>", level: 0 };
+    }
+    var pLines = chunk.split("\n").map(function (l) { return l.trim(); }).filter(Boolean);
+    return { html: "<p>" + pLines.map(function (l) { return inlineMarkdownToHtml(collapseWs(l)); }).join("<br>") + "</p>", level: 0 };
+  }
+
+  // Full textarea value -> array of chunkToBlock results, one per blank-line-
+  // separated chunk (zero-length input -> zero blocks -> the block is deleted).
+  // allowH1 only ever applies to the *first* chunk, and only when the edited
+  // element itself was the page's <h1> -- typing "# Foo" into an ordinary
+  // paragraph downgrades to <h2> rather than minting a second page title.
+  //
+  // origEl (optional) is the block being edited: if the *first* resulting chunk
+  // keeps the same tag (the common case -- editing text without changing its
+  // type), origEl's other attributes are carried over onto it, so e.g. a
+  // <p class="lede"> stays a <p class="lede"> rather than becoming a bare <p>.
+  // id/data-files/data-wired/data-graph-key are excluded -- those are re-derived
+  // fresh each edit (see chunkToBlock / graphColumn's rescan), not preserved.
+  function parseBlocks(md, allowH1, origEl) {
+    var text = String(md).replace(/\r\n?/g, "\n");
+    var chunks = text.split(/\n[ \t]*\n+/).map(function (s) { return s.trim(); }).filter(function (s) { return s.length; });
+    var blocks = chunks.map(function (c, i) { return chunkToBlock(c, allowH1 && i === 0); });
+    if (origEl && blocks[0]) blocks[0].html = withOrigAttrs(blocks[0].html, origEl);
+    return blocks;
+  }
+
+  var CARRIED_ATTR_EXCLUDE = { id: 1, "data-files": 1, "data-wired": 1, "data-graph-key": 1, style: 1 };
+  function withOrigAttrs(html, origEl) {
+    var m = html.match(/^<([a-zA-Z][a-zA-Z0-9]*)((?:\s[^>]*)?)>/);
+    if (!m || m[1].toLowerCase() !== origEl.tagName.toLowerCase()) return html;
+    var already = {};
+    var attrRe = /([a-zA-Z_:][-a-zA-Z0-9_:.]*)\s*=/g, am;
+    while ((am = attrRe.exec(m[2]))) already[am[1].toLowerCase()] = true;
+    var extra = "";
+    Array.prototype.forEach.call(origEl.attributes, function (a) {
+      var name = a.name.toLowerCase();
+      if (CARRIED_ATTR_EXCLUDE[name] || already[name]) return;
+      extra += " " + a.name + '="' + escapeAttr(a.value) + '"';
+    });
+    return extra ? "<" + m[1] + m[2] + extra + ">" + html.slice(m[0].length) : html;
   }
 })();
