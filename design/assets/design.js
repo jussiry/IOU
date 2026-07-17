@@ -818,7 +818,6 @@
       if (sel && String(sel).length) return; // don't hijack a text selection
       var block = e.target.closest(EDIT_BLOCK_SELECTOR);
       if (!block || !main.contains(block)) return;
-      if ((block.tagName === "UL" || block.tagName === "OL") && block.querySelector("ul, ol")) return; // skip nested lists
       beginEdit(block);
     });
 
@@ -828,7 +827,7 @@
       if (index < 0) return;
       var ta = document.createElement("textarea");
       ta.className = "doc-edit";
-      ta.value = blockToMarkdown(el);
+      ta.value = blockToEditorText(el);
       ta.setAttribute("aria-label", "Edit content");
       el.style.display = "none";
       el.parentNode.insertBefore(ta, el);
@@ -912,7 +911,10 @@
         // attribute order and each value's exact original string untouched.
         var openTagMatch = srcMain.outerHTML.match(/^<main[^>]*>/i);
         var openTag = openTagMatch ? openTagMatch[0] : text.slice(open, openEnd + 1);
-        var out = text.slice(0, open) + openTag + srcMain.innerHTML + text.slice(close);
+        // The HTML serializer emits void elements bare (<hr>); the docs write
+        // them self-closed (<hr />). Restore that so unedited <hr /> etc.
+        // elsewhere in <main> round-trip byte-identical instead of churning.
+        var out = text.slice(0, open) + openTag + selfCloseVoids(srcMain.innerHTML) + text.slice(close);
         return fetch("/api/save", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -929,6 +931,15 @@
   function autosize(ta) {
     ta.style.height = "auto";
     ta.style.height = ta.scrollHeight + "px";
+  }
+
+  // Rewrite bare void tags (<hr>, <br>, <img …>) to the self-closed form
+  // (<hr />) the docs use, matching how the HTML is authored. Applied to
+  // serialized <main> output; text/attribute content can't match because the
+  // serializer escapes any literal "<" there.
+  var VOID_TAG_RE = /<(area|base|br|col|embed|hr|img|input|link|meta|param|source|track|wbr)((?:\s+[^>]*?)?)\s*>/gi;
+  function selfCloseVoids(html) {
+    return html.replace(VOID_TAG_RE, function (_, tag, attrs) { return "<" + tag + attrs + " />"; });
   }
 
   // Replace `target` (a block matching EDIT_BLOCK_SELECTOR, live or from a
@@ -1002,6 +1013,43 @@
     return out;
   }
 
+  // Whether a block round-trips losslessly through the inline markdown grammar.
+  // The block's *own* attributes are fine (carried over by withOrigAttrs / kept
+  // by raw fallback); this only inspects descendants. Anything markdown can't
+  // express — an unknown element (span, div, table…), a nested list, an <li>
+  // with attributes (e.g. the Conventions legend's class="chip" data-status),
+  // or an attribute other than a link's href — makes the block "unsafe", so it
+  // is edited as raw HTML instead (see blockToEditorText / detectBlockType).
+  function isMarkdownSafe(el) {
+    var listCtx = el.tagName === "UL" || el.tagName === "OL";
+    var descendants = el.querySelectorAll("*");
+    for (var i = 0; i < descendants.length; i++) {
+      var c = descendants[i];
+      if (c.closest(".graph-open-btn")) continue; // injected icon (+ its <svg>)
+      var ct = c.tagName.toLowerCase();
+      var okTag = ct === "strong" || ct === "b" || ct === "em" || ct === "i" ||
+        ct === "code" || ct === "a" || ct === "br" || (listCtx && ct === "li");
+      if (!okTag) return false;
+      for (var j = 0; j < c.attributes.length; j++) {
+        if (ct === "a" && c.attributes[j].name.toLowerCase() === "href") continue;
+        return false;
+      }
+    }
+    return true;
+  }
+
+  // The text shown in the textarea for a block: markdown when the block is
+  // representable (below), otherwise its raw HTML (minus any injected graph
+  // icon), which parseBlocks passes straight back through untouched.
+  function blockToEditorText(el) {
+    if (!isMarkdownSafe(el)) {
+      var clone = el.cloneNode(true);
+      Array.prototype.forEach.call(clone.querySelectorAll(".graph-open-btn"), function (b) { b.remove(); });
+      return clone.outerHTML;
+    }
+    return blockToMarkdown(el);
+  }
+
   function blockToMarkdown(el) {
     var tag = el.tagName.toLowerCase();
     var headingLevel = /^h[1-6]$/.test(tag) ? +tag.slice(1) : 0;
@@ -1061,6 +1109,7 @@
   function detectBlockType(chunk) {
     var lines = chunk.split("\n").map(function (l) { return l.trim(); }).filter(Boolean);
     if (!lines.length) return null;
+    if (lines[0][0] === "<") return "html"; // raw HTML passthrough (see isMarkdownSafe)
     if (/^#{1,6}\s+/.test(lines[0])) return "heading";
     if (lines.every(function (l) { return /^(?:[-*]|\d+\.)\s+/.test(l); })) return "list";
     if (lines.every(function (l) { return /^>\s?/.test(l); })) return "blockquote";
@@ -1076,6 +1125,13 @@
   // resolved data-files value for <main> (a string, possibly "" to mean clear).
   function chunkToBlock(chunk, allowH1) {
     var type = detectBlockType(chunk);
+    if (type === "html") {
+      // Verbatim HTML the user typed or kept from an unsupported block. `raw`
+      // stops parseBlocks from merging the original element's attributes back in
+      // (the user owns the full markup here).
+      var raw = chunk.trim();
+      return { html: raw, level: /^<h1[\s>]/i.test(raw) ? 1 : 0, raw: true };
+    }
     if (type === "heading") {
       var m = chunk.match(/^(#{1,6})\s+([\s\S]*)$/);
       var level = m[1].length;
@@ -1129,7 +1185,7 @@
     var text = String(md).replace(/\r\n?/g, "\n");
     var chunks = text.split(/\n[ \t]*\n+/).map(function (s) { return s.trim(); }).filter(function (s) { return s.length; });
     var blocks = chunks.map(function (c, i) { return chunkToBlock(c, allowH1 && i === 0); });
-    if (origEl && blocks[0]) blocks[0].html = withOrigAttrs(blocks[0].html, origEl);
+    if (origEl && blocks[0] && !blocks[0].raw) blocks[0].html = withOrigAttrs(blocks[0].html, origEl);
     return blocks;
   }
 
