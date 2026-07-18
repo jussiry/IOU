@@ -43,7 +43,7 @@ async function main() {
   const graph = buildGraph(raw);
 
   renderLegend(graph);
-  const categoryDropdown = setupCategoryDropdown();
+  setupCategoryDropdown();
   const stats = document.getElementById('stats');
   reserveStatsWidth(stats, graph);
   const setStats = (shown) => {
@@ -118,10 +118,7 @@ async function main() {
     sizeContainer: document.getElementById('size-filter'),
     legendContainer: document.getElementById('legend'),
     onChange: setStats,
-    // The "custom" entry can appear/disappear at runtime (via the embed API),
-    // which changes how much room the legend needs — recheck the collapse
-    // threshold whenever that happens.
-    onLegendChange: categoryDropdown.updateLayout,
+    categoriesToggle: document.getElementById('categories-toggle'),
   });
 
   setupEmbedBridge({ graph, zoom, filters, setFitTarget });
@@ -231,30 +228,17 @@ function reserveStatsWidth(stats, graph) {
   stats.style.minWidth = `${stats.offsetWidth}px`;
 }
 
-// The category legend shows inline when it fits next to the other header
-// controls; otherwise it collapses into a fixed-size "Categories" button that
-// opens the same toggle list as a popover. Re-checked on resize against
-// #topbar's own overflow, so it reacts to both window width and category count.
+// The category legend is always a popover: a fixed-size "Categories" button
+// (its label kept in sync by filters.js — see updateDropdownLabel) opens the
+// toggle list beneath it. Clicking outside closes it.
 function setupCategoryDropdown() {
   const wrap = document.getElementById('categories');
-  const topbar = document.getElementById('topbar');
   const toggle = document.getElementById('categories-toggle');
-
-  const updateLayout = () => {
-    wrap.classList.remove('collapsed'); // lay out inline first to measure it
-    const overflowing = topbar.scrollWidth > topbar.clientWidth + 1;
-    wrap.classList.toggle('collapsed', overflowing);
-    if (!overflowing) wrap.classList.remove('open');
-  };
 
   toggle.addEventListener('click', () => wrap.classList.toggle('open'));
   document.addEventListener('click', (e) => {
     if (wrap.classList.contains('open') && !wrap.contains(e.target)) wrap.classList.remove('open');
   });
-
-  updateLayout();
-  new ResizeObserver(updateLayout).observe(topbar);
-  return { updateLayout };
 }
 
 main().catch((e) => console.error('GraphEditor failed to start:', e));

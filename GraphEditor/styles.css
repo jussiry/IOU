@@ -84,14 +84,13 @@ html, body {
 .size-filter button:hover { color: var(--text); background: rgba(255,255,255,0.04); }
 .size-filter button.active { color: var(--text); background: rgba(255,255,255,0.1); }
 
-/* Categories — inline row of toggles by default. When the row doesn't fit
-   the header (checked in JS against #topbar's overflow), main.js adds
-   .collapsed, which hides the inline row and turns #legend into a popover
-   opened by the fixed-size .categories-toggle button instead. */
+/* Categories — always a popover: a fixed-size trigger button (its label kept
+   in sync by filters.js) opens a dropdown list beneath it. Never shown inline
+   in the header, so its width can't push around the other top-bar controls. */
 .categories { position: relative; flex-shrink: 0; margin-left: auto; }
 
 .categories-toggle {
-  display: none;
+  display: inline-flex;
   align-items: center;
   gap: 4px;
   flex-shrink: 0;
@@ -107,10 +106,8 @@ html, body {
   transition: background 0.12s ease, color 0.12s ease;
 }
 .categories-toggle:hover { color: var(--text); background: rgba(255,255,255,0.04); }
-.categories.collapsed .categories-toggle { display: inline-flex; }
 
-.legend { display: flex; align-items: center; gap: 14px; flex-wrap: nowrap; }
-.categories.collapsed .legend {
+.legend {
   display: none;
   position: absolute;
   top: 100%;
@@ -127,7 +124,7 @@ html, body {
   z-index: 30;
   min-width: 180px;
 }
-.categories.collapsed.open .legend { display: flex; }
+.categories.open .legend { display: flex; }
 
 .legend-item {
   display: inline-flex;
@@ -150,18 +147,12 @@ html, body {
   cursor: pointer;
   user-select: none;
   line-height: 1;
-  padding-right: 6px;
-  border-right: 1px solid #2c3540;
-  transition: color 0.12s ease;
-}
-.legend-toggle-all:hover { color: var(--text); }
-.categories.collapsed .legend-toggle-all {
-  border-right: 0;
-  padding-right: 0;
   padding-bottom: 6px;
   border-bottom: 1px solid #2c3540;
   align-self: stretch;
+  transition: color 0.12s ease;
 }
+.legend-toggle-all:hover { color: var(--text); }
 
 /* Embed mode — shown when GraphEditor is hosted in an iframe (?embed=1), e.g.
    the Design site's graph column. Only difference is a close button that asks

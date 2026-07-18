@@ -18,6 +18,10 @@
  *
  * Positions are left untouched (no relayout) so the surviving graph stays where
  * the user last saw it.
+ *
+ * The category dropdown trigger (`categoriesToggle`) is kept in sync here too:
+ * it reads "Categories ▾" normally, or the single category's own name when
+ * exactly one is enabled — see updateDropdownLabel.
  */
 
 import { CUSTOM_KEY, CUSTOM_STYLE, MODIFIED_KEY, MODIFIED_STYLE, legendItemEl } from './categories.js';
@@ -38,7 +42,7 @@ function normaliseRef(s) {
   return String(s).trim().replace(/^\.?\//, '').replace(/^app\//, '');
 }
 
-export function setupFilters({ nodes, edges, sizeContainer, legendContainer, onChange, onLegendChange }) {
+export function setupFilters({ nodes, edges, sizeContainer, legendContainer, onChange, categoriesToggle }) {
   let sizeMode = 'all';
   const disabledCategories = new Set();
   let customIds = null;   // Set<normalised ref> | null — populated by applyCustom()
@@ -119,10 +123,20 @@ export function setupFilters({ nodes, edges, sizeContainer, legendContainer, onC
   const toggleAllBtn = legendContainer.querySelector('#legend-toggle-all');
 
   function syncToggleAll() {
+    updateDropdownLabel();
     if (!toggleAllBtn) return;
     const allOff = catButtons.length > 0 && catButtons.every((b) => disabledCategories.has(b.dataset.category));
     toggleAllBtn.textContent = allOff ? '○' : '◎';
     toggleAllBtn.title = allOff ? 'Show all categories' : 'Hide all categories';
+  }
+
+  // The dropdown trigger shows "Categories ▾" by default, but when exactly one
+  // category is enabled it shows that category's own name instead — a quick
+  // visual confirmation of what's isolated without having to open the popover.
+  function updateDropdownLabel() {
+    if (!categoriesToggle) return;
+    const enabled = catButtons.filter((b) => !disabledCategories.has(b.dataset.category));
+    categoriesToggle.textContent = enabled.length === 1 ? `${enabled[0].dataset.label} ▾` : 'Categories ▾';
   }
 
   if (toggleAllBtn) {
@@ -164,7 +178,6 @@ export function setupFilters({ nodes, edges, sizeContainer, legendContainer, onC
     syncLegendOff();
 
     syncToggleAll();
-    onLegendChange && onLegendChange();
     recompute();
   }
 
@@ -176,7 +189,6 @@ export function setupFilters({ nodes, edges, sizeContainer, legendContainer, onC
     disabledCategories.clear(); // back to showing everything
     syncLegendOff();
     syncToggleAll();
-    onLegendChange && onLegendChange();
     recompute();
   }
 
@@ -199,7 +211,6 @@ export function setupFilters({ nodes, edges, sizeContainer, legendContainer, onC
       wireCategoryButton(modifiedBtn);
     }
     syncToggleAll();
-    onLegendChange && onLegendChange();
     recompute();
   }
 

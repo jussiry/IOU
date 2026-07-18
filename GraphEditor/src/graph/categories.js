@@ -62,6 +62,7 @@ export function legendItemEl(key, { color, symbol, label }) {
   const item = document.createElement('span');
   item.className = 'legend-item';
   item.dataset.category = key;
+  item.dataset.label = label || key;
   item.setAttribute('role', 'button');
   item.title = `Toggle ${label || key}`;
   item.innerHTML =
