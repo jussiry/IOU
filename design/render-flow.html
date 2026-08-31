@@ -1,0 +1,135 @@
+<!--
+  render-flow.html — how a data change (or a URL change) becomes a rendered
+  page. Written from js/app.js, js/app-state.js, and js/ui/. Longer page, so the
+  GraphEditor file lists (data-files) sit on each root-level <h2>.
+-->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Render flow — Design</title>
+  <link rel="stylesheet" href="assets/design.css" />
+</head>
+<body>
+  <main class="page" data-status="reference">
+    <h1>Render flow</h1>
+
+    <p class="lede">
+      How the screen updates. Everything — a
+      <a href="glossary.html#command">command</a> mutating state, an inbound peer
+      message, a presence change, or the user navigating — converges on
+      <strong>one render path</strong> that rebuilds the current page from a
+      freshly derived view. There is no virtual DOM and no fine-grained
+      reactivity: it re-renders the whole active page, which stays simple and
+      predictable for an app this size.
+    </p>
+
+    <h2 data-files="
+      js/app-state.js js/ui/view-model.js js/app.js
+    ">Two kinds of state</h2>
+    <p>
+      The UI is a function of exactly two inputs:
+    </p>
+    <ul>
+      <li><strong>App state</strong> — the persistent source of truth (user,
+        friends, contacts, the <a href="glossary.html#ledger">ledger</a>, outbox)
+        held in memory and saved to IndexedDB. Owned by
+        <code>app-state.js</code>; see <a href="p2p.html">P2P</a>.</li>
+      <li><strong>Location</strong> — the ephemeral "where am I" held in
+        <code>window.location.hash</code> (e.g. <code>#friends</code>,
+        <code>#friend/&lt;id&gt;</code>). Not persisted; it only selects which
+        page to show.</li>
+    </ul>
+    <p>
+      The render is <code>(app&nbsp;state × location)</code>. A change to either
+      re-runs the same path below, so what you see always reflects both.
+    </p>
+
+    <h2 data-files="js/commands/transaction.js js/commands/friendship.js js/commands/trust-limit.js js/commands/payment-request.js js/app-state.js js/ui/view-model.js js/models/data-model.ts">From data change to render</h2>
+    <p>When state changes — the local user acting, or an inbound durable message applied during <a href="communication.html">sync</a> — the sequence is:</p>
+    <ol><li>A <a href="glossary.html#command">command</a> mutates <code>state</code> and calls <code>persistAndBuildView(state)</code>.</li><li>That normalises the state, <strong>saves</strong> it to IndexedDB, then calls <code>emitDataChange(state)</code>.</li><li><code>emitDataChange</code> runs <code>buildView(state)</code> — the pure derivation of a <strong>read-only, sanitised view</strong> (balances totalled, private keys stripped) — and fans it out to every subscriber registered via <code>subscribeToDataChanges</code>.</li><li>The app shell's subscriber is <code>scheduleRouteRefresh</code>, which <strong>debounces</strong> (a zero-delay timer coalescing a burst of changes into one) and then re-renders the current route.</li></ol>
+    <p>
+      <a href="communication.html">Peer presence</a> (the green/amber/grey icon)
+      and relay-status changes also feed <code>scheduleRouteRefresh</code> — via
+      <code>subscribeToPeerStatusChanges</code> and a re-emit from the relay
+      registry — so connectivity updates re-render through the exact same path,
+      without touching persisted state.
+    </p>
+
+    <h2 data-files="
+      js/app.js js/ui/nav.js js/ui/page-transitions.js
+    ">Rendering a page</h2>
+    <p>
+      Whether triggered by a data change or a navigation, rendering funnels
+      through <code>loadActiveRoute() → loadPage(route)</code>, which:
+    </p>
+    <ol>
+      <li>fetches the page's HTML template (cached) and calls
+        <code>loadData()</code> — the current <code>buildView</code>;</li>
+      <li>builds a fresh detached DOM for the page;</li>
+      <li>sets route UI state — document title, active nav item, subpage flag —
+        and refreshes the nav badges;</li>
+      <li>calls that page's <strong>binder</strong> (<code>bindTally</code>,
+        <code>bindFriends</code>, <code>bindFriendDetail</code>, …), handing it
+        the view <code>data</code> to populate the DOM and wire event handlers;</li>
+      <li>swaps the new page in with an animated transition.</li>
+    </ol>
+    <p>
+      Binders receive the whole view and rebuild their page's DOM each time —
+      the UI holds no state of its own and never mutates app state directly; it
+      only reads the view and calls commands. A <code>navigationSequence</code>
+      guard drops any render whose newer navigation has already superseded it.
+    </p>
+
+    <h2 data-files="js/app.js js/ui/nav.js js/ui/swipe.js">The URL: routing &amp; navigation</h2>
+    <p>
+      Location is the hash, and it is the only thing that decides which page
+      renders:
+    </p>
+    <ul>
+      <li><strong>Navigating = setting the hash.</strong> Nav buttons, in-page
+        links, and post-action redirects (e.g. creating a user jumps to
+        <code>#tally</code>) all just assign <code>window.location.hash</code>.</li>
+      <li>A <code>hashchange</code> listener records the hash in a small history
+        stack (for Back) and calls <code>loadActiveRoute()</code> — the same
+        entry point the data-change path uses.</li>
+      <li><code>parseRoute()</code> maps the hash to a route object: a main page
+        (<code>#tally</code>, <code>#friends</code>, <code>#logs</code>,
+        <code>#settings</code>), a subpage (<code>#friend/&lt;id&gt;</code>,
+        <code>#record/&lt;id&gt;</code>, <code>#trust/&lt;id&gt;</code>,
+        <code>#add-friend</code>, <code>#request</code>, <code>#transfer</code>),
+        or <code>#welcome</code>. Unknown hashes fall back to Tally.</li>
+      <li><code>resolveRouteForUserState</code> guards routes — with no user, any
+        route redirects to <code>#welcome</code>.</li>
+      <li><code>navigateTo</code> does smart Back: if the target hash is already
+        in history it steps back to it (<code>history.go</code>) instead of
+        pushing a duplicate, so tab-hopping doesn't pile up entries.</li>
+      <li><code>getSlideDirection</code> compares the old and new route against
+        the nav order to pick the transition's slide direction; swipe gestures
+        map to the same left/right navigation.</li>
+    </ul>
+
+    <h2 data-files="
+      js/ui/page-transitions.js
+    ">Page transitions</h2>
+    <p><code>swapPage</code> owns the ~400 ms slide: it mounts the incoming page offscreen, commits a paint, then animates the outgoing page out and the incoming page in, cleaning up when the transition ends. It sequences swaps so rapid navigation can't leave two pages half-animated.</p>
+    <blockquote>
+      <strong>Testing note:</strong> after any navigation, wait for the
+      ~400&nbsp;ms transition before asserting on the DOM (or read the DOM
+      directly, which is correct even mid-animation).
+    </blockquote>
+
+    <h2>In one line</h2>
+    <p>
+      <code>command → persist → buildView → notify → (debounce) →
+      loadActiveRoute → loadPage → bind → swapPage</code>, with the hash
+      selecting which page <code>loadPage</code> builds — and a URL change
+      entering the same pipeline at <code>loadActiveRoute</code>.
+    </p>
+  </main>
+
+  <script src="assets/pages.js"></script>
+  <script src="assets/design.js"></script>
+</body>
+</html>

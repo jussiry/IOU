@@ -27,6 +27,7 @@ window.DESIGN_PAGES = [
   { group: "Glossary", href: "glossary.html", title: "Glossary", status: "reference" },
 
   { group: "UI", href: "ui.html", title: "UI", status: "reference" },
+  { group: "UI", href: "render-flow.html", title: "Render flow", status: "reference" },
 
   { group: "P2P", href: "p2p.html", title: "P2P", status: "reference" },
   { group: "P2P", href: "spec-ledger.html", title: "Spec: Ledger", status: "reference" },

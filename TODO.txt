@@ -1,16 +1,15 @@
 
-Here are 4 features to implement. Some smaller, some quite major. Work on them one by one, as far as you can before you hit usage limit. 
 
-1. Graph editor when design has opened custom category, zoom the graph editor as close as possible so that all nodes are still in the view. Make this zoom only when it's called from API, not on all category clicks.
-
-2. In Design add search field at the top of contents sidebar. When search text is written make instant search through all documents (maybe with 150 ms delay from typing) and show matcing document names on sidebar. When a document is opened highlight all matching texts from it and scroll the document to first matching text. In search input change search icon to clear icon (X) when there is text and and by pressing it clear text and return to normal sidebar view.
-
-3. In glossary add graph editor links to terms where it is applicaple. General terms like "Tally" don't need linking, but more specific terms that have clear correspondance in code (like Ledger) should have linking.
-
-4. Add git functionality in Graph Editor. Add "modified" as a new category, that shows only files that have been modified since last commit. This can be seen with "git status". Graph editor already uses node server so i guess it's not a problem for it to run git commands?
+Each new task starts with one of the following:
+-  undone task, ready for implementing
++  already implemented; change - to + after implementing a task.
+x  failed to implement fully, needs human input. Add rows starting with ? to denote what input is required.
+o  still in planning phase, don't implemet yet
 
 
 
+
+DO NOT CONTINUE BELOW THIS AUTOMATICALLY
 
 FEATURES
 Add inactivate friend button.
