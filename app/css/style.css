@@ -39,22 +39,33 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+html {
+  height: 100%;
+}
+
+/* The shell owns the viewport and never scrolls itself: scrolling happens
+   inside each page view (see page-transitions.css). That is what lets two
+   stacked pages hold independent scroll positions during a transition — the
+   outgoing page stays where the user left it while the incoming one starts at
+   its top — and keeps the header and nav fixed instead of scrolling away. */
 body {
   margin: 0;
   background: radial-gradient(120% 120% at 20% -10%, var(--bg-tint) 0%, #f0ece5 50%, #e4e9e6 100%);
   color: var(--ink);
   font-family: "Space Grotesk", "IBM Plex Sans", "Avenir Next", sans-serif;
-  overflow-x: hidden;
+  height: 100%;
+  overflow: hidden;
 }
 
 .app {
-  min-height: 100vh;
+  height: 100%;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .app.is-welcome {
-  min-height: 100vh;
+  height: 100%;
 }
 
 .app.is-welcome header {

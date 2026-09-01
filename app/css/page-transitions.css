@@ -3,6 +3,10 @@
   display: grid;
   isolation: isolate;
   overflow: hidden;
+  /* Fill the remaining shell height; min-height:0 lets this flex child shrink
+     so its children can scroll internally instead of stretching the page. */
+  flex: 1 1 auto;
+  min-height: 0;
   --page-transition-duration: 320ms;
   --page-transition-easing: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
@@ -11,7 +15,13 @@
   grid-area: 1 / 1;
   width: 100%;
   min-width: 0;
-  overflow: hidden;
+  /* Each page view is its own scroll container — the core of the transition
+     behaviour described above. overscroll-behavior stops a page that hits its
+     end from chaining the scroll to the shell. */
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   transform: translateX(0%);
   padding-bottom: calc(105px + env(safe-area-inset-bottom, 0px));
 }

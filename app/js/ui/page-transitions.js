@@ -15,6 +15,23 @@ const transitionSequences = new WeakMap();
 const prefersReducedMotion = () =>
   window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches ?? false;
 
+// Re-apply a carried scroll offset until it sticks. The first assignment can
+// clamp short because binders finish asynchronously (a push-permission hint, a
+// lazily rendered list) and grow the page only after it is mounted. Retries are
+// bounded, and stop as soon as the target is reached or the reader scrolls past
+// it themselves.
+const restoreScrollTop = (page, top) => {
+  if (!top) return;
+  page.scrollTop = top;
+  let framesLeft = 12;
+  const reapply = () => {
+    if (framesLeft-- <= 0 || page.scrollTop >= top || !page.isConnected) return;
+    page.scrollTop = top;
+    requestAnimationFrame(reapply);
+  };
+  requestAnimationFrame(reapply);
+};
+
 const nextPaint = () =>
   new Promise((resolve) => {
     requestAnimationFrame(() => requestAnimationFrame(resolve));
@@ -122,7 +139,7 @@ export const getSlideDirection = (fromRoute, toRoute, navOrder) => {
   return null;
 };
 
-export const swapPage = async (container, nextPage, { direction } = {}) => {
+export const swapPage = async (container, nextPage, { direction, resetScroll = false } = {}) => {
   if (!container || !nextPage) return;
 
   const seq = (transitionSequences.get(container) ?? 0) + 1;
@@ -133,16 +150,28 @@ export const swapPage = async (container, nextPage, { direction } = {}) => {
   nextPage.classList.add(PAGE_CLASS);
 
   const currentPage = getActivePage(container);
+
+  // Every page view is its own scroll container, so scroll needs no correction
+  // during a swap: a freshly built page starts at its top, and the outgoing one
+  // keeps the offset the user left it at while it slides away. The exception is
+  // re-rendering the *same* page (a data change), which builds a new element and
+  // would otherwise silently jump the reader back to the top — carry it over.
+  const carriedScrollTop = !resetScroll && currentPage ? currentPage.scrollTop : 0;
+  const mount = (page) => {
+    container.appendChild(page);
+    restoreScrollTop(page, carriedScrollTop);
+  };
+
   if (!currentPage) {
     nextPage.classList.add(ACTIVE_CLASS);
-    container.appendChild(nextPage);
+    mount(nextPage);
     return;
   }
 
   if (!direction || prefersReducedMotion()) {
     currentPage.remove();
     nextPage.classList.add(ACTIVE_CLASS);
-    container.appendChild(nextPage);
+    mount(nextPage);
     container.removeAttribute("data-transitioning");
     return;
   }
@@ -163,7 +192,7 @@ export const swapPage = async (container, nextPage, { direction } = {}) => {
   nextPage.style.transform = `translateX(${enterStart})`;
 
   container.setAttribute("data-transitioning", "true");
-  container.appendChild(nextPage);
+  mount(nextPage);
 
   // Ensure the entering page has a committed "offscreen" paint before starting the transition.
   // This avoids cases on slower devices where only the exiting page animates.

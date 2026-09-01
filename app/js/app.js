@@ -165,6 +165,12 @@ const createSubpageRoute = (type, friendId = null) => ({
   mainPage: lastMainPage,
 });
 
+// Identity of a route for "did the page actually change?" checks. Ignores
+// `mainPage`, which is only back-navigation context and can differ between two
+// renders of the same page.
+const routeKey = (route) =>
+  route ? `${route.type}:${route.page || route.friendId || ""}` : "";
+
 const fetchTemplate = async (path) => {
   if (templateCache.has(path)) {
     return templateCache.get(path);
@@ -244,6 +250,9 @@ const loadPage = async (route) => {
     isWelcome || currentRoute?.type === "welcome"
       ? null
       : getSlideDirection(currentRoute, route, navOrder);
+  // Navigating to a different page starts at the top; re-rendering the same
+  // page (a data change, peer status update, …) must leave the scroll alone.
+  const isSameRoute = routeKey(currentRoute) === routeKey(route);
   const sequence = (navigationSequence += 1);
 
   try {
@@ -420,7 +429,7 @@ const loadPage = async (route) => {
     if (!isWelcome) {
       initTallyToggles(pageView);
     }
-    await swapPage(contentRoot, pageView, { direction });
+    await swapPage(contentRoot, pageView, { direction, resetScroll: !isSameRoute });
     if (sequence !== navigationSequence) return;
 
     currentRoute = route;
