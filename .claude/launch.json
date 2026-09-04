@@ -2,43 +2,85 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "Dev Server (nodemon)",
+      "name": "Tally app",
       "runtimeExecutable": "/Users/jussi/.nvm/versions/node/v24.14.0/bin/npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
       "env": {
         "PATH": "/Users/jussi/.nvm/versions/node/v24.14.0/bin:/usr/bin:/bin:/usr/sbin:/sbin"
       },
       "port": 3000,
-      "autoPort": true
+      "autoPort": false
     },
     {
-      "name": "Production Server",
-      "runtimeExecutable": "/Users/jussi/.nvm/versions/node/v24.14.0/bin/node",
-      "runtimeArgs": ["server/server.js"],
-      "port": 3000
-    }
-  ,{
-      "name": "Web (landing)",
-      "runtimeExecutable": "/Users/jussi/.nvm/versions/node/v24.14.0/bin/npx",
-      "runtimeArgs": ["serve", "web", "-l", "3001"],
-      "port": 3001
-    }
-  ,{
-      "name": "grapheditor",
-      "runtimeExecutable": "node",
-      "runtimeArgs": ["/Users/jussi/code/IOU/GraphEditor/scripts/serve.mjs"],
-      "port": 8088,
-      "autoPort": true
-    }
-  ,{
-      "name": "Design (static)",
-      "runtimeExecutable": "/Users/jussi/.nvm/versions/node/v24.14.0/bin/npx",
-      "runtimeArgs": ["serve", "design"],
+      "name": "Design",
+      "runtimeExecutable": "/Users/jussi/.nvm/versions/node/v24.14.0/bin/npm",
+      "runtimeArgs": [
+        "run",
+        "dev:design"
+      ],
       "env": {
         "PATH": "/Users/jussi/.nvm/versions/node/v24.14.0/bin:/usr/bin:/bin:/usr/sbin:/sbin"
       },
       "port": 4000,
-      "autoPort": true
+      "autoPort": false
+    },
+    {
+      "name": "Web landing",
+      "runtimeExecutable": "/Users/jussi/.nvm/versions/node/v24.14.0/bin/npx",
+      "runtimeArgs": [
+        "serve",
+        "web",
+        "-l",
+        "3001"
+      ],
+      "env": {
+        "PATH": "/Users/jussi/.nvm/versions/node/v24.14.0/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+      },
+      "port": 3001,
+      "autoPort": false
+    },
+    {
+      "name": "GraphEditor",
+      "runtimeExecutable": "/Users/jussi/.nvm/versions/node/v24.14.0/bin/npm",
+      "runtimeArgs": [
+        "--prefix",
+        "GraphEditor",
+        "run",
+        "dev"
+      ],
+      "env": {
+        "PATH": "/Users/jussi/.nvm/versions/node/v24.14.0/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+      },
+      "port": 8088,
+      "autoPort": false
+    },
+    {
+      "name": "devAll (all four)",
+      "runtimeExecutable": "/Users/jussi/.nvm/versions/node/v24.14.0/bin/npm",
+      "runtimeArgs": [
+        "run",
+        "devAll"
+      ],
+      "env": {
+        "PATH": "/Users/jussi/.nvm/versions/node/v24.14.0/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+      },
+      "port": 3000,
+      "autoPort": false
+    },
+    {
+      "name": "Production Server",
+      "runtimeExecutable": "/Users/jussi/.nvm/versions/node/v24.14.0/bin/node",
+      "runtimeArgs": [
+        "server/server.js"
+      ],
+      "env": {
+        "PATH": "/Users/jussi/.nvm/versions/node/v24.14.0/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+      },
+      "port": 3003,
+      "autoPort": false
     }
   ]
 }
