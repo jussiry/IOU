@@ -22,6 +22,7 @@ window.DESIGN_PAGES = [
   { href: "index.html", title: "Overview", status: "reference" },
 
   { group: "Purpose", href: "purpose.html", title: "Purpose", status: "reference" },
+  { group: "Purpose", href: "related-work.html", title: "Related work", status: "reference" },
   { group: "Purpose", href: "plan-idea.html", title: "Original idea notes", status: "reference" },
 
   { group: "Glossary", href: "glossary.html", title: "Glossary", status: "reference" },
@@ -49,6 +50,7 @@ window.DESIGN_PAGES = [
   { group: "TIPs", href: "tip-005-os-notifications.html", title: "TIP-005 OS notifications", status: "proposal" },
   { group: "TIPs", href: "tip-006-external-nostr-key-storage.html", title: "TIP-006 External Nostr key storage", status: "implemented" },
   { group: "TIPs", href: "tip-006-remote-signers.html", title: "TIP-006 Remote signers (cont.)", status: "proposal" },
+  { group: "TIPs", href: "tip-007-chained-transactions.html", title: "TIP-007 Chained transactions", status: "proposal" },
 
   { group: "Tooling", href: "tooling.html", title: "Tooling", status: "reference" },
   { group: "Tooling", href: "design-roadmap.html", title: "Design roadmap", status: "proposal" },

@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TIP-007 Chained transactions — Design</title>
+  <link rel="stylesheet" href="assets/design.css" />
+</head>
+<body>
+  <main class="page" data-status="proposal">
+<h1>TIP-007: Chained Transactions</h1>
+<div class="table-scroll"><table><thead><tr><th>Field</th><th>Value</th></tr></thead><tbody><tr><td>Number</td><td>TIP-007</td></tr><tr><td>Title</td><td>Chained Transactions</td></tr><tr><td>Status</td><td>Draft (very early — signature design only)</td></tr><tr><td>Author</td><td>Jussi Rytkönen</td></tr><tr><td>Created</td><td>2026-09-02</td></tr></tbody></table></div>
+<hr />
+<h2>Summary</h2>
+<p>A chained transaction lets Alice pay Charlie when they are not friends, by passing IOUs along a path of mutual friends: Alice→Bob→Charlie. Each hop is an ordinary IOU between friends; the chain as a whole must be <strong>all-or-nothing</strong>, so that no intermediary ever ends up having paid out without being paid in.</p>
+<p>This draft defines the <strong>commit mechanism</strong>: a single multi-party record that is valid only once every participant has signed it, plus the signed <code>cancel</code> that lets a not-yet-signed participant kill it early, plus the in-flight reservations that stop the same credit being promised twice. <strong>Routing is deliberately left open</strong> — see §Phase 1.</p>
+<p>The commit mechanism is intended to be the <em>same primitive</em> used by <a href="tip-002-circular-cancellation.html">TIP-002</a>. See §Relationship to TIP-002.</p>
+<hr />
+<h2>Motivation</h2>
+<p>Chained transactions are the feature that turns Tally from a shared debt notebook into money: without them, value only moves between people who already trust each other. They are named in <code>README.md</code> and <a href="purpose.html">Purpose</a> as core to the idea, and are the largest unimplemented piece of the project.</p>
+<p>The design constraint that makes this hard is Tally's own: there is <strong>no chain and no global ledger</strong> (see <a href="related-work.html">Related work</a>). Every comparable system — Trustlines, Circles — solved multi-hop atomicity by putting the whole path in one on-chain transaction, and solved routing by publishing the trust graph. Tally has neither, by choice.</p>
+<hr />
+<h2>Relationship to TIP-002 — one primitive, two features</h2>
+<p>A chained transaction and a circular cancellation are <strong>structurally the same operation</strong>:</p>
+<div class="table-scroll"><table><thead><tr><th></th><th>TIP-002 circular cancellation</th><th>TIP-007 chained transaction</th></tr></thead><tbody><tr><td>Shape</td><td>A cycle (last hop closes back to the first)</td><td>A path (distinct payer and payee ends)</td></tr><tr><td>Effect on each edge</td><td>Reduces existing debt</td><td>Creates new debt</td></tr><tr><td>Needs unanimous signing</td><td>Yes</td><td>Yes</td></tr><tr><td>Needs a canonical record every participant appends</td><td>Yes</td><td>Yes</td></tr><tr><td>Every hop is between direct friends</td><td>Yes</td><td>Yes</td></tr></tbody></table></div>
+<p>They differ in one respect that matters enormously for safety:</p>
+<blockquote><p><strong>Cancellation can only ever make you better off; a chained transaction can make you worse off.</strong></p></blockquote>
+<p>TIP-002 gets away with a signing pass that has no id, no deadline and no reservation, because its final guard (<code>cancel_amount ≤ current_debt</code>) is self-limiting: a stale cancellation revealed months later either still applies harmlessly or fails the guard. A stale <em>chained transaction</em> revealed months later <strong>increases</strong> the debt you owe, at a moment you did not choose. Everything in §Deadlines below exists because of that asymmetry.</p>
+<p><strong>Recommendation:</strong> build a shared <code>multi_party_record</code> primitive — canonical digest, signature set, deadline, reservation, signed cancel, ledger sharing rules — and express both TIPs on top of it, rather than writing two bespoke signing flows. If TIP-002 lands first with its own ad-hoc flow, it should be rebased onto the primitive when this TIP is implemented.</p>
+<p><em>Open:</em> whether the primitive is generic over "cycle" and "path", or whether a cycle is simply a path whose last hop points back at the first (which would make it one shape with one validation rule).</p>
+<hr />
+<h2>Key structural properties</h2>
+<p><strong>1. Every hop is between direct friends.</strong> As in TIP-002, no message ever has to be routed through a non-friend: each edge of the path is an existing friendship with an existing peer connection. The protocol runs on the existing signed envelope infrastructure.</p>
+<p><strong>2. Only the completed chain is a ledger entry.</strong> Route discovery and proposal traffic are ephemeral (like <code>sync_hello</code>); only the fully-signed record is durable.</p>
+<p><strong>3. There is no double-spend to resolve, so no consensus is needed — only evidence.</strong> Either the complete signature set exists or it does not, and it is self-verifying: anyone holding it can prove validity to anyone else. Unlike a blockchain, there is never a choice between two conflicting histories. This reduces "did it commit?" from a coordination problem to a <strong>delivery</strong> problem — which is why §Deadlines, not consensus, is the hard part.</p>
+<p><strong>4. Intermediaries end net-neutral.</strong> Bob receives an IOU from Alice and issues one to Charlie of equal value (modulo fees), so his net balance is unchanged. What he spends is <em>credit</em>, not money.</p>
+<hr />
+<h2>The record</h2>
+<pre><code>ChainedTransaction {
+  id:        "ctx_…"          // unique; part of the signed digest
+  legs: [                      // ordered, payer → payee
+    { from: A, to: B, amount: 50.10 },
+    { from: B, to: C, amount: 50.05 },
+    { from: C, to: D, amount: 50.00 },
+  ]
+  deadline:  &lt;timestamp&gt;       // after which no signature may be added
+  note?:     &lt;string&gt;          // visible to endpoints; see §Privacy
+}</code></pre>
+<p>Participants = every pubkey appearing in any leg. Each participant signs the canonical digest of the whole object (<code>js/crypto/canonical.js</code>), exactly as TIP-002 signs <code>{chain, cancel_amount}</code>.</p>
+<p>The record is <strong>valid if and only if</strong> every participant's signature is present and verifies. There is no partial state: an incomplete signature set is not a transaction, it is a proposal.</p>
+<p>On commit, each participant appends the <em>identical</em> record to their ledger and derives their own effect from their position: a participant appearing as <code>to</code> in leg <em>i</em> and <code>from</code> in leg <em>i+1</em> applies both.</p>
+<p><em>Open:</em> whether amounts decrease along the path (fees to intermediaries, as in the original idea notes) in v1, or whether every leg is equal for now and fees come later. Fees complicate the digest slightly and help decorrelate amounts (§Privacy), but need a policy for who sets them.</p>
+<hr />
+<h2>Phase 1 — Routing (open)</h2>
+<p><strong>Deliberately unspecified in this draft.</strong> Tally has no global graph and does not want one, so a route must be discovered by asking friends — which is the genuinely unsolved half of this feature.</p>
+<p>Sketch of the option space, to be worked out in a later revision or a separate TIP:</p>
+<ul><li><strong>Probing / flooding</strong>, in the shape of TIP-002's <code>loop_search</code>: ask friends "can you reach D for 50?", forwarded with a hop limit and a de-duplicating <code>search_id</code>. Reuses machinery TIP-002 already needs.</li><li><strong>Recipient-side advertisement</strong>: D tells its friends it wants to be reachable; the two searches meet in the middle.</li><li><strong>Cached neighbourhood knowledge</strong>: each node keeps a partial view of the graph two or three hops out, refreshed on sync.</li><li><strong>Manual routing</strong>: the user picks a mutual friend themselves. Ugly, but a valid v0 and useful for testing the commit path in isolation.</li></ul>
+<p>Open sub-questions: what "optimal" means (fewest hops / greatest bottleneck capacity / lowest fee / <strong>most debt-reducing</strong> — a route that cancels existing debt rather than creating new debt increases network capacity and should probably be preferred); whether to probe only WebRTC-connected peers; how much a probe leaks.</p>
+<p><strong>The commit design below does not depend on how the route is found</strong>, which is why it can be specified first.</p>
+<hr />
+<h2>Phase 2 — Signature collection</h2>
+<p>Once a route exists, one participant (normally the payer) becomes the <strong>assembler</strong>: it builds the record, signs it, and circulates it for signatures.</p>
+<h3>Message: <code>ctx_propose</code> (ephemeral)</h3>
+<p>Carries the unsigned record plus the signatures gathered so far. Not written to the ledger.</p>
+<h3>What each participant verifies before signing</h3>
+<ol><li>The record is well-formed and <code>deadline</code> is in the future by a sane margin.</li><li>Their own legs are consistent: the amount they receive ≥ the amount they send (they are not being asked to subsidise the chain).</li><li>Their <strong>outgoing</strong> leg fits within the credit their next-hop friend extends them, <em>after</em> existing in-flight reservations (§Reservations).</li><li>Their <strong>incoming</strong> leg is within their own trust limit for the previous hop — i.e. they are willing to be owed this much more by that friend.</li><li>The path does not visit them twice (see §Validation).</li><li>They have not already signed or cancelled this <code>id</code>.</li></ol>
+<p>If all pass, the participant signs, <strong>reserves</strong> (§Reservations), and forwards.</p>
+<h3>Collection topology (open)</h3>
+<ul><li><strong>Sequential along the path</strong> — as TIP-002 does. Simple, matches the friend-to-friend connectivity, and each hop only ever talks to its neighbours (best for a future private variant). Slowest, and one offline hop stalls everything.</li><li><strong>Hub-and-spoke via the assembler</strong> — the assembler contacts everyone. Faster and easier to reason about, but the assembler must be able to <em>reach</em> every participant, and they are not all its friends. Would need relay-mediated delivery to strangers, which the current envelope model does not do.</li><li><strong>Hybrid</strong> — sequential by default, with the assembler re-driving a stalled hop.</li></ul>
+<p>Sequential is the natural fit for v1 given the friends-only connectivity, but this is genuinely open.</p>
+<hr />
+<h2>Phase 3 — Commit</h2>
+<p>Whoever adds the final signature holds a complete, self-verifying record. They broadcast it to every participant they can reach; each recipient re-broadcasts to <em>its</em> neighbours in the chain. Because the record proves itself, any participant can convince any other — there is no privileged announcer.</p>
+<p><em>Open:</em> whether commit is also acknowledged (a receipt per participant), so the assembler can tell the user "everyone has it" rather than "it committed". Probably yes for UX, but the record is valid regardless.</p>
+<hr />
+<h2>Cancel</h2>
+<p>A participant that has <strong>not yet signed</strong> may refuse, and should say so explicitly rather than letting the proposal evaporate:</p>
+<pre><code>ChainedTransactionCancel {
+  id:       "ctx_…"       // the proposal being cancelled
+  by:       &lt;pubkey&gt;
+  reason?:  "declined" | "insufficient_capacity" | "expired" | …
+  signature
+}</code></pre>
+<p>A valid signed cancel from any participant <strong>voids the id permanently</strong> for everyone who sees it: no signature may be added afterwards, and every recipient releases its reservation immediately instead of waiting out the deadline. It propagates the same way the proposal did.</p>
+<p>Rules:</p>
+<ul><li>Anyone in <code>legs</code> may cancel <strong>before they have signed</strong>.</li><li>A cancel is itself evidence, and is self-verifying like the commit record.</li><li>Cancel and commit are mutually exclusive; a participant that has seen both must treat <em>the one that is provably complete</em> as authoritative — see §Deadlines for why this is not fully symmetrical.</li></ul>
+<p>*<em>Open — can a participant cancel </em>after* signing?** Arguments both ways:</p>
+<ul><li><strong>No (recommended for v1).</strong> A signature is a commitment; allowing retraction destroys atomicity, because "everyone has signed" would stop meaning "it will commit". The escape hatch is the deadline.</li><li><strong>Yes, until the set is complete.</strong> More forgiving in a network where a chain can sit half-signed for hours. But then two participants can race — one completing, one retracting — and you are back to needing a tie-break rule, which is exactly the consensus problem property 3 says we do not have.</li><li><strong>Middle ground:</strong> post-signing retraction is not a protocol operation but a <em>social</em> one — you ask the assembler to cancel before it completes. Costs nothing to implement.</li></ul>
+<p><em>Open:</em> whether a cancel should be a ledger entry or ephemeral. Ephemeral is cheaper and matches TIP-002's treatment of failed flows; durable makes "why did this fail?" answerable later and gives evidence against a peer who cancels constantly.</p>
+<hr />
+<h2>In-flight reservations</h2>
+<p>Without reservations, two concurrent chains through Bob can each individually fit inside his available credit and jointly exceed it. Both would be signed in good faith, and the second to commit would push him past a limit that was never agreed.</p>
+<p><strong>Rule:</strong> signing reserves the amount on both of that participant's affected edges — outgoing capacity toward the next hop, and headroom against the previous hop — until the record commits, is cancelled, or the deadline passes.</p>
+<p>Reserved amounts are subtracted from <code>available_trust</code> everywhere it is computed (<code>js/utils/friendships.js</code>, <code>js/friends-helpers.js</code>), so a second proposal validating against the same credit correctly fails check 3 above.</p>
+<p>Open points:</p>
+<ul><li><strong>Reserve at propose time or sign time?</strong> Sign time is cleaner (a reservation is the local half of a commitment). Propose time reduces wasted round-trips when a chain is doomed, but lets a hostile proposer freeze a friend's credit for free — a denial-of-service with no signature cost. <strong>Sign time is recommended.</strong></li><li><strong>Persisted or in-memory?</strong> In-memory is simpler and matches TIP-002's "state evaporates" model, but a reload would drop a reservation while its signature is still outstanding, which is unsafe. Reservations probably have to be persisted alongside the outbox, and reconciled on load against the deadline.</li><li><strong>UI:</strong> reserved credit should be visible ("€50 pending in a chained payment"), otherwise available trust silently drops and looks like a bug.</li><li><strong>Interaction with TIP-002:</strong> a cancellation and a chained payment competing for the same edge must see each other's reservations, which is another argument for one shared primitive.</li></ul>
+<hr />
+<h2>Deadlines, and the withholding problem</h2>
+<p>This is the sharp edge of the whole design, and it is not fully solvable.</p>
+<p><strong>The attack.</strong> A participant — most naturally the assembler, or whoever adds the last signature — holds the completed record instead of broadcasting it. Your signature is out there; you do not know whether the chain committed. The holder waits, watches how your balances develop, and presents the record at the moment it hurts most, or discards it if the chain stopped being useful to them. Your signature has become a <strong>free option</strong> written against you.</p>
+<p><strong>Why an honest network produces the same state.</strong> A peer that is simply offline, a relay that drops an envelope, or a device that crashes mid-broadcast leaves you in the identical position: signed, unresolved, unable to distinguish malice from a partition. Any rule must therefore work for both cases.</p>
+<p><strong>Why it is still relatively benign in Tally.</strong> Every counterparty in the chain is either your friend or your friend's friend, the amount is bounded by a credit limit you chose, and there is a real person to ask. That is a genuine advantage over trustless systems — but it is a mitigation, not a fix, and it weakens as chains lengthen and as devices (rather than people) get compromised.</p>
+<p><strong>The impossibility.</strong> After the deadline, a complete-and-correctly-dated record arrives late. Either:</p>
+<ul><li>you <strong>accept it</strong>, and the deadline bounds nothing — you can be surprised indefinitely, which is the attack above; or</li><li>you <strong>reject it</strong>, and a participant who was honest but slow (or partitioned) loses value they are genuinely owed.</li></ul>
+<p>There is no rule that avoids both. This is the classical result that atomic commit is impossible with unreliable messaging; you can only choose who carries the risk.</p>
+<p><strong>Options, none obviously right:</strong></p>
+<ol><li><strong>Strict received-by deadline.</strong> The record must be <em>received</em> before <code>deadline</code>, not merely dated before it. Hard bound, simple to implement, and the loss lands on the slow/partitioned party. Requires deadlines generous enough that honest offline peers are not routinely burned — which widens the option window.</li><li><strong>Deadline + grace.</strong> Accept until <code>deadline + Δ</code>. Softens honest failures; the option window is just longer. Δ is arbitrary.</li><li><strong>Assembler duty.</strong> The assembler is named in the record and is responsible for delivery; failure to deliver is attributable, and the ledger's evidence trail makes it socially visible. Enforcement is friendship, not protocol. Fits Tally's trust model; useless against a compromised device.</li><li><strong>Revive-on-evidence.</strong> A late record does not commit automatically, but surfaces as a claim the affected participants can accept manually ("Bob says this chain completed — accept?"). Turns a silent debt into a decision, and keeps the audit trail. More UI, but arguably the most honest option for a peer-to-peer app.</li><li><strong>Short deadlines, online-only chains for v1.</strong> Only attempt a chain when every hop is currently WebRTC-connected, with a deadline of seconds. Massively shrinks the window and the failure surface, at the cost of chains that only work when everyone happens to be online. <strong>Probably the right v1</strong>, with a longer-lived variant once the mechanism is proven.</li></ol>
+<p><em>Open:</em> whether the deadline is absolute (wall-clock, requiring roughly synced clocks) or relative to a signed proposal timestamp. Note the ledger already distrusts local <code>timestamp</code> and relies on the signed <code>originated_at</code> (<a href="spec-ledger.html">Ledger spec</a> §2) — the same reasoning applies here, and clock skew between friends is a real source of spurious expiry.</p>
+<hr />
+<h2>Validation rules</h2>
+<p>An inbound <code>chained_transaction</code> entry is applied only if:</p>
+<ol><li>Every participant in <code>legs</code> has a present, verifying signature over the canonical digest.</li><li>The record was received within the accepted window (§Deadlines, option-dependent).</li><li>No participant appears twice in the path (a self-intersecting route would multiply that person's exposure).</li><li>Each leg amount is positive, and amounts are non-increasing along the path.</li><li>The <code>id</code> has not already been applied, and has not been cancelled.</li><li>For the applying node's own edges: the resulting debt does not exceed a limit it agreed to — <em>open:</em> whether this is a hard rejection (safe, but can produce a chain the rest of the network considers committed and one node does not) or a warning that still applies (consistent, but overrides the user's limit). This is the ugliest open question in the draft.</li></ol>
+<hr />
+<h2>Ledger integration</h2>
+<p>A chained transaction is the ledger's <strong>first multi-party record</strong>, and it breaks an assumption baked into the current design: entries have one <code>from_user_id</code> and one <code>to_user_id</code>, and <code>getLedgerEntriesForPeer</code> slices the ledger bilaterally, never forwarding third-party entries (<a href="spec-ledger.html">Ledger spec</a> §4.1).</p>
+<p>A chained record must be held by participants who are not one of its two endpoints, so the spec needs:</p>
+<ul><li>a definition of which participants receive which parts during sync,</li><li>a rule for verifying a multi-party record that arrives from someone who is not its author,</li><li>a decision on whether the whole record is shared with all participants (simple; leaks the route) or sliced per participant (see §Privacy).</li></ul>
+<p><em>Open:</em> whether the record is stored once with a participant list, or whether each node stores a projection of it. Storing it whole is much simpler and makes the record self-verifying on replay; projections are a prerequisite for the private variant below.</p>
+<hr />
+<h2>Partly private chained transactions (future — explicitly not v1)</h2>
+<p>In v1 every participant sees the whole record: the full route, every amount, and the identities of the endpoints. That is a real privacy regression relative to bilateral transactions, and worth improving later — but the obvious fix does not work, and it is worth writing down why.</p>
+<p><strong>The tension:</strong> onion routing (Sphinx, as used by Lightning) hides the route from the hops, but <strong>requires the sender to already know the full route</strong>. Lightning affords that only because it gossips the entire channel graph publicly. Tally cannot publish that graph without giving up the property that distinguishes it. Meanwhile, hop-by-hop route discovery (§Phase 1) leaks the route to participants <em>by construction</em>, because they are the ones doing the discovery. <strong>Hiding the route from participants and discovering it without a global graph pull in opposite directions</strong>, and no design here escapes that without a global graph.</p>
+<p>What is nonetheless available later:</p>
+<ul><li><strong>Per-leg signing bound by a shared root.</strong> Each participant signs only its own leg plus a binding value (the <code>id</code>, or a Merkle root over all legs) and receives an inclusion proof. Hides leg <em>contents</em> from non-adjacent participants. Does <strong>not</strong> hide <em>participation</em>: verifying unanimity requires knowing the signer set, which leaks path length and membership.</li><li><strong>Leg-to-leg encryption of the payload.</strong> The <code>note</code> and the endpoints' identities are encrypted to the endpoints, so intermediaries learn only their two neighbours and their amount. Cheap, and worth doing early — arguably even in v1.</li><li><strong>Signature aggregation</strong> (MuSig2 / FROST over the Schnorr keys already in use). Compresses unanimity to one signature. Elegant, but verification still requires the key set, so it buys little privacy, adds two rounds, and nonce mishandling can leak a private key. Not worth it.</li><li><strong>Amount correlation</strong> remains regardless: an identical amount along a path fingerprints it. Per-hop fees perturb this slightly; multi-part payments would perturb it more.</li></ul>
+<p>A reasonable target is "intermediaries learn their neighbours, their amount, and the path length — nothing else", reached by per-leg signing plus payload encryption. It is a v2 concern, and the v1 record shape should simply avoid decisions that make it impossible (notably: keep the digest structured per-leg even if everyone currently signs the whole thing).</p>
+<hr />
+<h2>Why not HTLC / ILP for v1</h2>
+<p>Interledger and Lightning solve the same commit problem with a hash time-locked contract: the recipient picks a secret <code>r</code> and publishes <code>H(r)</code>; each hop promises conditionally ("I pay if shown <code>r</code> before T"), timeouts decrease along the path so each hop can always claim upstream after being claimed downstream, and revealing <code>r</code> unlocks every leg at once.</p>
+<p>This machinery exists to achieve atomicity between parties who <strong>do not trust each other and cannot settle socially</strong>. It also needs an enforcement layer to mean anything — for Lightning that is the blockchain; for ILP it is that your peer is a business partner. A timeout by itself provides no recourse, only a rule for what the ledger concludes.</p>
+<p>Tally's hops are friends with an explicit credit limit, so the unanimous-signature design gets the same atomicity with far less machinery and no secret management. What is worth taking from ILP is the <em>discipline</em>, and this draft takes it: an expiry inside the signed object, reservations on prepare, and an explicit reject.</p>
+<p>HTLCs become worth revisiting if hops stop being friends-of-friends, or if a private variant needs a hop to commit without seeing who is downstream.</p>
+<hr />
+<h2>Open questions</h2>
+<ol><li><strong>Where does the deadline risk land</strong> — strict received-by, grace, assembler duty, or revive-on-evidence (§Deadlines)? Everything else in the design is comparatively mechanical.</li><li><strong>Online-only chains for v1?</strong> Requiring every hop to be WebRTC-connected shrinks the problem enormously; is the resulting feature still useful enough to ship?</li><li><strong>Can a signer retract?</strong> (§Cancel.) Recommended no; needs a decision before implementation.</li><li><strong>Hard-reject or apply-with-warning</strong> when an inbound chain would push a node past its own limit (§Validation rule 6)?</li><li><strong>Reservation persistence</strong> across reload, and reconciliation on load.</li><li><strong>Shared primitive scope</strong> — is a cycle just a path that closes, or two shapes with one signing flow (§Relationship to TIP-002)?</li><li><strong>Fees in v1 or later</strong>, and who sets them.</li><li><strong>Maximum path length.</strong> Longer chains find more routes and multiply every failure mode; 3 hops is probably the right ceiling to start.</li><li><strong>Multi-currency chains</strong> — out of scope here, but the record shape should not make it impossible.</li></ol>
+<hr />
+<h2>Implementation notes</h2>
+<ul><li>New ephemeral peer message kinds: <code>ctx_propose</code>, <code>ctx_cancel</code>, <code>ctx_commit</code>.</li><li>New ledger entry type: <code>chained_transaction</code> — the project's first multi-party record.</li><li>New command: <code>createChainedTransaction(route, amount)</code>, alongside <code>createTransaction</code> in <code>js/commands/transaction.js</code>.</li><li>Reservations belong next to the outbox in persisted state; <code>available_trust</code> computations must subtract them.</li><li>Signature payload: the canonical digest of <code>{id, legs, deadline}</code> via <code>js/crypto/canonical.js</code>, signed with the existing authorship-proof machinery (<code>js/peer/authorship.js</code>) so a third-party-forwarded record verifies without change.</li><li>Build the <code>multi_party_record</code> helpers first and port TIP-002 onto them, rather than duplicating the signing flow.</li></ul>
+  </main>
+  <script src="assets/pages.js"></script>
+  <script src="assets/design.js"></script>
+</body>
+</html>
