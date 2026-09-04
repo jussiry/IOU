@@ -12,7 +12,7 @@
   <link rel="stylesheet" href="assets/design.css" />
 </head>
 <body>
-  <main class="page" data-status="reference" data-files="
+    <main class="page" data-status="reference" data-files="
     js/commands/transaction.js js/commands/trust-limit.js
     js/commands/payment-request.js js/commands/friendship.js
     js/utils/friendships.js js/friends-helpers.js js/ledger.ts
@@ -38,18 +38,9 @@
       between two friends.
     </p>
 
-    <h2>Trust, and chained transactions</h2>
-    <p>
-      Two quantities drive everything:
-    </p>
-    <ul>
-      <li><strong>Debt</strong> — the current balance of IOUs with a friend:
-        positive (they owe you) or negative (you owe them). It only moves when
-        you send or receive an IOU.</li>
-      <li><strong>Trust</strong> — the
-        <a href="glossary.html#trust-limit">trust limit</a> you set per friend:
-        the most you're comfortable being owed by them.</li>
-    </ul>
+    <h2>Tally and chained transactions</h2>
+    
+    <ul><li><strong>Tally</strong> — the current balance of IOUs with a friend: positive (they owe you) or negative (you owe them). It only moves when you send or receive an IOU.</li><li><strong>Trust</strong> — the <a href="glossary.html#trust-limit">trust limit</a> you set per friend: the most you're comfortable being owed by them.</li></ul>
     <p>Trust limits let value flow between people who <em>don't</em> know each other. If Alice and Bob trust each other and so do Bob and Charlie, Alice can pay Charlie by passing an IOU through Bob: Alice's IOU to Bob, Bob's own IOU to Charlie. Bob is left neutral (equal in and out), and Charlie gets an IOU he trusts. Chains can be any length, so with enough trust in the network, anyone can transact with anyone. The <a href="glossary.html#available-trust">available trust</a> along a route is the headroom these chains flow through.</p>
 
     <h2>Why it's built the way it is</h2>
@@ -63,11 +54,9 @@
       <a href="communication.html">Communication</a>).
     </p>
 
-    <p>
-      For the full original framing — including future ideas like routing
-      <em>fees</em> to incentivise keeping the network liquid — see the imported
-      <a href="plan-idea.html">original idea notes</a>.
-    </p>
+    
+
+    <p>For the full original framing — including future ideas like routing <em>fees</em> to incentivise keeping the network liquid — see the imported <a href="plan-idea.html">original idea notes</a>.</p><h2>Long history</h2><p>The seed for Tally existed already 20 years ago in the original idea of Ripple (ripple pay). I wrote about it in my blog back then, but even with <a href="related-work.html">many attempts on the way</a>, this revolutionary idea is still hasn't caught the fire it deserves.</p>
   </main>
 
   <script src="assets/pages.js"></script>

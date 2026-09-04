@@ -1,0 +1,267 @@
+<!--
+  related-work.html — the projects Tally shares a lineage with, and what it does
+  differently. Authored, external-facing background: it explains why Tally has
+  no blockchain, and which open problems the whole field still shares.
+  Companion to purpose.html; keep the "Where Tally differs" section honest.
+-->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Related work — Design</title>
+  <link rel="stylesheet" href="assets/design.css" />
+</head>
+<body>
+  <main class="page" data-status="reference">
+    <h1>Related work</h1>
+
+    <p class="lede">
+      Tally is not a new idea — it is the newest attempt at a twenty-year-old
+      one. Peer-to-peer <a href="glossary.html#transaction">IOUs</a> routed over
+      a graph of <a href="glossary.html#trust-limit">trust limits</a> have been
+      designed, funded and shipped several times. Almost all of those attempts
+      reached for a blockchain. Tally does not, and this page is where that
+      choice is argued against the record.
+    </p>
+
+    <h2>The root: Ripple (2004)</h2>
+    <p>
+      Ryan Fugger's <strong>RipplePay</strong> is the origin of the whole
+      family. Its claim: money is already just mutual credit between people who
+      trust each other, so a payment to a stranger is a chain of IOUs passed
+      along a path of friends — exactly the model in
+      <a href="purpose.html">Purpose</a>. It ran as an ordinary web server with
+      one shared database, and never grew a user base large enough for routing
+      to matter.
+    </p>
+    <p>
+      Everything below is a descendant, and each one differs mainly in
+      <em>what it replaced that shared database with</em>. Note the name
+      collision: today's <strong>XRP Ledger</strong> and <strong>Stellar</strong>
+      still use the word "trustline", but there it means "I accept token X from
+      issuer Y" — a whitelist of asset issuers, not bilateral mutual credit.
+      Neither is related to Tally's model beyond the borrowed vocabulary.
+    </p>
+
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr><th>Project</th><th>Substrate for shared truth</th><th>Open source</th><th>State (2026)</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>RipplePay (2004)</td><td>One central server</td><td>No</td><td>Gone</td></tr>
+          <tr><td>Trustlines</td><td>Own chain (TLBC) → Gnosis Chain</td><td>Yes</td><td>Dormant since Dec 2022</td></tr>
+          <tr><td>Circles</td><td>Gnosis Chain (ERC-1155)</td><td>Yes</td><td>Active</td></tr>
+          <tr><td>fiatjaf/trustlines</td><td>Bitcoin blocks as a clock only</td><td>Yes</td><td>Concept sketch</td></tr>
+          <tr><td>Holochain mutual credit</td><td>Per-agent chains, countersigned</td><td>Yes</td><td>Experimental</td></tr>
+          <tr><td>Credit Commons / CES</td><td>Federated community ledgers</td><td>Yes</td><td>Active, ~20k users</td></tr>
+          <tr><td>Sikoba</td><td>Permissioned "federated" chain</td><td>No</td><td>Dormant</td></tr>
+          <tr><td><strong>Tally</strong></td><td><strong>None — bilateral signed records</strong></td><td>Yes</td><td>In development</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2>Open, decentralised descendants</h2>
+
+    <h3>Trustlines Network</h3>
+    <p>
+      The most complete engineering of Tally's exact model, and the most useful
+      one to read. Credit lines live in a <code>CurrencyNetwork</code> smart
+      contract — one per denomination — which stores, for every pair, two
+      directional credit limits plus a signed balance. That is Tally's trust
+      limit and <a href="glossary.html#tally">tally</a>, in public contract
+      storage. A multi-hop payment is a <em>single on-chain transaction</em>
+      that walks the path and moves every intermediate balance at once, so
+      atomicity is free. Users are identity contracts, letting a delegate pay
+      gas on their behalf (meta-transactions), and an off-chain
+      <strong>relay server</strong> indexes the chain into a cached graph and
+      runs Dijkstra over it to find paths.
+    </p>
+    <p>
+      Trustlines built its own Proof-of-Stake Ethereum sidechain (TLBC, live
+      November 2019), then <strong>sunset it in December 2022</strong> and moved
+      the protocol to Gnosis Chain, having concluded that running a validator
+      set was not worth it. The protocol repositories have had no commits since
+      then, and the documentation, developer and blog domains no longer resolve.
+    </p>
+    <p>
+      <strong>The lesson Tally takes:</strong> on-chain state buys atomic
+      multi-hop routing and a graph you can actually search — and costs you a
+      fully public trust graph, gas per payment, a token, and validators to
+      maintain. The graph being public is not a side effect; it is what makes
+      the pathfinding possible.
+    </p>
+
+    <h3>Circles</h3>
+    <p>
+      Live on Gnosis Chain and actively developed — the only project in this
+      space with current momentum. Issuance differs fundamentally: instead of
+      bilateral credit, every person continuously mints their <em>own</em>
+      personal token (a UBI), and a trust graph decides whose tokens you will
+      accept. Paying a stranger means swapping along a transitive chain of
+      trusted currencies until you hold one the recipient accepts — the same
+      routing problem as a chained transaction, reached from the opposite
+      direction. Worth watching for its pathfinder and its group currencies,
+      not for its money model.
+    </p>
+
+    <h3>fiatjaf/trustlines</h3>
+    <p>
+      A short protocol sketch, notable because it takes Tally's constraint
+      seriously: mutual credit with <strong>no chain to write to</strong>. It
+      moves value with conditional IOUs (<code>PREPARE</code> / <code>OK</code>,
+      borrowed from Interledger) and uses Bitcoin block heights purely as an
+      uncensorable clock for timeouts — never publishing a transaction, never
+      paying a fee. Unfinished, but it is the closest published thinking to the
+      commit problem Tally has to solve, and comes from the author of Nostr,
+      whose keys Tally already uses.
+    </p>
+
+    <h3>Holochain mutual credit</h3>
+    <p>
+      Agent-centric rather than chain-centric: each participant keeps their own
+      hash chain, and a transaction is an entry <em>countersigned</em> by both
+      parties and committed to both chains. There is no global ledger and no
+      consensus — validity is local and checkable. Architecturally this is the
+      closest relative to Tally's <a href="glossary.html#ledger">ledger</a> and
+      <a href="glossary.html#authorship">authorship proofs</a>, and the best
+      prior art for "how do you validate without consensus". Still largely
+      experimental.
+    </p>
+
+    <h3>Credit Commons, CES and Community Forge</h3>
+    <p>
+      The non-blockchain branch, and the one with real users. The
+      <strong>Credit Commons Protocol</strong> nests independent community
+      ledgers into federations that clear against each other in any agreed unit,
+      with no central issuer. Its GPL reference implementation runs the
+      Community Exchange System and Community Forge — on the order of twenty
+      thousand accounts, with inter-network clearing operating since 2011.
+      Trust is organisational (you trust the group's bookkeeping) rather than
+      personal, so it scales differently from Tally, but it demonstrates the
+      point that the blockchain layer was never the hard part.
+    </p>
+
+    <h3>Adjacent: Interledger and Lightning</h3>
+    <p>
+      Not IOU systems, but they solved the two problems Tally has left open.
+      <strong>Interledger (ILP)</strong> moves value across a chain of
+      independent, mutually-trusting hops using prepare/fulfil/reject packets;
+      <strong>Lightning</strong> does the same over payment channels, with
+      onion-routed paths so no intermediary learns the full route. Both are the
+      literature to read before designing chained transactions — see
+      <a href="tips.html">TIPs</a>.
+    </p>
+
+    <h2>Centralised and closed systems</h2>
+    <p>
+      <strong>Sikoba</strong> is the near-twin of Tally's feature list — credit
+      lines, credit conversion through intermediaries (where you keep exposure
+      only to the person you chose to trust), and clearing of circular debts,
+      which is Tally's <a href="tip-002-circular-cancellation.html">circular
+      cancellation</a> under another name. Despite the blockchain branding it is
+      a conventional server product: Crystal and PostgreSQL behind a REST API,
+      with a permissioned validator set (Babble) and Ethereum only ever proposed
+      as a notary. It is closed source, its 2017 token sale underdelivered, the
+      2020 beta and the Luxembourg e-Beki pilot did not lead anywhere visible,
+      and the app host no longer resolves. Its "clearing nodes" design only
+      works because one operator sees the whole graph — the design Tally's
+      privacy model rules out.
+    </p>
+    <p>
+      <strong>Cyclos</strong> is the mature commercial engine for LETS,
+      timebanks and barter circuits — hundreds of live deployments, each a
+      hosted database. <strong>Grassroots Economics</strong> (Sarafu, Kenya) is
+      open and on-chain but issues pooled community vouchers, not bilateral
+      IOUs, and is the strongest evidence in the field that field deployment
+      matters more than the ledger technology.
+      <strong>Splitwise</strong>, Tricount and Settle Up are the ones people
+      actually use: bilateral tallies with good UX and no transferability at
+      all. They are Tally's competition for the first screen, not for the
+      protocol.
+    </p>
+
+    <h2>Where Tally differs</h2>
+    <p>
+      <strong>No chain at all.</strong> Not a private chain, not a sidechain,
+      not an L2 — no shared ledger of any kind. Every record lives in the two
+      (or few) devices it concerns, as an append-only
+      <a href="glossary.html#ledger">ledger</a> of signed
+      <a href="glossary.html#durable-message">durable records</a> exchanged over
+      <a href="communication.html">WebRTC</a>. There is no gas, no token, no
+      validator set, no indexer, no global graph to publish, and nothing to keep
+      running once two people have the app. Every project above except the
+      Credit Commons family needed infrastructure that someone had to fund
+      indefinitely; most of them stopped when that funding did.
+    </p>
+    <p>
+      <strong>A transaction is just a signed promise.</strong> On Trustlines a
+      credit line is an on-chain object that both parties must open before value
+      can move; on XRPL and Stellar the receiver must explicitly create a
+      trustline before they can be paid at all. In Tally the record <em>is</em>
+      the promise: an IOU is a Schnorr-signed statement that stands on its own
+      and is simply appended to both ledgers. The
+      <a href="glossary.html#trust-limit">trust limit</a> is a number you keep
+      about someone else — headroom for deciding what you are willing to accept,
+      and later for routing — not a precondition either side has to accept
+      before the first payment. Nothing has to be created, funded or activated
+      first, which is why onboarding a friend is a QR code and no transaction.
+    </p>
+    <p>
+      <strong>Privacy is bilateral by construction.</strong> Sync only ever
+      offers a peer the slice of the ledger that is <em>between the two of
+      you</em>; third-party entries are never forwarded (see
+      <a href="spec-ledger.html">Ledger spec</a> and
+      <a href="security.html">Security</a>). Trustlines' entire trust graph is
+      readable by anyone with an RPC endpoint. This is the sharpest difference
+      in the family, and the source of the open problems below.
+    </p>
+
+    <h2>Open problems this lineage leaves us</h2>
+    <p>
+      <a href="glossary.html#transaction">Chained transactions</a> are not
+      implemented, and the two obstacles are exactly the ones every project
+      above had to answer:
+    </p>
+    <ul>
+      <li><strong>Routing without a global graph.</strong> Trustlines and
+        Circles run a shortest-path search over a graph the chain publishes for
+        them. Tally has no such graph and does not want one, so a route has to
+        be discovered by asking friends — probing, gossip, or source-routing
+        over a locally-known neighbourhood, as Lightning does.</li>
+      <li><strong>The decentralised commit problem.</strong> A chain of IOUs
+        must be all-or-nothing: no intermediary may end up having paid out
+        without being paid in. On-chain systems get this from a single
+        transaction. Without consensus it needs either a signature from every
+        participant before any leg counts, or conditional IOUs with timeouts in
+        the ILP/HTLC style.</li>
+    </ul>
+    <p>
+      Both belong in a <a href="tips.html">TIP</a> before any code, alongside
+      <a href="tip-002-circular-cancellation.html">TIP-002</a>, which solves the
+      easier neighbouring problem of unwinding a loop that already exists.
+    </p>
+
+    <h2>Links</h2>
+    <ul>
+      <li>Trustlines — <a href="https://github.com/trustlines-protocol/contracts">contracts</a>,
+        <a href="https://github.com/trustlines-protocol/relay">relay</a>,
+        <a href="https://smokyish.github.io/tl-docs/resources/FAQ/">docs mirror</a></li>
+      <li>Circles — <a href="https://github.com/aboutcircles/circles-contracts-v2/">circles-contracts-v2</a>,
+        <a href="https://www.gnosis.io/blog/introducing-circles-v2-money-for-a-multipolar-world">v2 announcement</a></li>
+      <li><a href="https://github.com/fiatjaf/trustlines">fiatjaf/trustlines</a></li>
+      <li><a href="https://blog.holochain.org/mutual-credit-part-1-a-new-type-of-cryptocurrency-as-old-as-civilisation/">Holochain on mutual credit</a></li>
+      <li><a href="https://creditcommons.org/">Credit Commons Protocol</a>,
+        <a href="https://www.community-exchange.org/home/what-is-the-ces/">CES</a></li>
+      <li>Sikoba — <a href="https://technology.sikoba.com/">technology</a>,
+        <a href="https://users.sikoba.com/faq.html">FAQ</a></li>
+      <li><a href="https://www.cyclos.org/">Cyclos</a>,
+        <a href="https://opencredit.network/">Open Credit Network</a></li>
+    </ul>
+  </main>
+
+  <script src="assets/pages.js"></script>
+  <script src="assets/design.js"></script>
+</body>
+</html>
