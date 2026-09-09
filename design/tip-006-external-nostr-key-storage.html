@@ -7,11 +7,8 @@
   <link rel="stylesheet" href="assets/design.css" />
 </head>
 <body>
-  <main class="page" data-status="implemented" data-files="
-    js/crypto/key-provider.js js/crypto/nip44.js js/crypto/nip49.js
-    js/crypto/nostr-event.js js/crypto/canonical.js js/crypto/peer-crypto.js
-    js/peer/authorship.js js/peer/envelope.js js/utils/nostr-keys.js
-  ">
+  <main class="page" data-status="implemented"
+    data-files="js/crypto/key-provider.js js/crypto/nip44.js js/crypto/nip49.js js/crypto/nostr-event.js js/crypto/canonical.js js/crypto/peer-crypto.js js/peer/authorship.js js/peer/envelope.js js/utils/nostr-keys.js">
 <h1>TIP-006: External Nostr Key Storage</h1>
 <div class="table-scroll"><table><thead><tr><th>Field</th><th>Value</th></tr></thead><tbody><tr><td>Number</td><td>TIP-006</td></tr><tr><td>Title</td><td>External Nostr Key Storage</td></tr><tr><td>Status</td><td>Implemented (layers 1–5)</td></tr><tr><td>Author</td><td>Jussi Rytkönen</td></tr><tr><td>Created</td><td>2026-06-05</td></tr></tbody></table></div>
 <blockquote><p><strong>Context:</strong> The KeyProvider abstraction, <code>authorship</code> proofs and legacy signature migration, NIP-44 v2 transport (envelope v3 with v2 decrypt drain), and <strong>NIP-07</strong> browser-extension support are implemented and verified — including a successful real-signer test against nos2x. This document is the record of that implemented design. The remaining layer — <strong>NIP-46 remote signers and NIP-55 Android signers</strong> — is not implemented; its design continues in <code>../TIP-006-remote-signers.md</code>.</p></blockquote>
