@@ -62,8 +62,22 @@ function parseList(lines, start) {
       i = ni;
       continue;
     }
-    out += `<li>${inline(m[2])}</li>`;
+    const item = [m[2]];
     i++;
+    // Lazy continuation: a wrapped list item's later lines are indented past
+    // the marker. Without folding them back into the <li> they escape as their
+    // own paragraph, and any inline span (**bold**, `code`) split across the
+    // wrap is left unclosed.
+    while (
+      i < lines.length &&
+      !/^\s*$/.test(lines[i]) &&
+      !/^\s*(?:[-*+]|\d+\.)\s/.test(lines[i]) &&
+      lines[i].match(/^(\s*)/)[1].length > indent
+    ) {
+      item.push(lines[i].trim());
+      i++;
+    }
+    out += `<li>${inline(item.join(" "))}</li>`;
   }
   return [out + (ordered ? "</ol>" : "</ul>"), i];
 }

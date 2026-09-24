@@ -40,16 +40,20 @@
       <li><a href="glossary.html"><strong>Glossary</strong></a> — the shared
         vocabulary; short entries that link into the rest.</li>
       <li><a href="ui.html"><strong>UI</strong></a> — what people see and do:
-        pages, flows, presence.</li>
+        pages, flows, presence, and the
+        <a href="render-flow.html">render flow</a> behind them.</li>
       <li><a href="p2p.html"><strong>P2P</strong></a> — the peer-to-peer core:
-        the local-first ledger, state, storage, and how peers connect and sync
-        (WebRTC, the relay, envelopes).</li>
+        the local-first <a href="spec-ledger.html">ledger</a>,
+        <a href="spec-data-storage.html">state and storage</a>, and how peers
+        <a href="communication.html">connect and sync</a> (WebRTC, the relay,
+        envelopes).</li>
       <li><a href="security.html"><strong>Security</strong></a> — identity, keys,
         encryption, authorship, and the privacy model.</li>
       <li><a href="tips.html"><strong>TIPs</strong></a> — Tally Improvement
         Proposals: design docs with an implemented/draft lifecycle.</li>
       <li><a href="tooling.html"><strong>Tooling</strong></a> — how the project
-        is built and maintained, including this site.</li>
+        is <a href="build.html">built</a>, tested and maintained, including this
+        site.</li>
     </ul>
 
     <h2>Conventions</h2>
@@ -66,8 +70,11 @@
       <li class="chip" data-status="reference">reference — background or a spec</li>
     </ul>
     <p>
-      Some pages are still <em>imported as-is</em> from older Markdown notes
-      (marked with a banner) and may conflict with the code until reconciled.
+      Pages that describe implemented behaviour say when they were last checked
+      against the code. Two pages are <em>original notes</em>, kept verbatim for
+      their reasoning rather than as a description of the code — they carry a
+      banner saying so. The <a href="tips.html">TIP</a> pages are generated from
+      the Markdown under <code>TIPs/</code>; everything else is authored here.
       See the <a href="design-roadmap.html">Design roadmap</a> for where this site
       is headed.
     </p>

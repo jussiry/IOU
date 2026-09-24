@@ -113,15 +113,15 @@
     <h2 data-files="
       js/ui/page-transitions.js
     ">Page transitions</h2>
-    <p><code>swapPage</code> owns the ~400 ms slide: it mounts the incoming page offscreen, commits a paint, then animates the outgoing page out and the incoming page in, cleaning up when the transition ends. It sequences swaps so rapid navigation can't leave two pages half-animated.</p>
+    <p><code>swapPage</code> owns the slide — <strong>320 ms</strong>, set once as the CSS variable <code>--page-transition-duration</code> in <code>page-transitions.css</code> and read from there by everything that has to wait for it: it mounts the incoming page offscreen, commits a paint, then animates the outgoing page out and the incoming page in, cleaning up when the transition ends. It sequences swaps so rapid navigation can't leave two pages half-animated.</p>
 
     <h3>Scroll position</h3>
     <p>The shell owns the viewport and never scrolls: the header and nav are fixed, and <strong>each page view is its own scroll container</strong> (<code>overflow-y: auto</code>). That is what makes the transition behave — the outgoing page keeps the offset the reader left it at while it slides away, and the incoming page, being a fresh element, starts at its top. No scroll correction is needed, and nothing can jump when the old page is removed.</p>
     <p>One case does need help: re-rendering the <em>same</em> page (a data change or presence update) also builds a fresh element, which would silently send the reader back to the top. <code>swapPage</code> therefore carries the previous page's <code>scrollTop</code> across, re-applying it for a few frames because binders that finish asynchronously can grow the page after it mounts and clamp the first assignment short. <code>app.js</code> picks between the two by comparing route identity.</p>
 
     <blockquote>
-      <strong>Testing note:</strong> after any navigation, wait for the
-      ~400&nbsp;ms transition before asserting on the DOM (or read the DOM
+      <strong>Testing note:</strong> after any navigation, wait out the
+      transition before asserting on rendered output (or read the DOM
       directly, which is correct even mid-animation).
     </blockquote>
 

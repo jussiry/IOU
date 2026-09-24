@@ -6,19 +6,7 @@
   data-files (below) is hidden metadata: the code files this page documents, as
   GraphEditor node ids. design.js reads it and adds a graph icon by the heading
   that opens the graph filtered to just these files. A short page like this uses
-  one list on <main>; longer pages can instead put a data-files list on each
-  root-level <h2>.
--->
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Communication — Design</title>
-  <link rel="stylesheet" href="assets/design.css" />
-</head>
-<body>
-  <main class="page" data-status="reference" data-files="
+  one list on <main class="page" data-status="reference" data-files="
     js/peer/mesh.js js/peer/client.js js/peer/bridge.js
     js/peer/envelope.js js/peer/outbox.js js/peer/messages.js
     js/peer/handlers.js js/peer/status.ts js/peer/authorship.js
@@ -60,12 +48,16 @@
       from durable records and carry no authorship.
     </p>
 
+    <h2>The server's two jobs</h2>
+    <p>One Node process does both serving the app bundle and being a relay, but they are deliberately different roles, and a deployment may one day split them. That separation is also what makes <a href="glossary.html#relay">secondary relays</a> possible: a relay you add in settings serves no app, and the relay that served your app is just the one you get for free. Neither role stores user data — the relay holds only presence and a short queue of undelivered <a href="glossary.html#envelope">envelopes</a> it cannot read.</p>
+
     <h2>Go deeper</h2>
     <p>
-      Imported, pending reconciliation:
-      <a href="spec-peer-communication.html">Peer communication protocol</a>.
-      Code lives in <code>app/js/peer/</code>,
-      <code>app/js/signaling/</code>, and <code>server/</code>.
+      <a href="spec-peer-communication.html">Peer communication protocol</a> —
+      the message-by-message specification. Code lives in
+      <code>app/js/peer/</code>, <code>app/js/signaling/</code>, and
+      <code>server/</code>; how it is built and shipped is
+      <a href="build.html">Build &amp; runtime</a>.
     </p>
   </main>
 

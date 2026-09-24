@@ -19,8 +19,9 @@ is the worker's own content-hash versioning, separate from data/version.json
 */
 
 importScripts("dist/precache-manifest.js");
-// secp256k1 ECDH + AES-GCM decrypt for Web Push hints. Bundled separately
-// because the SW is a classic worker and WebCrypto can't do secp256k1.
+// secp256k1 decrypt for Web Push hints (NIP-44, with the legacy AES-GCM path
+// kept to drain old hints). Bundled separately because the SW is a classic
+// worker and WebCrypto can't do secp256k1.
 importScripts("dist/sw-crypto.js");
 
 const VERSION = self.__PRECACHE_VERSION || "dev";

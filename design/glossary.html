@@ -1,7 +1,8 @@
 <!--
   glossary.html — project-specific vocabulary for Tally.
 
-  Migrated from GLOSSARY.md (root). Authored text-first; reads cleanly as raw
+  This is the canonical glossary; root GLOSSARY.md now points here. Authored
+  text-first; reads cleanly as raw
   HTML. Synonyms are comma-separated in each term, most-commonly-used first.
   Scope is the Tally app only (not GraphEditor/ or web/).
 
@@ -75,6 +76,13 @@
         <strong>friend</strong> is the current word everywhere in UI and new
         code.</dd>
 
+      <dt id="friendship-status" data-files="js/utils/friendships.js js/models/data-model.ts"><a class="term-self" href="#friendship-status">Friendship status</a></dt>
+      <dd>Where a friendship stands, from the local user's point of view:
+        <code>pending_outgoing</code> (you asked), <code>pending_incoming</code>
+        (they asked), <code>accepted</code>, or <code>rejected</code>. Only an
+        accepted friendship is a <a href="#friend">friend</a> in the everyday
+        sense.</dd>
+
       <dt id="contact" data-files="js/models/data-model.ts js/utils/friendships.js"><a class="term-self" href="#contact">Contact</a></dt>
       <dd>A cached public identity (npub + display name) of a person the client
         has seen. Broader than <a href="#friend">friend</a>: every friend has a
@@ -87,8 +95,10 @@
       <dt id="trust-limit" data-files="js/commands/trust-limit.js"><a class="term-self" href="#trust-limit">Trust limit, Credit limit</a></dt>
       <dd>The maximum amount you allow a friend to owe you. Lowering takes effect
         immediately; raising requires the friend's agreement (sits pending until
-        they echo it). "Credit limit" is the term used in the message payload;
-        "trust limit" is the UI / most-common term.</dd>
+        they echo it). "Credit limit" is the legacy term still used on the
+        wire (<code>credit_limit_suggestion</code>) and in the stored fields
+        (<code>trust_credit_limit_eur</code>); "trust limit" is the UI and
+        everyday term.</dd>
 
       <dt id="available-trust" data-files="js/utils/friendships.js js/friends-helpers.js"><a class="term-self" href="#available-trust">Available trust</a></dt>
       <dd>A friend's <a href="#trust-limit">trust limit</a> plus the current
@@ -159,12 +169,49 @@
         contents.</dd>
     </dl>
 
+    <h2>State &amp; rendering</h2>
+    <dl>
+      <dt id="view" data-files="js/ui/view-model.js js/app-state.js"><a class="term-self" href="#view">View, view model</a></dt>
+      <dd>The read-only, sanitised object derived from app state and handed to
+        the UI — balances totalled, private keys stripped. Rebuilt in full by
+        <code>buildView</code> on every change; the UI never reads raw state and
+        never writes it. See <a href="render-flow.html">Render flow</a>.</dd>
+
+      <dt id="binder" data-files="js/app.js js/ui/nav.js"><a class="term-self" href="#binder">Binder</a></dt>
+      <dd>A page's <code>bind*</code> function (<code>bindTally</code>,
+        <code>bindFriends</code>, …). It receives the <a href="#view">view</a>,
+        populates that page's freshly built DOM, and wires its event handlers.
+        Pages hold no state of their own, so a binder runs again from scratch on
+        every render.</dd>
+
+      <dt id="route" data-files="js/app.js js/ui/swipe.js"><a class="term-self" href="#route">Route</a></dt>
+      <dd>Where the user is, parsed from <code>window.location.hash</code> — a
+        main page (<code>#tally</code>, <code>#friends</code>,
+        <code>#logs</code>, <code>#settings</code>), a subpage
+        (<code>#friend/&lt;id&gt;</code>, <code>#record</code>, …), or
+        <code>#welcome</code>. The only thing that decides which page renders;
+        navigating <em>is</em> setting the hash.</dd>
+
+      <dt id="model-version" data-files="js/models/data-model.ts js/storage/migrations.ts"><a class="term-self" href="#model-version">Model version, migration</a></dt>
+      <dd><code>DATA_MODEL_VERSION</code> stamps the shape of the persisted root
+        state. On load, versioned migrations reshape an older record forward
+        before normalisation. Unrelated to the app version or the service
+        worker's precache hash — see
+        <a href="build.html">Build &amp; runtime</a>.</dd>
+    </dl>
+
     <h2>Transport &amp; connectivity</h2>
     <dl>
       <dt id="peer" data-files="js/peer/client.js js/peer/mesh.js js/peer/bridge.js"><a class="term-self" href="#peer">Peer</a></dt>
       <dd>A remote endpoint the client connects to: a friend's device, or one of
         the user's <em>own</em> other devices. Keyed by
         <code>(userId, deviceId)</code>.</dd>
+
+      <dt id="device-id" data-files="js/models/data-model.ts js/peer/client.js js/signaling/socket-client.js"><a class="term-self" href="#device-id">Device id</a></dt>
+      <dd>A stable identifier the client generates for itself on first start and
+        persists. One user can be online on several devices at once, so a
+        <a href="#peer">peer</a> is addressed by <code>(user id, device id)</code>
+        rather than by user alone.</dd>
 
       <dt id="mesh" data-files="js/peer/mesh.js js/peer/client.js js/peer/bridge.js"><a class="term-self" href="#mesh">Mesh</a></dt>
       <dd>The <a href="#webrtc">WebRTC</a> overlay of live peer connections. Split
@@ -223,6 +270,12 @@
       <dd>The Nostr standards in use: event/signature format (01),
         browser-extension signer (07), encrypted payloads (44), and
         passphrase-encrypted key export / <code>ncryptsec</code> (49).</dd>
+
+      <dt id="signer-type" data-files="js/crypto/key-provider.js js/models/data-model.ts"><a class="term-self" href="#signer-type">Signer type</a></dt>
+      <dd>Which <a href="#keyprovider">KeyProvider</a> a user's identity uses:
+        <code>local</code> (private key stored in the app) or <code>nip07</code>
+        (key held in a browser extension). Stored on the user record and not
+        secret. See <a href="tip-006-external-nostr-key-storage.html">TIP-006</a>.</dd>
 
       <dt id="schnorr" data-files="js/crypto/secp256k1.js js/crypto/nostr-event.js"><a class="term-self" href="#schnorr">Schnorr / secp256k1</a></dt>
       <dd>The signature scheme and curve behind Nostr identities and

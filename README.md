@@ -1,93 +1,109 @@
-# IOU - Create Your Own Money
+# Tally — Create Your Own Money
 
-A peer-to-peer IOU tracking app that records debts and trust connections between friends. Debts are recorded locally on users' own devices, and by setting trust limits the debts can be extended to make transactions between strangers — as long as there is a chain of trusted friends between them.
+A peer-to-peer IOU app that records debts and trust between friends. Debts live
+on users' own devices, and trust limits let them extend to strangers — as long
+as there is a chain of trusted friends in between.
+
+*(The project was formerly called "IOU"; the name survives in package names and
+in `iou_` storage keys.)*
 
 ## Why
 
-Money, in its essence, is just bookkeeping that tracks good deeds that should be paid back. IOU (I owe you) returns money to its roots by basing it on personal loans that can be extended to strangers through a trusted chain of friends. This relatively basic functionality can become the basis for a whole monetary system — returning the control, and responsibility, of money from governments and banks back to people.
+Money, in its essence, is bookkeeping that tracks good deeds owed back. Tally
+returns money to that root by basing it on personal loans that can be extended
+to strangers through a trusted chain of friends. This relatively basic
+functionality can become the basis for a whole monetary system — returning the
+control, and the responsibility, of money from governments and banks back to
+people.
 
 ## Try it out
 
-https://iou-ui.up.railway.app
+https://tally.earth
 
-Development is on early stage, so don't use it to transact large amounts yet. Also backup your data regularly (when in active use) to avoid catastrophes.
+Development is at an early stage, so don't use it to transact large amounts yet.
+Also back up your data regularly when in active use, to avoid catastrophes.
 
 ## How it works
 
-Users create an identity (public/private keypair), add friends by exchanging public keys (via QR code or copy-paste), and send IOUs through direct WebRTC data channels. Debts can be settled through direct repayment or automatic circular cancellation — if A owes B, B owes C, and C owes A, the system can cancel the loop.
+Users create an identity (a Nostr keypair), add friends by exchanging public
+keys via QR code or copy-paste, and send IOUs over direct WebRTC data channels.
 
-There is no central ledger. Each client stores its own state in IndexedDB and syncs with peers when both are online. Messages that can't be delivered immediately are queued in an outbox and retried on reconnection.
+There is no central ledger. Each client stores its own state in IndexedDB and
+reconciles with peers when both are online. Messages that can't be delivered
+immediately are queued in an outbox, held by a relay server as encrypted
+envelopes, and retried on reconnection.
 
-## Chained transactions
+Chained transactions — paying someone you don't know through a chain of mutual
+friends — are the idea the whole design is aimed at, and are **not implemented
+yet**. See [Purpose](design/purpose.html) for how they work and
+[TIP-007](TIPs/TIP-007-chained-transactions.md) for the design in progress.
 
-Chained transactions expand trust to people are not known directly. This works by finding a connection through trusted friends: Alice and Bob trust each other, Bob and Charlie trust each other. With a chained transaction Alice can send an IOU to Charlie that Charlie trusts, even if Alice and Charlie don't trust each other directly.
+## Documentation
 
-```
-Alice wants to pay Charlie for a table, but they don't know each other.
-Bob is friends with both.
+Everything beyond this page lives in **[Design](design/index.html)** — a
+cross-linked, text-first documentation site covering purpose, the glossary, the
+UI, the peer-to-peer core, security, and tooling. Open `design/index.html`
+straight from disk, or browse it at https://tally.earth/design.
 
-Before:
-  Alice ──trust── Bob ──trust── Charlie
+Start with [Overview](design/index.html), or jump to:
 
-Transaction (Alice pays Charlie 50 EUR):
-  Alice ──IOU 50──> Bob ──IOU 50──> Charlie
+| | |
+|---|---|
+| [Purpose](design/purpose.html) | why Tally exists; the trust economics |
+| [Glossary](design/glossary.html) | the shared vocabulary |
+| [P2P](design/p2p.html) | the ledger, state, storage |
+| [Communication](design/communication.html) | how peers connect and sync |
+| [Security](design/security.html) | identity, keys, encryption |
+| [Build & runtime](design/build.html) | the build, the service worker, versions |
 
-After:
-  Alice owes Bob 50       (Alice gave her IOU to Bob)
-  Bob owes Charlie 50     (Bob gave his IOU to Charlie)
-  Bob's net balance: 0    (received 50 from Alice, gave 50 to Charlie)
-  Charlie got paid        (holds Bob's trusted IOU worth 50)
+Non-trivial changes get a **TIP** (Tally Improvement Proposal) under
+[`TIPs/`](TIPs/README.md); implemented ones move to `TIPs/implemented/`.
 
-Longer chains work the same way:
-  Alice ──> Bob ──> Carol ──> Dave ──> Charlie
-  Each link passes an IOU of equal value to the next.
-```
-
-## Current Features
+## Current features
 
 - Send and receive IOUs between friends
 - QR code generation and scanning for adding friends and receiving payments
 - Trust limits between friends (credit agreements)
-- Real-time peer status (online/offline indicators)
+- Payment requests
+- Real-time peer status (direct / via relay / offline)
+- Multiple user-chosen relay servers
 - Transaction history and activity logs
-- Works on mobile browsers
+- Optional OS notifications via encrypted Web Push
+- External key storage via a NIP-07 browser extension
+- Installable PWA that works offline; works on mobile browsers
 
-## TODO
+## Roadmap
 
-- Chained transactions have not yet been implemented.
-- Multiple servers that clients can connect to (to keep decentralized)
-- Different currencies (beside euros). Could be anything that users want to transact with.
-- "Market place": personal exchange rates for transferring one currency to another.
-- Fees on chained transactions (see /plan/idea.md for explanation).
+- Chained transactions ([TIP-007](TIPs/TIP-007-chained-transactions.md))
+- Circular debt cancellation — if A owes B, B owes C, and C owes A, cancel the
+  loop ([TIP-002](TIPs/TIP-002-circular-cancellation.md))
+- Currencies other than euros — anything users agree to transact in
+- A "marketplace": personal exchange rates between currencies
+- Fees on chained transactions (see
+  [the original idea notes](design/plan-idea.html))
 
 ## Architecture
 
 ```
 Browser A  <──WebRTC DataChannel──>  Browser B
     \                                    /
-     \──WebSocket──> Server <──WebSocket/
+     \──WebSocket──> Relay <──WebSocket/
 ```
 
-- **Client**: Vanilla JS SPA with no build step (for now).
-- **Server**: Node.js HTTP server that serves static files and runs a WebSocket signaling server. No database, no user data storage.
-- **Signaling**: WebSocket server routes offer/answer/ICE messages between peers and tracks online presence.
-- **Transport**: WebRTC data channels carry JSON messages (friend requests, IOUs, trust limit negotiations, receipts).
-- **Identity**: Nostr-compatible keys (npub/nsec). Users can import existing Nostr private keys.
-- **Storage**: IndexedDB on each client. All long term data is stored on clients. Single root state object.
+- **Client** — vanilla JS/TS progressive web app, transpiled per-file by esbuild
+  into `app/dist/`. No framework, no bundle.
+- **Server** — Node.js. Serves static files and runs a WebSocket relay. No
+  database; it holds presence and a short queue of envelopes it cannot read.
+- **Transport** — WebRTC data channels carry encrypted JSON; STUN helps peers
+  connect across networks. There is deliberately **no TURN server** — the relay
+  already covers the case where a direct connection can't form.
+- **Identity** — Nostr keys (npub/nsec). Existing Nostr keys can be imported, or
+  kept in a NIP-07 extension.
+- **Storage** — IndexedDB on each client, one root state object. All long-term
+  data stays on clients.
 
-## WebRTC and signaling
-
-The server assigns no roles — it only forwards messages between clients who have declared each other as peer candidates. When a client connects:
-
-1. Client registers its user ID via WebSocket
-2. Client sends its list of friend public keys (peer candidates)
-3. Server checks if any candidates are online and sends `peer_connect` to both sides
-4. Clients negotiate a WebRTC connection using the "perfect negotiation" pattern
-5. Once the data channel opens, all app messages flow peer-to-peer
-
-When a client disconnects, the server notifies its eligible peers immediately so they can clean up stale connections.
-
-ICE servers: STUN for direct connections, TURN over TCP as fallback (hosted on Railway via coturn).
+[Communication](design/communication.html) and
+[Peer communication](design/spec-peer-communication.html) go into detail.
 
 ## Getting started
 
@@ -98,19 +114,21 @@ npm install
 npm run dev
 ```
 
-This starts the server on `http://localhost:3000` with auto-reload via nodemon.
+Starts the client build in watch mode and the server on `http://localhost:3000`.
+`npm run devAll` also brings up Design, GraphEditor and the landing site.
 
 ### Production
 
 ```bash
-npm start
+npm run build && node server/server.js
 ```
 
-Or with Docker:
+`app/dist/` is build output and is not committed, so the build step is required.
+Or with Docker, which does both:
 
 ```bash
-docker build -t iou .
-docker run -p 8080:8080 iou
+docker build -t tally .
+docker run -p 8080:8080 tally
 ```
 
 ## Tests
@@ -119,6 +137,10 @@ docker run -p 8080:8080 iou
 npm run test:e2e:two-client
 npm run test:e2e:friend-request-online
 npm run test:e2e:reload-reconnect
+npm run typecheck
 ```
 
-Tests use Playwright to run two browser instances that connect to a local server and exercise friend requests, messaging, and reconnection scenarios.
+The end-to-end tests use Playwright to run two browser instances against a local
+server, exercising friend requests, messaging and reconnection. `npm run peer`
+drives a headless second user for manual testing — see
+[Tooling](design/tooling.html).

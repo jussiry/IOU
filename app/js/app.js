@@ -49,9 +49,9 @@ const navOrder = navButtons.map((button) => button.dataset.page).filter(Boolean)
 
 const pageTitles = {
   tally: "Tally",
-  friends: "IOU — Friends",
-  logs: "IOU — Logs",
-  settings: "IOU — Settings",
+  friends: "Tally — Friends",
+  logs: "Tally — Logs",
+  settings: "Tally — Settings",
 };
 
 const templatePaths = {
@@ -116,7 +116,7 @@ const setRouteUiState = (route) => {
 
   if (isWelcome) {
     appRoot?.classList.remove("is-subpage");
-    document.title = "IOU — Welcome";
+    document.title = "Tally — Welcome";
     setActiveNav(navButtons, null);
     return;
   }
@@ -298,9 +298,9 @@ const loadPage = async (route) => {
 
       bindFriendDetail(pageView, data, route.friendId);
       if (friend?.person_name) {
-        document.title = `IOU — ${friend.person_name}`;
+        document.title = `Tally — ${friend.person_name}`;
       } else {
-        document.title = "IOU — Friend";
+        document.title = "Tally — Friend";
       }
       initTallyActions(pageView, route.friendId);
       setFallbackBackNavigation(pageView);
@@ -315,7 +315,7 @@ const loadPage = async (route) => {
       renderTemplateIntoSlots(pageView, "trust-explainer", trustExplainerHtml);
 
       const addFriendHandlers = bindAddFriend(pageView, data);
-      document.title = "IOU — Add a friend";
+      document.title = "Tally — Add a friend";
       setFallbackBackNavigation(pageView);
 
       // Pre-fill friend key if redirected from send page scanner
@@ -341,7 +341,7 @@ const loadPage = async (route) => {
       const recordHtml = await fetchTemplate(templatePaths.record);
       renderSubpageContent(pageView, recordHtml);
       const recordHandlers = bindRecord(pageView, data, route.friendId);
-      document.title = "IOU — Record a tally";
+      document.title = "Tally — Record a tally";
       setFallbackBackNavigation(pageView);
       if (recordHandlers?.submitEl) {
         recordHandlers.submitEl.addEventListener("click", async () => {
@@ -369,7 +369,7 @@ const loadPage = async (route) => {
       const requestHtml = await fetchTemplate(templatePaths.request);
       renderSubpageContent(pageView, requestHtml);
       const requestHandlers = bindRequest(pageView, data);
-      document.title = "IOU — Request";
+      document.title = "Tally — Request";
       setFallbackBackNavigation(pageView);
       if (requestHandlers?.submitEl) {
         requestHandlers.submitEl.addEventListener("click", async () => {
@@ -385,7 +385,7 @@ const loadPage = async (route) => {
       const transferHtml = await fetchTemplate(templatePaths.transfer);
       renderSubpageContent(pageView, transferHtml);
       bindTransfer(pageView, data);
-      document.title = "IOU — Transfer";
+      document.title = "Tally — Transfer";
       setFallbackBackNavigation(pageView);
     } else if (route.type === "trust") {
       const [trustHtml, trustLimitFieldHtml, trustExplainerHtml] = await Promise.all([
@@ -397,7 +397,7 @@ const loadPage = async (route) => {
       renderTemplateIntoSlots(pageView, "trust-limit-field", trustLimitFieldHtml);
       renderTemplateIntoSlots(pageView, "trust-explainer", trustExplainerHtml);
       const trustHandlers = bindTrust(pageView, data, route.friendId);
-      document.title = "IOU — Trust";
+      document.title = "Tally — Trust";
       setFallbackBackNavigation(pageView);
       if (trustHandlers?.submitEl && route.friendId) {
         trustHandlers.submitEl.addEventListener("click", async () => {

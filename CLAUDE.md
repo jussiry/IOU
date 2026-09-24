@@ -154,18 +154,6 @@ exports `{ name, run }` and register it in `tests/two-client-e2e/run.cjs`.
 
 ---
 
-## Key files
-
-| Path | Purpose |
-|------|---------|
-| `client/js/dev/seed.js` | Dev seed — user identities and starting states |
-| `client/js/models/data-model.ts` | `createConnectionModel` — register new connection fields here |
-| `client/ui-modules/subpage/friend.js` | Friend detail page binding |
-| `tests/peer-helper/run.cjs` | Headless secondary-user driver |
-| `tests/two-client-e2e/scenarios/` | E2E scenario modules |
-
----
-
 ## TypeScript vs JavaScript strategy
 
 The codebase is gradually migrating from JavaScript to TypeScript.
@@ -175,5 +163,5 @@ The codebase is gradually migrating from JavaScript to TypeScript.
 
 **Write in JavaScript when:**
 - The module is **UI code**, specifically in:
-  * `js/ui/**/*.js`
-  * `client/ui-modules/**/*.js`
+  * `app/js/ui/**/*.js`
+  * `app/ui-modules/**/*.js`

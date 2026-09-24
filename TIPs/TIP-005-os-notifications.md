@@ -58,7 +58,7 @@ text. Instead:
 1. The **sender** knows the human-readable context (its own name, the amount).
    When it queues an envelope for an offline recipient, it also builds a short
    hint (`{ title, body }`), encrypts it **for the recipient** with the same
-   secp256k1 ECDH + AES-256-GCM scheme used for envelope bodies
+   NIP-44 v2 scheme used for envelope bodies
    (`crypto/peer-crypto.js`), and attaches it as `envelope.push_hint`.
 2. The **relay** forwards `push_hint` (plus the plaintext `from_user_id` routing
    field) as the Web Push payload — only when no device of the recipient is

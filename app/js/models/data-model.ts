@@ -56,11 +56,11 @@ export interface FriendModel {
   pending_payment_request: PaymentRequestModel | null;
   pending_name_change: PendingNameChange | null;
   /**
-   * Relay-server URLs this friend has told us they use. Populated by an
-   * incoming `my_relays` peer message (only when both sides have opted in via
-   * `state.share_my_relays`). Used to suggest popular-among-friends relays in
-   * the add-relay UI. Empty when the friend hasn't shared (or we haven't
-   * received their hint yet).
+   * Relay-server URLs this friend has told us they use, to suggest
+   * popular-among-friends relays in the add-relay UI. The `my_relays` exchange
+   * that would populate this is TIP-003 phase 2 and is NOT implemented, so in
+   * practice this is always empty today; the field exists so the schema is
+   * ready and `share_my_relays` has something to gate.
    */
   relays: string[];
 }
@@ -161,8 +161,8 @@ export interface RootState {
   /**
    * Whether to tell friends which relay servers we use, via a `my_relays`
    * peer message exchanged when both sides come online. Defaults to true.
-   * Friends use the aggregated info to suggest popular relays in their
-   * own add-relay flow. See TIP-003 §10 for drawbacks and rationale.
+   * The flag is persisted and surfaced in settings, but the exchange itself is
+   * not implemented yet — see TIP-003 §10 for the rationale and drawbacks.
    */
   share_my_relays: boolean;
   /**

@@ -23,8 +23,8 @@ After decryption, callers may trust the returned `inner` only after:
   2. For durable messages, the authorship proof verifies against `from_user_id`.
 
 Encryption itself is delegated to the caller's KeyProvider, so this module
-never touches raw key material. (Envelope version 2 uses the provider's
-AES-GCM path; NIP-44 / version 3 is introduced in a later layer.)
+never touches raw key material. Version 3 encrypts with NIP-44 v2; version 2
+used the provider's legacy AES-GCM path and is decrypted, never sent.
 @category network
 */
 

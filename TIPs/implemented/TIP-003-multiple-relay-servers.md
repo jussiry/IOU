@@ -234,6 +234,8 @@ Currently absent (any origin can open the WebSocket). Secondary relays may want 
 
 2. **TURN / STUN servers.** WebRTC needs ICE servers for NAT traversal. TURN config is independent of relay list — tying them together would force every relay operator to also run a TURN server, which is a much higher bar. TURN servers should be a separate list in settings (defaulting to a few well-known public STUN servers and optionally a self-hosted TURN). This is a separate settings section from relays.
 
+   > **Resolved since.** ICE servers did become their own settings section, but TURN was dropped entirely rather than made configurable: the encrypted-envelope relay already store-and-forwards for peers that cannot form a direct connection, which is the need TURN would have covered. Settings now holds a STUN-only list defaulting to Cloudflare. See [Communication](../../design/communication.html).
+
 3. **Relay reputation / discovery.** Beyond defaults shipped in the bundle, how does a user learn about new relays? A list page? A friend recommending one? Out of scope for v1; ship with curated defaults.
 
 4. **Backwards compatibility.** Old single-relay clients will continue to work as long as they are connected to a relay also in the new client's set. Otherwise they are invisible. No protocol change is needed; this is a population-overlap issue.
@@ -289,6 +291,5 @@ Phase 2 (the actual `my_relays` message exchange) and Phase 3 (refinements) are 
 ## Out of Scope
 
 - Signed relay identity / TOFU pinning (future TIP).
-- TURN server federation.
 - Cross-relay envelope ordering guarantees beyond what the recipient's local `processed_peer_message_ids` provides.
 - A directory or discovery service for new relays.

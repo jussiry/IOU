@@ -1,0 +1,153 @@
+<!--
+  build.html — how Tally's source becomes the thing a browser runs, and how a
+  running install picks up a new version. Written from scripts/build-client.cjs,
+  app/sw.js, app/js/ui/app-update.js and package.json. No prior doc.
+-->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Build &amp; runtime — Design</title>
+  <link rel="stylesheet" href="assets/design.css" />
+</head>
+<body>
+  <main class="page" data-status="reference">
+    <h1>Build &amp; runtime</h1>
+
+    <p class="lede">
+      Tally has no framework and no bundler output to speak of, but it does have
+      a build. This is the shape of it: what turns <code>app/js/</code> into the
+      files a browser actually loads, how the app keeps working offline, and how
+      an installed copy learns that a new version exists.
+    </p>
+
+    <h2 data-files="js/app.js js/version.js">Source and served are different trees</h2>
+    <p>
+      Everything is authored under <code>app/js/</code> and
+      <code>app/ui-modules/</code>, but <code>app/index.html</code> loads
+      <code>dist/js/app.js</code>. <strong><code>app/dist/</code> is build
+      output</strong> — gitignored, produced by <code>npm run build</code> (the
+      Docker image runs it while building the image), and never edited by hand. Editing a file there is silently undone by the next build,
+      so if a change appears to have no effect, check which tree it landed in.
+    </p>
+    <p>
+      Templates, CSS and icons are <em>not</em> copied: they are served straight
+      from <code>app/ui-modules/</code> and <code>app/css/</code>, so only
+      JS/TS passes through the build.
+    </p>
+
+    <h2 data-files="js/models/data-model.ts js/ledger.ts js/storage/indexeddb.ts js/storage/migrations.ts js/state-utils.ts js/peer/status.ts">The build: per-file, not bundled</h2>
+    <p>
+      <code>scripts/build-client.cjs</code> runs esbuild with
+      <code>bundle: false</code>, transpiling every <code>.ts</code> and
+      <code>.js</code> file individually into <code>app/dist/</code> with the
+      directory layout preserved. One source file, one output file. That choice
+      buys three things:
+    </p>
+    <ul>
+      <li><strong>Import paths never change.</strong>
+        <code>import "./foo.js"</code> resolves to <code>./foo.js</code> at
+        runtime whether <code>foo</code> is authored as JS or TS — so migrating a
+        file to TypeScript touches nothing but that file.</li>
+      <li><strong>Lazy loading keeps working.</strong> Dev seeds and the vendor
+        loader fetch modules by path at runtime; a bundle would have dissolved
+        those paths.</li>
+      <li><strong>The output stays readable</strong>, which matters for a project
+        whose stated aim is to be legible.</li>
+    </ul>
+    <p>
+      <code>app/js/vendor/*.js</code> passes through untouched — it contains no
+      TypeScript syntax, so esbuild emits it verbatim. Watch mode
+      (<code>--watch</code>) is mtime-driven and incremental; cold builds touch
+      everything once.
+    </p>
+
+    <h3>Why some files are TypeScript</h3>
+    <p>
+      The codebase is migrating to TypeScript <em>selectively</em>, not wholesale.
+      Data-heavy modules that define or normalise structured state — the
+      <a href="spec-data-storage.html">data model</a>,
+      <a href="spec-ledger.html">the ledger</a>, storage and migrations — are
+      TypeScript, because that is where a wrong shape is expensive and where the
+      types document the contract. UI modules under <code>app/js/ui/</code> and
+      <code>app/ui-modules/</code> stay JavaScript. <code>npm run typecheck</code>
+      runs <code>tsc --noEmit</code>; esbuild itself does not type-check.
+    </p>
+
+    <h2 data-files="sw.js sw-crypto-entry.js js/ui/app-update.js">Offline shell and updates</h2>
+    <p>
+      Tally is an installable PWA that must work with no network — a debt you
+      recorded offline is still a debt. <code>app/sw.js</code> is a
+      <strong>precache + cache-first</strong> service worker: at build time the
+      same script writes <code>dist/precache-manifest.js</code>, listing every
+      static asset with a content hash plus one combined version hash. On install
+      the worker fetches that whole list into a versioned cache; afterwards it
+      serves from cache, so the app boots instantly and offline.
+    </p>
+    <p>
+      Because the manifest's bytes change whenever any cached file changes, the
+      browser's byte-comparison of the worker detects an update on its own — no
+      version string to remember to bump. The new worker installs into the
+      <strong>waiting</strong> state and deliberately does <em>not</em>
+      auto-activate: <code>js/ui/app-update.js</code> surfaces "update available"
+      as one piece of state (a nav badge, a settings banner, a toast), and only
+      when the user accepts does the app post <code>SKIP_WAITING</code> and
+      reload. A refresh therefore never lands in the middle of recording a
+      transaction.
+    </p>
+    <p>
+      <code>app/sw-crypto-entry.js</code> is the one place a real bundle is
+      produced (an IIFE at <code>dist/sw-crypto.js</code>): the service worker is
+      a classic worker that cannot import the app's ES modules, and it needs
+      secp256k1 to decrypt <a href="glossary.html#push-hint">push hints</a> —
+      which WebCrypto cannot do. See
+      <a href="tip-005-os-notifications.html">TIP-005</a>.
+    </p>
+
+    <h3>Two version numbers, two jobs</h3>
+    <p>
+      They are unrelated, and conflating them causes confusion:
+    </p>
+    <ul>
+      <li><strong>The precache version</strong> is a content hash, computed at
+        build time. It decides <em>when the browser fetches new files</em>.</li>
+      <li><strong><code>app/data/version.json</code></strong> is a hand-bumped
+        semver (<code>scripts/bump-version.sh</code>) read by
+        <code>js/version.js</code>. It gates <em>local data</em> concerns, not
+        assets. Note that persisted state is versioned separately again, by
+        <code>DATA_MODEL_VERSION</code> and the
+        <a href="spec-data-storage.html">storage migrations</a>.</li>
+    </ul>
+
+    <h2>Running it</h2>
+    <p>
+      <code>npm run dev</code> starts the build in watch mode and the Node server
+      together (port 3000, nodemon restarting the backend). The server does
+      double duty — static files and the WebSocket relay — for the reasons in
+      <a href="communication.html">Communication</a>.
+    </p>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Command</th><th>Serves</th><th>Port</th></tr></thead>
+        <tbody>
+          <tr><td><code>npm run dev</code></td><td>the Tally app</td><td>3000</td></tr>
+          <tr><td><code>npm run dev:design</code></td><td>this site</td><td>4000</td></tr>
+          <tr><td><code>npm run devAll</code></td><td>app, GraphEditor, Design, and the landing site together</td><td>3000 / 8088 / 4000 / 3001</td></tr>
+          <tr><td><code>node server/server.js</code></td><td>production; the Docker entry point, after <code>npm run build</code></td><td><code>$PORT</code>, else 3000</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>
+      Under <code>devAll</code> each child gets its port explicitly, because all
+      four inherit one <code>PORT</code> from the parent otherwise and collide.
+      Test tooling — the seeded Alice/Bob/Carol identities, the headless peer
+      helper, and the two-client end-to-end scenarios — is covered in
+      <a href="tooling.html">Tooling</a>.
+    </p>
+  </main>
+
+  <script src="assets/pages.js"></script>
+  <script src="assets/design.js"></script>
+</body>
+</html>

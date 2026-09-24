@@ -33,8 +33,6 @@ window.DESIGN_PAGES = [
   { group: "P2P", href: "p2p.html", title: "P2P", status: "reference" },
   { group: "P2P", href: "spec-ledger.html", title: "Ledger", status: "reference" },
   { group: "P2P", href: "spec-data-storage.html", title: "Data storage", status: "reference" },
-  { group: "P2P", href: "plan-data-model.html", title: "Data model", status: "reference" },
-  { group: "P2P", href: "plan-architecture.html", title: "Architecture", status: "reference" },
   { group: "P2P", href: "communication.html", title: "Communication", status: "reference" },
   { group: "P2P", href: "spec-peer-communication.html", title: "Peer communication", status: "reference" },
 
@@ -53,5 +51,6 @@ window.DESIGN_PAGES = [
   { group: "TIPs", href: "tip-007-chained-transactions.html", title: "TIP-007 Chained transactions", status: "proposal" },
 
   { group: "Tooling", href: "tooling.html", title: "Tooling", status: "reference" },
+  { group: "Tooling", href: "build.html", title: "Build & runtime", status: "reference" },
   { group: "Tooling", href: "design-roadmap.html", title: "Design roadmap", status: "proposal" },
 ];

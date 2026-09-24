@@ -24,9 +24,11 @@
     <h2>What it is</h2>
     <p>
       One place to understand — and eventually to shape — how Tally works,
-      unifying what is today scattered across <code>TIPs/</code>,
-      <code>specs/</code>, <code>plan/</code>, and <code>GLOSSARY.md</code> into a
-      cross-linked, text-first HTML site. Each page reads cleanly as raw source
+      unifying what was scattered across <code>TIPs/</code>, <code>specs/</code>,
+      <code>plan/</code> and <code>GLOSSARY.md</code> into a cross-linked,
+      text-first HTML site. Those folders have since been folded in and removed;
+      <code>TIPs/</code> remains as the Markdown source the TIP pages are built
+      from. Each page reads cleanly as raw source
       (for a human or an AI) and renders as a paged, navigable doc site — the
       GraphEditor <code>readme.html</code> pattern, generalised to a whole
       multi-document project.
@@ -63,8 +65,12 @@
         <tr><td>Shell (topbar, sticky sidebar TOC, status system)</td><td><span class="tag" data-status="implemented">implemented</span></td></tr>
         <tr><td>Overview + Glossary pages</td><td><span class="tag" data-status="implemented">implemented</span></td></tr>
         <tr><td>Glossary terms linkable (stable anchors)</td><td><span class="tag" data-status="implemented">implemented</span></td></tr>
-        <tr><td>TIPs migrated in</td><td><span class="tag" data-status="planned">planned</span></td></tr>
-        <tr><td>Plan &amp; specs imported as-is (to reconcile)</td><td><span class="tag" data-status="planned">planned</span></td></tr>
+        <tr><td>TIPs migrated in (built from <code>TIPs/*.md</code>)</td><td><span class="tag" data-status="implemented">implemented</span></td></tr>
+        <tr><td>Plan &amp; specs imported, sources removed</td><td><span class="tag" data-status="implemented">implemented</span></td></tr>
+        <tr><td>Specs reconciled against the code</td><td><span class="tag" data-status="implemented">implemented</span></td></tr>
+        <tr><td>Project-anatomy groups + collapsing nav</td><td><span class="tag" data-status="implemented">implemented</span></td></tr>
+        <tr><td>GraphEditor opened from a page's <code>data-files</code></td><td><span class="tag" data-status="implemented">implemented</span></td></tr>
+        <tr><td>Served at <code>/design</code> alongside the landing site</td><td><span class="tag" data-status="implemented">implemented</span></td></tr>
         <tr><td>Cross-linking prose → glossary terms, sitewide</td><td><span class="tag" data-status="proposal">proposal</span></td></tr>
         <tr><td>In-browser editing</td><td><span class="tag" data-status="proposal">proposal</span></td></tr>
         <tr><td>Absorb GraphEditor under <code>design/graph/</code></td><td><span class="tag" data-status="proposal">proposal</span></td></tr>
@@ -73,9 +79,9 @@
 
     <h2>Phasing</h2>
     <ol>
-      <li><strong>Static site.</strong> Build the shell, migrate + reconcile the
-        docs, cross-link, serve at a <code>/design</code> route, point
-        <code>CLAUDE.md</code> at it.</li>
+      <li><strong>Static site.</strong> <em>Done.</em> Shell built, docs migrated
+        and reconciled, cross-linked, served at <code>/design</code>, and
+        <code>CLAUDE.md</code> points here.</li>
       <li><strong>In-browser editor.</strong> Edit a page's prose and save. The
         hard part is <em>persistence</em>: File System Access API for a local
         author, or an authenticated write endpoint when deployed. The editing UI
@@ -85,25 +91,40 @@
         graph and back.</li>
     </ol>
 
-    <h2>Known drift to reconcile</h2>
+    <h2>Drift, and how it gets caught</h2>
     <p>
-      Consolidation surfaces existing inconsistencies — that's a feature. Flagged
-      for when each area becomes canonical here:
+      Consolidation surfaces existing inconsistencies — that's a feature. The
+      first sweep (2026-09-09) closed these:
     </p>
     <ul>
-      <li>Two glossaries: root <code>GLOSSARY.md</code> and
-        <code>specs/glossary.md</code> hold different content.</li>
-      <li><code>plan/idea.md</code> overlaps <code>README.md</code>.</li>
-      <li>Several specs may be stale versus current code; each imported page
-        should get a status and a "verified against code on &lt;date&gt;" line.</li>
+      <li><strong>Two glossaries</strong> merged into
+        <a href="glossary.html">one</a>; <code>GLOSSARY.md</code> is now a
+        pointer to it.</li>
+      <li><strong>Duplicated data-model pages</strong> collapsed into
+        <a href="spec-data-storage.html">Data storage</a>, which now names
+        <code>data-model.ts</code> as the authority rather than restating it.</li>
+      <li><strong>Superseded crypto</strong> — the specs still described bare
+        Schnorr signatures and AES-GCM envelopes; both were replaced by TIP-006's
+        authorship proofs and NIP-44.</li>
+      <li><strong>Dropped TURN</strong> — removed from the docs that still
+        assumed it.</li>
     </ul>
+    <p>
+      What keeps recurring is <em>transcription</em>: a page that copies a field
+      table, a constant, or a duration out of the code will drift, every time.
+      The habit that works is to state the intent and the invariant here and name
+      the file that holds the value. Reconciled pages carry a "reconciled against
+      the code on &lt;date&gt;" line so the next reader knows how much to trust
+      the detail.
+    </p>
 
     <h2>Open questions</h2>
     <ul>
       <li>Do specs/plan/TIPs keep their own identities as sections, or dissolve
         into one flat topic list?</li>
-      <li>When does Design become AI's canonical source, so <code>CLAUDE.md</code>
-        and the scattered docs point <em>into</em> it?</li>
+      <li>How far does <code>README.md</code> shrink? It now points into Design
+        for the concepts, but the split between "repo front door" and "the docs"
+        is still drawn by hand.</li>
       <li>Editor persistence model for the deployed case (auth + conflict).</li>
     </ul>
   </main>

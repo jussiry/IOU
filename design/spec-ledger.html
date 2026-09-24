@@ -13,18 +13,17 @@
     js/crypto/peer-crypto.js js/peer/authorship.js js/peer/messages.js
     js/storage/indexeddb.ts js/dev/seed.js
   ">
-<div class="import-note">Imported verbatim from the old <code>specs/</code> and <code>plan/</code> notes, which have since been removed. This has not yet been reconciled with the current code or the other pages in its group — it may conflict with them.</div>
-<h1>IOU Ledger Specification</h1>
-<p><strong>Version:</strong> 2   <strong>Last updated:</strong> 2026-04-18</p>
+<h1>Ledger</h1>
+<p class="lede">The append-only local log every balance is derived from: what an entry is, how its author is proven, and how two peers merge theirs. Reconciled against the code on 2026-09-09.</p>
 <hr />
 <h2>1. Overview</h2>
-<p>The ledger is an append-only log of every peer message the local user has produced or received. It is persisted in IndexedDB (see <code>specs/data-storage.md</code>) as the <code>ledger</code> array inside the root state object.</p>
+<p>The ledger is an append-only log of every peer message the local user has produced or received. It is persisted in IndexedDB (see <a href="spec-data-storage.html">Data storage</a>) as the <code>ledger</code> array inside the root state object.</p>
 <p>Its two primary purposes are:</p>
 <ol><li><strong>Audit trail</strong> — a tamper-evident history of all bilateral interactions (friend requests, transactions, trust-limit changes, payment requests).</li><li><strong>State recovery</strong> — if a user's IndexedDB is wiped, a peer who still holds their ledger entries can replay them chronologically and fully reconstruct the wiped user's view of the shared relationship.</li></ol>
 <p>Unlike the <code>outbox</code> (which holds messages pending delivery), the ledger is permanent. Entries are never removed.</p>
 <hr />
 <h2>2. Entry Structure</h2>
-<p>See <code>specs/data-storage.md §4.4</code> for the full field table. The key semantic distinction between the two timestamp fields:</p>
+<p>See <a href="spec-data-storage.html">Data storage</a> §4.4 for the full field table. The key semantic distinction between the two timestamp fields:</p>
 <div class="table-scroll"><table><thead><tr><th>Field</th><th>Who sets it</th><th>Signed?</th><th>Purpose</th></tr></thead><tbody><tr><td><code>timestamp</code></td><td>Local machine at append time</td><td>No</td><td>Ordering and display</td></tr><tr><td><code>originated_at</code></td><td>Sender (copied from <code>created_at</code>)</td><td>Yes</td><td>Digest reconstruction for signature verification</td></tr></tbody></table></div>
 <p>Because <code>timestamp</code> is local it cannot be trusted by a sync peer. <code>originated_at</code> is what was inside the sender's signed inner message; it must be preserved unchanged so the Schnorr signature can be re-verified at any future point.</p>
 <hr />
@@ -49,10 +48,10 @@ originatedAt — the peer message's created_at timestamp</code></pre>
 <h3>4.2 <code>getAllLedgerEntries(ledger)</code></h3>
 <p>Returns a shallow copy of the full ledger. Used by the <strong>self-mesh</strong> (same-user devices) during initial catch-up and live broadcast (see §9): a self-peer is entitled to the full ledger because it represents another device of the same user.</p>
 <hr />
-<h2>5. Signature Verification</h2>
+<h2>5. Authorship Verification</h2>
 <h3>5.1 Why verify?</h3>
-<p>The AES-256-GCM envelope that wraps sync messages (<code>sync_data</code>) proves the <em>transport peer</em> produced the batch — but not that the individual entries inside it were authored by whoever they claim. A compromised peer could forward forged entries with a fabricated <code>from_user_id</code>. Schnorr verification on each entry's claimed author closes this gap.</p>
-<h3>5.2 <code>verifyLedgerEntrySignature(entry)</code></h3>
+<p>The <a href="glossary.html#envelope">envelope</a> that wraps sync messages (<code>sync_data</code>) is encrypted to the transport peer, which proves <em>that peer</em> produced the batch — but not that the individual entries inside it were authored by whoever they claim. A compromised peer could forward forged entries with a fabricated <code>from_user_id</code>. Verifying each entry against its claimed author closes this gap, and is the reason durable records carry their own proof rather than relying on the transport (see <a href="security.html">Security</a>).</p>
+<h3>5.2 <code>verifyLedgerEntryAuthorship(entry)</code></h3>
 <p>Reconstructs the inner-message shape from the stored entry:</p>
 <pre><code>{
   id:           entry.id,
@@ -61,20 +60,21 @@ originatedAt — the peer message's created_at timestamp</code></pre>
   to_user_id:   entry.to_user_id,
   created_at:   entry.originated_at || entry.timestamp,
   payload:      entry.payload || {},
-  signature:    entry.signature,
+  signature:    entry.signature,      // legacy bare Schnorr, may be ""
+  authorship:   entry.authorship,     // TIP-006 proof, null on old entries
 }</code></pre>
-<p>Then calls <code>verifyInnerSignature(innerShape)</code> from <code>peer/envelope.js</code>, which:</p>
-<ol><li>Serialises the shape as canonical JSON (fields in a fixed order, <code>signature</code> field excluded).</li><li>Computes SHA-256 of the JSON string.</li><li>Verifies the BIP-340 Schnorr signature against <code>from_user_id</code>'s secp256k1 public key.</li></ol>
-<p>Returns <code>false</code> if <code>signature</code> is absent or empty — unsigned entries are always rejected during sync.</p>
+<p>Then calls <code>verifyTallyAuthorship(innerShape)</code> from <code>peer/authorship.js</code> — the same check the live envelope path uses, so a record replayed out of the ledger is held to exactly the standard it was held to on arrival. It accepts either proof form:</p>
+<ul><li><strong><code>tally-nostr-event-v1</code></strong> (TIP-006, current) — a signed Nostr event (kind 177700) whose content commits to the canonical inner message.</li><li><strong><code>tally-canonical-schnorr-v1</code></strong> — the legacy bare BIP-340 signature over the canonical digest, wrapped into the proof shape so pre-TIP-006 entries still verify.</li></ul>
+<p>Both ultimately verify a Schnorr signature against <code>from_user_id</code>'s secp256k1 public key over a canonical JSON serialisation (fixed field order, proof fields excluded) hashed with SHA-256. Returns <code>false</code> when neither proof is present or valid — unproven entries are always rejected during sync.</p>
 <hr />
 <h2>6. Sync Merge</h2>
 <h3>6.1 <code>mergeSyncedLedgerEntries(state, entries)</code></h3>
 <p>Merges a batch of entries received from a sync peer:</p>
-<ol><li>Builds a set of existing entry ids.</li><li>For each entry: normalises, skips duplicates, runs <code>verifyLedgerEntrySignature</code>.</li><li>Entries that fail verification are logged and discarded.</li><li>New entries are prepended; after the loop the array is sorted descending by <code>timestamp</code>.</li><li>Returns the count of entries actually added.</li></ol>
+<ol><li>Builds a set of existing entry ids.</li><li>For each entry: normalises, skips duplicates, runs <code>verifyLedgerEntryAuthorship</code>.</li><li>Entries that fail verification are logged and discarded.</li><li>New entries are prepended; after the loop the array is sorted descending by <code>timestamp</code>.</li><li>Returns the count of entries actually added.</li></ol>
 <p>Does <strong>not</strong> persist. The caller owns persistence so a single <code>saveAppState</code> can cover the ledger update and any concurrent state changes.</p>
 <hr />
 <h2>7. Recovery via Peer Sync</h2>
-<p>When a user's IndexedDB is wiped (data loss, device migration, or a deliberate test reset), peers who hold the other side of the ledger can fully reconstruct the wiped user's view of each shared relationship. The mechanism is the sync protocol (fully described in <code>specs/peer-communication.md §12</code>); this section focuses on what happens at the ledger and handler level.</p>
+<p>When a user's IndexedDB is wiped (data loss, device migration, or a deliberate test reset), peers who hold the other side of the ledger can fully reconstruct the wiped user's view of each shared relationship. The mechanism is the sync protocol (fully described in <a href="spec-peer-communication.html">Peer communication</a> §12); this section focuses on what happens at the ledger and handler level.</p>
 <h3>7.1 Prerequisites</h3>
 <p>Sync is initiated only after the WebSocket server signals <code>queue_drained</code>, ensuring any server-queued envelopes (normal inbound messages) are delivered first. This prevents re-requesting entries that are about to arrive anyway via the regular inbound path.</p>
 <h3>7.2 Entry Classification</h3>
@@ -116,12 +116,12 @@ signature     = Schnorr over the canonical inner-message digest</code></pre>
 <p>Without guardrails the live broadcast would echo forever: A broadcasts to B, B appends and broadcasts back to A, A appends and broadcasts again. Two cooperating rules break the cycle:</p>
 <ul><li>The sender maintains a <code>broadcastedLedgerIds</code> set and skips any entry already in it.</li><li>On receiving <code>sync_data</code> via the self-mesh, the receiver <strong>seeds this set with each inbound id before applying the entries</strong>. The resulting data-change tick therefore sees the id as "already broadcast" and the entry is not echoed back.</li></ul>
 <h3>8.2 No Receipts on Self-Sync</h3>
-<p>Self-sync inner messages do not generate receipts (see <code>specs/peer-communication.md §13.7</code>). After convergence, both devices share identical <code>processed_peer_message_ids</code> maps, so an acknowledgement would be redundant; moreover, a receipt from device A to device A' would itself trigger a broadcast, causing unbounded fan-out.</p>
-<h3>8.3 Signature Handling</h3>
-<p>Every self-sync entry still carries its original BIP-340 Schnorr signature and is verified by the receiver exactly like a friend-sync entry. Reusing the signature path keeps the merge code DRY and guarantees that even if the self-mesh were somehow spoofed, forged entries with invalid signatures would be rejected before touching local state.</p>
+<p>Self-sync inner messages do not generate receipts (see <a href="spec-peer-communication.html">Peer communication</a> §13.7). After convergence, both devices share identical <code>processed_peer_message_ids</code> maps, so an acknowledgement would be redundant; moreover, a receipt from device A to device A' would itself trigger a broadcast, causing unbounded fan-out.</p>
+<h3>8.3 Authorship Handling</h3>
+<p>Every self-sync entry still carries its original <a href="glossary.html#authorship">authorship proof</a> and is verified by the receiver exactly like a friend-sync entry. Reusing the one verification path keeps the merge code DRY and guarantees that even if the self-mesh were somehow spoofed, unproven entries would be rejected before touching local state.</p>
 <hr />
 <h2>9. Security Properties</h2>
-<div class="table-scroll"><table><thead><tr><th>Property</th><th>Mechanism</th></tr></thead><tbody><tr><td><strong>Authorship integrity</strong></td><td>Every entry carries a BIP-340 Schnorr signature by <code>from_user_id</code>; <code>verifyLedgerEntrySignature</code> rejects entries without a valid signature</td></tr><tr><td><strong>Non-repudiation</strong></td><td>The signature is over the canonical inner-message digest (id, type, from/to, created_at, payload); neither the transport peer nor the server can produce a valid signature for a different <code>from_user_id</code></td></tr><tr><td><strong>No forged history</strong></td><td><code>mergeSyncedLedgerEntries</code> and <code>handleSyncData</code> reject unsigned or invalidly-signed entries before they enter the local state</td></tr><tr><td><strong>Replay-safe deduplication</strong></td><td><code>processed_peer_message_ids</code> prevents the same entry from being applied twice, even across multiple sync cycles</td></tr><tr><td><strong>Bilateral isolation</strong></td><td><code>getLedgerEntriesForPeer</code> only shares entries involving both parties; third-party conversations are never forwarded</td></tr></tbody></table></div>
+<div class="table-scroll"><table><thead><tr><th>Property</th><th>Mechanism</th></tr></thead><tbody><tr><td><strong>Authorship integrity</strong></td><td>Every entry carries an authorship proof by <code>from_user_id</code>; <code>verifyLedgerEntryAuthorship</code> rejects entries without a valid one</td></tr><tr><td><strong>Non-repudiation</strong></td><td>The proof commits to the canonical inner-message digest (id, type, from/to, created_at, payload); neither the transport peer nor the server can produce a valid one for a different <code>from_user_id</code></td></tr><tr><td><strong>No forged history</strong></td><td><code>mergeSyncedLedgerEntries</code> and <code>handleSyncData</code> reject unsigned or invalidly-signed entries before they enter the local state</td></tr><tr><td><strong>Replay-safe deduplication</strong></td><td><code>processed_peer_message_ids</code> prevents the same entry from being applied twice, even across multiple sync cycles</td></tr><tr><td><strong>Bilateral isolation</strong></td><td><code>getLedgerEntriesForPeer</code> only shares entries involving both parties; third-party conversations are never forwarded</td></tr></tbody></table></div>
 <h3>9.1 Limitations</h3>
 <ul><li><strong>Key compromise</strong> — if a user's private key is stolen, an attacker can produce valid signatures for arbitrary messages. There is currently no key rotation mechanism.</li><li><strong>Timestamp forgery</strong> — <code>originated_at</code> is sender-asserted and covered by the signature, so it cannot be altered after signing; however, a malicious sender can choose any timestamp at signing time.</li><li><strong>Selective disclosure</strong> — a peer can withhold entries from <code>sync_data</code>. There is no way for the recovering peer to know that entries are missing. Full recovery depends on peers being cooperative.</li></ul>
   </main>

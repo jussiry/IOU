@@ -58,15 +58,37 @@
       short page carries one list on its <code>&lt;main&gt;</code> (the icon sits
       by the <code>&lt;h1&gt;</code>); a long page can instead put a list on each
       root-level <code>&lt;h2&gt;</code>.
-      <a href="communication.html">Communication</a> is the first page wired up;
-      the rest gain metadata as they're reconciled.
+      Most pages carry it now; a page without it simply shows no icon.
+    </p>
+
+    <h2><a href="build.html">Build &amp; runtime</a></h2>
+    <p>
+      How source becomes the files a browser runs — the per-file esbuild step
+      into <code>app/dist/</code>, the TypeScript-where-it-pays policy, the
+      service worker that makes Tally installable and offline-capable, and how a
+      running install picks up a new version.
     </p>
 
     <h2>Dev &amp; test</h2>
     <p>
-      Seeded dev identities (Alice/Bob/Carol) for local multi-user testing, a
-      headless peer helper, and two-client end-to-end scenarios under
-      <code>tests/</code>. Build and optimisation notes:
+      Three seeded identities — <strong>Alice</strong>, <strong>Bob</strong> and
+      <strong>Carol</strong>, with fixed keypairs so they can genuinely connect —
+      make local multi-user work possible without hand-building state. Alice
+      starts with Bob accepted and Carol pending; the others mirror that.
+    </p>
+    <ul>
+      <li><strong>Seeding</strong> — <code>?seed=alice</code> on an empty
+        IndexedDB; <code>/?removeUser</code> first to start over.</li>
+      <li><strong>Peer helper</strong> (<code>npm run peer</code>) — drives a
+        headless second user through one action (change name, accept a friend
+        request, send a payment request) so you can watch the first user's UI
+        react.</li>
+      <li><strong>Two-client E2E</strong> (<code>tests/two-client-e2e/</code>) —
+        two full browsers against a dedicated test server, for friend requests,
+        reconnection, and relay queue delivery.</li>
+    </ul>
+    <p>
+      Performance notes, chiefly the cost of secp256k1 in JavaScript:
       <a href="plan-performance.html">Performance</a>.
     </p>
   </main>

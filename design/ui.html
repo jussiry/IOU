@@ -35,8 +35,11 @@
         (green = direct <a href="glossary.html#peer">peer</a> connection, amber =
         via <a href="glossary.html#relay">relay</a>, grey = offline).</li>
       <li><strong>Logs</strong> — a readable history of activity.</li>
-      <li><strong>Settings</strong> — identity, relays, STUN servers,
-        notifications, and account transfer/removal.</li>
+      <li><strong>Settings</strong> — display name, relays,
+        <a href="glossary.html#stun">STUN</a> servers, notifications, account
+        transfer and removal, and the
+        <a href="build.html">app-update</a> banner when a new version is
+        waiting.</li>
       <li><strong>Welcome</strong> — first-run onboarding: create an identity,
         restore one, or connect an external signer.</li>
     </ul>
@@ -64,8 +67,9 @@
       <em>view</em> derived from state (never touching private keys), and user
       actions call <a href="glossary.html#command">commands</a>, which update the
       <a href="p2p.html">ledger</a> and propagate over
-      <a href="communication.html">the transport</a>. There is a ~400 ms animated
-      transition between pages.
+      <a href="communication.html">the transport</a>. How a change to that state
+      becomes a repainted screen — and how pages slide, scroll and route — is
+      <a href="render-flow.html">Render flow</a>.
     </p>
   </main>
 

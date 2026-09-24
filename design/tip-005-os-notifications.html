@@ -25,51 +25,20 @@
 <hr />
 <h2>Why encrypted hints</h2>
 <p>A normal Web Push lets the <strong>application server</strong> put the notification text in the payload. Here the relay is semi-trusted (it already only sees opaque envelope ciphertext), so we don't want it composing or reading notification text. Instead:</p>
-<ol><li>The <strong>sender</strong> knows the human-readable context (its own name, the amount).</li></ol>
-<p>   When it queues an envelope for an offline recipient, it also builds a short    hint (<code>{ title, body }</code>), encrypts it <strong>for the recipient</strong> with the same    secp256k1 ECDH + AES-256-GCM scheme used for envelope bodies    (<code>crypto/peer-crypto.js</code>), and attaches it as <code>envelope.push_hint</code>.</p>
-<ol><li>The <strong>relay</strong> forwards <code>push_hint</code> (plus the plaintext <code>from_user_id</code> routing</li></ol>
-<p>   field) as the Web Push payload — only when no device of the recipient is    online to receive the envelope over WebSocket.</p>
-<ol><li>The <strong>recipient's service worker</strong> decrypts the hint locally using the</li></ol>
-<p>   private key from IndexedDB and the sender's public key, then calls    <code>showNotification</code>. If anything is missing (no key, malformed payload), it    falls back to a generic "You have new Tally activity".</p>
+<ol><li>The <strong>sender</strong> knows the human-readable context (its own name, the amount). When it queues an envelope for an offline recipient, it also builds a short hint (<code>{ title, body }</code>), encrypts it <strong>for the recipient</strong> with the same NIP-44 v2 scheme used for envelope bodies (<code>crypto/peer-crypto.js</code>), and attaches it as <code>envelope.push_hint</code>.</li><li>The <strong>relay</strong> forwards <code>push_hint</code> (plus the plaintext <code>from_user_id</code> routing field) as the Web Push payload — only when no device of the recipient is online to receive the envelope over WebSocket.</li><li>The <strong>recipient's service worker</strong> decrypts the hint locally using the private key from IndexedDB and the sender's public key, then calls <code>showNotification</code>. If anything is missing (no key, malformed payload), it falls back to a generic "You have new Tally activity".</li></ol>
 <p>The relay therefore learns <em>that</em> a notification was sent and <em>to whom</em> (it already knew both), but never the amount, the note, or the event type.</p>
 <hr />
 <h2>Components</h2>
 <p><strong>Server</strong></p>
-<ul><li><code>server/push/push-service.js</code> — VAPID identity (env → cached file →</li></ul>
-<p>  generate), in-memory <code>userId → Map&lt;endpoint, subscription&gt;</code> store, and   <code>sendToUser()</code> (prunes 404/410 endpoints).</p>
-<ul><li><code>server/signaling/websocket-server.js</code> — handles <code>push_subscribe</code> /</li></ul>
-<p>  <code>push_unsubscribe</code>; fires <code>pushService.sendToUser</code> from   <code>handleQueuePeerEnvelope</code> when <code>!deliveredToAny</code>.</p>
-<ul><li><code>server/server.js</code> — <code>GET /push/vapid-public-key</code>.</li></ul>
+<ul><li><code>server/push/push-service.js</code> — VAPID identity (env → cached file → generate), in-memory <code>userId → Map&lt;endpoint, subscription&gt;</code> store, and <code>sendToUser()</code> (prunes 404/410 endpoints).</li><li><code>server/signaling/websocket-server.js</code> — handles <code>push_subscribe</code> / <code>push_unsubscribe</code>; fires <code>pushService.sendToUser</code> from <code>handleQueuePeerEnvelope</code> when <code>!deliveredToAny</code>.</li><li><code>server/server.js</code> — <code>GET /push/vapid-public-key</code>.</li></ul>
 <p><strong>Client</strong></p>
-<ul><li><code>app/js/notify/notification-policy.js</code> — layer documentation + the</li></ul>
-<p>  message-type → hint mapping.</p>
-<ul><li><code>app/js/peer/client.js</code> — <code>flushOutbox</code> attaches the encrypted <code>push_hint</code></li></ul>
-<p>  on the offline (server-queue) path; exposes <code>setPushSubscription</code> /   <code>sendPushUnsubscribe</code> and a <code>getRealtimeClient()</code> singleton accessor.</p>
-<ul><li><code>app/js/signaling/socket-client.js</code> + <code>relay-pool.js</code> — carry the</li></ul>
-<p>  subscription, re-sent on every (re)register and fanned out to all relays.</p>
-<ul><li><code>app/js/push/push-subscribe.js</code> — permission + <code>pushManager.subscribe</code></li></ul>
-<p>  handshake, device-local state, resync on app start.</p>
-<ul><li><code>app/sw-crypto-entry.js</code> → bundled to <code>dist/sw-crypto.js</code> (IIFE) — secp256k1</li></ul>
-<p>  ECDH decrypt for the SW (WebCrypto can't do secp256k1, and the SW is a classic   worker that can't import the app's ESM).</p>
-<ul><li><code>app/sw.js</code> — <code>push</code> + <code>notificationclick</code> listeners.</li><li>Settings → "Notifications" toggle (device-local).</li></ul>
+<ul><li><code>app/js/notify/notification-policy.js</code> — layer documentation + the message-type → hint mapping.</li><li><code>app/js/peer/client.js</code> — <code>flushOutbox</code> attaches the encrypted <code>push_hint</code> on the offline (server-queue) path; exposes <code>setPushSubscription</code> / <code>sendPushUnsubscribe</code> and a <code>getRealtimeClient()</code> singleton accessor.</li><li><code>app/js/signaling/socket-client.js</code> + <code>relay-pool.js</code> — carry the subscription, re-sent on every (re)register and fanned out to all relays.</li><li><code>app/js/push/push-subscribe.js</code> — permission + <code>pushManager.subscribe</code> handshake, device-local state, resync on app start.</li><li><code>app/sw-crypto-entry.js</code> → bundled to <code>dist/sw-crypto.js</code> (IIFE) — secp256k1 ECDH decrypt for the SW (WebCrypto can't do secp256k1, and the SW is a classic worker that can't import the app's ESM).</li><li><code>app/sw.js</code> — <code>push</code> + <code>notificationclick</code> listeners.</li><li>Settings → "Notifications" toggle (device-local).</li></ul>
 <hr />
 <h2>Privacy &amp; security notes</h2>
-<ul><li><strong>Subscriptions are device-local.</strong> Nothing about push is written to the</li></ul>
-<p>  synced app state — a subscription is meaningless on a device that didn't   create it, and OS permission can't be granted remotely. The settings toggle   reflects the live browser state.</p>
-<ul><li><strong>VAPID public key is public</strong> by design; it only authenticates pushes as</li></ul>
-<p>  originating from this server.</p>
-<ul><li><strong>Hint plaintext never leaves the two endpoints.</strong> Same trust model as the</li></ul>
-<p>  envelope body.</p>
-<ul><li><strong>Generic fallback</strong> ensures a logged-out / key-less device still shows a</li></ul>
-<p>  non-leaking notification rather than failing silently.</p>
+<ul><li><strong>Subscriptions are device-local.</strong> Nothing about push is written to the synced app state — a subscription is meaningless on a device that didn't create it, and OS permission can't be granted remotely. The settings toggle reflects the live browser state.</li><li><strong>VAPID public key is public</strong> by design; it only authenticates pushes as originating from this server.</li><li><strong>Hint plaintext never leaves the two endpoints.</strong> Same trust model as the envelope body.</li><li><strong>Generic fallback</strong> ensures a logged-out / key-less device still shows a non-leaking notification rather than failing silently.</li></ul>
 <hr />
 <h2>Open questions / future work</h2>
-<ol><li><strong>Per-event-type opt-in.</strong> Today it's one on/off toggle. A future config</li></ol>
-<p>   could let users route specific event types to specific layers.</p>
-<ol><li><strong>Subscription persistence across server restarts.</strong> Subscriptions are</li></ol>
-<p>   in-memory and self-heal on client reconnect (like the envelope queue). A    durable store would close the gap where a push is missed in the window    between a restart and the next reconnect.</p>
-<ol><li><strong>Real-device verification.</strong> The encrypted-hint round trip can't be fully</li></ol>
-<p>   exercised in the preview browser; needs a home-screen PWA on a real device    with a live push service.</p>
+<ol><li><strong>Per-event-type opt-in.</strong> Today it's one on/off toggle. A future config could let users route specific event types to specific layers.</li><li><strong>Subscription persistence across server restarts.</strong> Subscriptions are in-memory and self-heal on client reconnect (like the envelope queue). A durable store would close the gap where a push is missed in the window between a restart and the next reconnect.</li><li><strong>Real-device verification.</strong> The encrypted-hint round trip can't be fully exercised in the preview browser; needs a home-screen PWA on a real device with a live push service.</li></ol>
   </main>
   <script src="assets/pages.js"></script>
   <script src="assets/design.js"></script>
