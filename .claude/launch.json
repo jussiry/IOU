@@ -25,7 +25,7 @@
         "PATH": "/Users/jussi/.nvm/versions/node/v24.14.0/bin:/usr/bin:/bin:/usr/sbin:/sbin"
       },
       "port": 4000,
-      "autoPort": false
+      "autoPort": true
     },
     {
       "name": "Web landing",

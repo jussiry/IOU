@@ -26,23 +26,8 @@
     </p>
 
     <h2>The root: Ripple (2004)</h2>
-    <p>
-      Ryan Fugger's <strong>RipplePay</strong> is the origin of the whole
-      family. Its claim: money is already just mutual credit between people who
-      trust each other, so a payment to a stranger is a chain of IOUs passed
-      along a path of friends — exactly the model in
-      <a href="purpose.html">Purpose</a>. It ran as an ordinary web server with
-      one shared database, and never grew a user base large enough for routing
-      to matter.
-    </p>
-    <p>
-      Everything below is a descendant, and each one differs mainly in
-      <em>what it replaced that shared database with</em>. Note the name
-      collision: today's <strong>XRP Ledger</strong> and <strong>Stellar</strong>
-      still use the word "trustline", but there it means "I accept token X from
-      issuer Y" — a whitelist of asset issuers, not bilateral mutual credit.
-      Neither is related to Tally's model beyond the borrowed vocabulary.
-    </p>
+    <p>Ryan Fugger's <strong>RipplePay</strong> is the origin of the whole family. Its claim: money is already just mutual credit between people who trust each other, so a payment to a stranger is a chain of IOUs passed along a path of friends — exactly the model in <a href="purpose.html">Purpose</a>. It is an ordinary GPL-licensed web server with one shared database — still running, renamed <a href="https://rumplepay.com/">Rumplepay</a> in 2020 — and never grew a user base large enough for routing to matter. Everything below is a descendants and variations of the idea.</p>
+
 
     <div class="table-scroll">
       <table>
@@ -50,7 +35,7 @@
           <tr><th>Project</th><th>Substrate for shared truth</th><th>Open source</th><th>State (2026)</th></tr>
         </thead>
         <tbody>
-          <tr><td>RipplePay (2004)</td><td>One central server</td><td>No</td><td>Gone</td></tr>
+          <tr><td>RipplePay (2004)</td><td>One central server</td><td>Yes (<a href="https://github.com/rfugger/ripplesite">ripplesite</a>)</td><td>Now called Rumplepay</td></tr>
           <tr><td>Trustlines</td><td>Own chain (TLBC) → Gnosis Chain</td><td>Yes</td><td>Dormant since Dec 2022</td></tr>
           <tr><td>Circles</td><td>Gnosis Chain (ERC-1155)</td><td>Yes</td><td>Active</td></tr>
           <tr><td>fiatjaf/trustlines</td><td>Bitcoin blocks as a clock only</td><td>Yes</td><td>Concept sketch</td></tr>
