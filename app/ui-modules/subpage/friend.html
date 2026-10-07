@@ -44,22 +44,7 @@
       </button>
     </div>
   </div>
-  <div class="actionable-box surface-box" data-section="payment-request" hidden>
-    <div class="actionable-box-label" data-bind="payment-request-label"></div>
-    <div class="actionable-box-actions" data-section="payment-request-accept-actions" hidden>
-      <button class="friend-inline-action friend-inline-action--primary surface-box" type="button" data-action="accept-payment-request">
-        Pay
-      </button>
-      <button class="friend-inline-action surface-box" type="button" data-action="decline-payment-request">
-        Decline
-      </button>
-    </div>
-    <div class="actionable-box-actions" data-section="payment-request-cancel-actions" hidden>
-      <button class="friend-inline-action surface-box" type="button" data-action="cancel-payment-request">
-        Cancel request
-      </button>
-    </div>
-  </div>
+  <div data-list="payment-requests"></div>
   <div class="friend-stats" aria-label="Tally and trust">
     <div class="friend-stat surface-box" data-section="friend-tally">
       <div class="friend-stat-label" data-bind="tally-label">owes you</div>
@@ -104,4 +89,23 @@
     <strong class="tx-amount" data-bind="amount"></strong>
     <span class="tx-note" data-bind="note"></span>
   </li>
+</template>
+
+<template data-template="payment-request">
+  <div class="actionable-box surface-box" data-section="payment-request">
+    <div class="actionable-box-label" data-bind="payment-request-label"></div>
+    <div class="actionable-box-actions" data-section="payment-request-accept-actions" hidden>
+      <button class="friend-inline-action friend-inline-action--primary surface-box" type="button" data-action="accept-payment-request">
+        Pay
+      </button>
+      <button class="friend-inline-action surface-box" type="button" data-action="decline-payment-request">
+        Decline
+      </button>
+    </div>
+    <div class="actionable-box-actions" data-section="payment-request-cancel-actions" hidden>
+      <button class="friend-inline-action surface-box" type="button" data-action="cancel-payment-request">
+        Cancel request
+      </button>
+    </div>
+  </div>
 </template>

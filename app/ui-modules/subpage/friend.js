@@ -16,7 +16,7 @@ import {
   respondToTrustLimitSuggestion,
 } from "../../js/commands/trust-limit.js";
 import {
-  dismissPaymentRequest,
+  cancelPaymentRequest,
   respondToPaymentRequest,
 } from "../../js/commands/payment-request.js";
 import { dismissNameChangeNotification } from "../../js/commands/user.js";
@@ -56,10 +56,8 @@ export const bindFriendDetail = (root, data, friendId) => {
   const suggestionCancelActionsEl = root.querySelector('[data-section="trust-cancel-actions"]');
   const suggestionOkActionsEl = root.querySelector('[data-section="trust-ok-actions"]');
 
-  const paymentRequestEl = root.querySelector('[data-section="payment-request"]');
-  const paymentRequestLabelEl = root.querySelector('[data-bind="payment-request-label"]');
-  const paymentRequestAcceptActionsEl = root.querySelector('[data-section="payment-request-accept-actions"]');
-  const paymentRequestCancelActionsEl = root.querySelector('[data-section="payment-request-cancel-actions"]');
+  const paymentRequestListEl = root.querySelector('[data-list="payment-requests"]');
+  const paymentRequestTemplate = root.querySelector('[data-template="payment-request"]');
 
   const syncInfoEl = root.querySelector('[data-section="sync-info"]');
   const syncTimeEl = root.querySelector('[data-bind="sync-time"]');
@@ -302,46 +300,39 @@ export const bindFriendDetail = (root, data, friendId) => {
     });
   }
 
-  const pendingPaymentRequest = friend?.pending_payment_request;
-  if (paymentRequestEl && pendingPaymentRequest) {
-    paymentRequestEl.hidden = false;
-    const amount = pendingPaymentRequest.amount_eur;
-    const note = pendingPaymentRequest.note;
-    if (pendingPaymentRequest.is_incoming) {
-      const labelText = note
-        ? `${friendFirstName} requests €${amount.toFixed(2)} — ${note}`
-        : `${friendFirstName} requests €${amount.toFixed(2)}`;
-      if (paymentRequestLabelEl) paymentRequestLabelEl.textContent = labelText;
-      if (paymentRequestAcceptActionsEl) paymentRequestAcceptActionsEl.hidden = false;
-    } else {
-      const labelText = note
-        ? `You requested €${amount.toFixed(2)} from ${friendFirstName} — ${note}`
-        : `You requested €${amount.toFixed(2)} from ${friendFirstName}`;
-      if (paymentRequestLabelEl) paymentRequestLabelEl.textContent = labelText;
-      if (paymentRequestCancelActionsEl) paymentRequestCancelActionsEl.hidden = false;
-    }
-  }
+  // One box per open request, in either direction. The box hides itself on
+  // click so the answer feels instant; the re-render after the command
+  // persists drops it for good.
+  const renderPaymentRequest = (request) => {
+    const box = paymentRequestTemplate.content.firstElementChild.cloneNode(true);
+    const amount = `€${request.amount_eur.toFixed(2)}`;
+    const label = request.is_incoming
+      ? `${friendFirstName} requests ${amount}`
+      : `You requested ${amount} from ${friendFirstName}`;
+    box.querySelector('[data-bind="payment-request-label"]').textContent =
+      request.note ? `${label} — ${request.note}` : label;
 
-  const acceptPaymentButton = root.querySelector('[data-action="accept-payment-request"]');
-  if (acceptPaymentButton && friendId) {
-    acceptPaymentButton.addEventListener("click", async () => {
-      if (paymentRequestEl) paymentRequestEl.hidden = true;
-      await respondToPaymentRequest(friendId, true);
-    });
-  }
-  const declinePaymentButton = root.querySelector('[data-action="decline-payment-request"]');
-  if (declinePaymentButton && friendId) {
-    declinePaymentButton.addEventListener("click", async () => {
-      if (paymentRequestEl) paymentRequestEl.hidden = true;
-      await respondToPaymentRequest(friendId, false);
-    });
-  }
-  const cancelPaymentButton = root.querySelector('[data-action="cancel-payment-request"]');
-  if (cancelPaymentButton && friendId) {
-    cancelPaymentButton.addEventListener("click", async () => {
-      if (paymentRequestEl) paymentRequestEl.hidden = true;
-      await dismissPaymentRequest(friendId);
-    });
+    const onClick = (action, handler) => {
+      box.querySelector(`[data-action="${action}"]`).addEventListener("click", async () => {
+        box.hidden = true;
+        await handler();
+      });
+    };
+    if (request.is_incoming) {
+      box.querySelector('[data-section="payment-request-accept-actions"]').hidden = false;
+      onClick("accept-payment-request", () => respondToPaymentRequest(friendId, request.id, true));
+      onClick("decline-payment-request", () => respondToPaymentRequest(friendId, request.id, false));
+    } else {
+      box.querySelector('[data-section="payment-request-cancel-actions"]').hidden = false;
+      onClick("cancel-payment-request", () => cancelPaymentRequest(friendId, request.id));
+    }
+    return box;
+  };
+
+  if (paymentRequestListEl && paymentRequestTemplate && friendId) {
+    paymentRequestListEl.replaceChildren(
+      ...(friend?.pending_payment_requests ?? []).map(renderPaymentRequest)
+    );
   }
 
   const friendKeyEl = root.querySelector('[data-bind="friend-public-key"]');

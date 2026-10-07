@@ -13,6 +13,7 @@ export const PEER_MESSAGE_TYPE_TRANSACTION_CREATED = "transaction_created";
 export const PEER_MESSAGE_TYPE_NAME_CHANGED = "name_changed";
 export const PEER_MESSAGE_TYPE_PAYMENT_REQUEST = "payment_request";
 export const PEER_MESSAGE_TYPE_PAYMENT_REQUEST_RESPONSE = "payment_request_response";
+export const PEER_MESSAGE_TYPE_PAYMENT_REQUEST_CANCEL = "payment_request_cancel";
 export const PEER_MESSAGE_TYPE_PING = "ping";
 export const PEER_MESSAGE_TYPE_PONG = "pong";
 export const PEER_MESSAGE_TYPE_RECEIVED = "received";

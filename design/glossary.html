@@ -88,9 +88,15 @@
         has seen. Broader than <a href="#friend">friend</a>: every friend has a
         contact, but a contact is not necessarily an accepted friend.</dd>
 
-      <dt id="payment-request" data-files="js/commands/payment-request.js"><a class="term-self" href="#payment-request">Payment request</a></dt>
-      <dd>Asking a friend to pay you. Accepting one materializes the mirroring
-        <a href="#transaction">transaction</a> on both sides.</dd>
+      <dt id="payment-request" data-files="js/commands/payment-request.js js/ledger.ts js/peer/handlers.js ui-modules/subpage/friend.js"><a class="term-self" href="#payment-request">Payment request</a></dt>
+      <dd>Asking a friend to pay you. Any number can be open at once, in
+        either direction. A request stays open until the friend
+        <em>pays</em> or <em>declines</em> it (a response) or the requester
+        <em>cancels</em> it — whichever reaches the
+        <a href="#ledger">ledger</a> first. Paying materializes the mirroring
+        <a href="#transaction">transaction</a> on both sides. Open requests are
+        derived from the ledger, never stored; see the
+        <a href="spec-ledger.html">Ledger spec</a> §4.3.</dd>
 
       <dt id="trust-limit" data-files="js/commands/trust-limit.js"><a class="term-self" href="#trust-limit">Trust limit, Credit limit</a></dt>
       <dd>The maximum amount you allow a friend to owe you. Lowering takes effect

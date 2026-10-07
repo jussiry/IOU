@@ -10,10 +10,12 @@ import { createPublicPersonModel } from "../models/data-model.js";
 import { isAcceptedFriendshipStatus } from "../utils/friendships.js";
 import { getMainRelayUrl } from "../utils/relay-url.js";
 import { getRelayStatus } from "../signaling/relay-status-registry.js";
+import { getOpenPaymentRequests } from "../ledger.js";
 
 export const buildView = (state) => {
   const user = state.user;
   const friends = Array.isArray(user.friends) ? user.friends : [];
+  const openPaymentRequests = getOpenPaymentRequests(state.ledger, user.id);
 
   const friendsWithInbound = friends.map((friend) => {
     const contact = state.contacts?.[friend.person_id];
@@ -21,6 +23,10 @@ export const buildView = (state) => {
     return {
       ...friend,
       person_name: contact?.name || friend.person_name || friend.person_id,
+      // Only an accepted friend can be asked to pay or answer a request.
+      pending_payment_requests: isAcceptedFriendshipStatus(friend.friendship_status)
+        ? openPaymentRequests.get(friend.person_id) ?? []
+        : [],
     };
   });
 

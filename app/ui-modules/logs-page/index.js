@@ -72,6 +72,10 @@ const formatLedgerEntry = (entry, myId, namesById, context = {}) => {
         ? `${peerBold} accepted your payment request`
         : `${peerBold} declined your payment request`;
     }
+    case "payment_request_cancel":
+      return isOutgoing
+        ? `You cancelled your payment request to ${peerBold}`
+        : `${peerBold} cancelled their payment request`;
     case "name_changed": {
       const newName = payload.name || "";
       if (isOutgoing) {

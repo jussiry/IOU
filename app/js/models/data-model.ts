@@ -26,14 +26,6 @@ export interface TransactionModel {
   note: string;
 }
 
-export interface PaymentRequestModel {
-  id: string;
-  amount_eur: number;
-  note: string;
-  is_incoming: boolean;
-  created_at: string;
-}
-
 export interface PendingNameChange {
   oldName: string;
   newName: string;
@@ -53,7 +45,8 @@ export interface FriendModel {
   recent_transactions: TransactionModel[];
   last_viewed_transaction_ids: string[];
   last_synced_at: string;
-  pending_payment_request: PaymentRequestModel | null;
+  // Open payment requests are deliberately absent: they are derived from the
+  // ledger (getOpenPaymentRequests in ledger.ts) and attached by buildView.
   pending_name_change: PendingNameChange | null;
   /**
    * Relay-server URLs this friend has told us they use, to suggest
@@ -318,16 +311,6 @@ export const createFriendModel = (input: any = {}): FriendModel => {
     recent_transactions: transactions,
     last_viewed_transaction_ids: lastViewedTransactionIds,
     last_synced_at: asTrimmedStringOrDefault(input.last_synced_at),
-    pending_payment_request:
-      input.pending_payment_request && typeof input.pending_payment_request === "object"
-        ? {
-            id: asTrimmedStringOrDefault(input.pending_payment_request.id),
-            amount_eur: asNumberOrDefault(input.pending_payment_request.amount_eur, 0),
-            note: asTrimmedStringOrDefault(input.pending_payment_request.note),
-            is_incoming: input.pending_payment_request.is_incoming === true,
-            created_at: asTrimmedStringOrDefault(input.pending_payment_request.created_at),
-          }
-        : null,
     pending_name_change:
       input.pending_name_change &&
       typeof input.pending_name_change.oldName === "string" &&

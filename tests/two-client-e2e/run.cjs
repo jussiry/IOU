@@ -31,6 +31,11 @@ const BUILT_IN_SCENARIOS = {
     "scenarios",
     "trio-recovery.cjs"
   ),
+  "multiple-payment-requests": path.join(
+    __dirname,
+    "scenarios",
+    "multiple-payment-requests.cjs"
+  ),
 };
 
 const parseArgs = (argv) => {

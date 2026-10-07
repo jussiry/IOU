@@ -16,12 +16,18 @@ untrusted entries are vetted before they enter the local log.
 
 import {
   createLedgerEntryModel,
+  normalizeCurrencyAmount,
   type AuthorshipProof,
   type LedgerEntryModel,
   type PeerMessageModel,
   type RootState,
 } from "./models/data-model.js";
 import { verifyTallyAuthorship } from "./peer/authorship.js";
+import {
+  PEER_MESSAGE_TYPE_PAYMENT_REQUEST,
+  PEER_MESSAGE_TYPE_PAYMENT_REQUEST_CANCEL,
+  PEER_MESSAGE_TYPE_PAYMENT_REQUEST_RESPONSE,
+} from "./peer/messages.js";
 import { createId } from "./state-utils.js";
 
 // ---------------------------------------------------------------------------
@@ -121,6 +127,74 @@ export const getAllLedgerEntries = (
 ): LedgerEntryModel[] => {
   if (!Array.isArray(ledger)) return [];
   return ledger.slice();
+};
+
+// ---------------------------------------------------------------------------
+// Derived queries
+// ---------------------------------------------------------------------------
+
+export interface OpenPaymentRequest {
+  /** The request's `request_id` — what a response or cancel refers to. */
+  id: string;
+  amount_eur: number;
+  note: string;
+  /** `true` when the friend asked us; `false` when we asked them. */
+  is_incoming: boolean;
+  created_at: string;
+}
+
+const requestIdOf = (entry: LedgerEntryModel): string =>
+  typeof entry.payload?.request_id === "string" ? entry.payload.request_id.trim() : "";
+
+// Payment requests are not stored on the friend record — they are read off the
+// ledger. A request stays open until the ledger holds a closing entry for its
+// request_id: a response authored by the recipient, or a cancel authored by the
+// requester. Any number can be open at once, and the result does not depend on
+// arrival order (sync can deliver a response before the request it answers).
+//
+// Keyed by the friend's user id; each list is newest-first, like the ledger.
+export const getOpenPaymentRequests = (
+  ledger: LedgerEntryModel[] | null | undefined,
+  myId: string
+): Map<string, OpenPaymentRequest[]> => {
+  const open = new Map<string, OpenPaymentRequest[]>();
+  if (!Array.isArray(ledger) || !myId) return open;
+
+  // `requester|recipient|request_id` for every request something has closed.
+  const closed = new Set<string>();
+  for (const entry of ledger) {
+    const requestId = requestIdOf(entry);
+    if (!requestId) continue;
+    if (entry.type === PEER_MESSAGE_TYPE_PAYMENT_REQUEST_RESPONSE) {
+      closed.add(`${entry.to_user_id}|${entry.from_user_id}|${requestId}`);
+    } else if (entry.type === PEER_MESSAGE_TYPE_PAYMENT_REQUEST_CANCEL) {
+      closed.add(`${entry.from_user_id}|${entry.to_user_id}|${requestId}`);
+    }
+  }
+
+  for (const entry of ledger) {
+    if (entry.type !== PEER_MESSAGE_TYPE_PAYMENT_REQUEST) continue;
+    const isIncoming = entry.to_user_id === myId;
+    if (!isIncoming && entry.from_user_id !== myId) continue;
+    // Requests predating request_id fall back to the message id, as the
+    // inbound handler always has.
+    const requestId = requestIdOf(entry) || entry.id;
+    if (closed.has(`${entry.from_user_id}|${entry.to_user_id}|${requestId}`)) continue;
+    const amount = normalizeCurrencyAmount(entry.payload?.amount_eur, NaN);
+    if (!Number.isFinite(amount) || amount <= 0) continue;
+
+    const friendId = isIncoming ? entry.from_user_id : entry.to_user_id;
+    const list = open.get(friendId) ?? [];
+    list.push({
+      id: requestId,
+      amount_eur: amount,
+      note: typeof entry.payload?.note === "string" ? entry.payload.note.trim() : "",
+      is_incoming: isIncoming,
+      created_at: entry.originated_at || entry.timestamp,
+    });
+    open.set(friendId, list);
+  }
+  return open;
 };
 
 // ---------------------------------------------------------------------------

@@ -18,7 +18,8 @@ peer-helper (tests/peer-helper/) to test multi-user interactions.
 @category util
 */
 
-import { DATA_MODEL_VERSION } from "../models/data-model.js";
+import { DATA_MODEL_VERSION, createLedgerEntryModel } from "../models/data-model.js";
+import { PEER_MESSAGE_TYPE_PAYMENT_REQUEST } from "../peer/messages.js";
 import {
   FRIENDSHIP_STATUS_ACCEPTED,
   FRIENDSHIP_STATUS_PENDING_INCOMING,
@@ -61,6 +62,22 @@ const CAROL = {
 // State builders
 // ---------------------------------------------------------------------------
 
+// An open payment request from Bob to Alice. Open requests are derived from
+// the ledger, so the fixture is a ledger entry. It is deliberately UNSIGNED:
+// a genuine authorship proof would let self-mesh sync carry it to every other
+// device signed in as Alice. Unsigned, any peer or device rejects it during
+// sync verification, so — like all seed data — it stays on this device.
+const buildBobPaymentRequestEntry = (createdAt) =>
+  createLedgerEntryModel({
+    id: "peer-seed-pr-1",
+    type: PEER_MESSAGE_TYPE_PAYMENT_REQUEST,
+    from_user_id: BOB.publicKeyNpub,
+    to_user_id: ALICE.publicKeyNpub,
+    timestamp: createdAt,
+    originated_at: createdAt,
+    payload: { request_id: "pr-seed-1", amount_eur: 12, note: "Coffee round" },
+  });
+
 const buildAliceState = () => {
   const now = new Date();
   const iso = (d) => new Date(now.getTime() - d * 86400000).toISOString();
@@ -85,13 +102,6 @@ const buildAliceState = () => {
           recent_transactions: [
             { id: "tx-seed-4", date: date(2), amount_eur: 42, note: "Groceries" },
           ],
-          pending_payment_request: {
-            id: "pr-seed-1",
-            amount_eur: 12,
-            note: "Coffee round",
-            is_incoming: true,
-            created_at: iso(0),
-          },
           last_synced_at: iso(1),
         },
         {
@@ -109,7 +119,7 @@ const buildAliceState = () => {
       [BOB.publicKeyNpub]: { id: BOB.publicKeyNpub, public_key: BOB.publicKeyNpub, public_key_hex: BOB.publicKeyHex, name: BOB.name },
       [CAROL.publicKeyNpub]: { id: CAROL.publicKeyNpub, public_key: CAROL.publicKeyNpub, public_key_hex: CAROL.publicKeyHex, name: CAROL.name },
     },
-    ledger: [],
+    ledger: [buildBobPaymentRequestEntry(iso(0))],
     outbox: [],
     processed_peer_message_ids: [],
   };

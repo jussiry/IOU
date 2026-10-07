@@ -47,6 +47,11 @@ originatedAt — the peer message's created_at timestamp</code></pre>
 <p>Returns all entries where <code>(from_user_id === myId &amp;&amp; to_user_id === peerId) || (from_user_id === peerId &amp;&amp; to_user_id === myId)</code>. This is the bilateral slice offered to a <strong>friend</strong> sync peer — entries involving third parties are never forwarded.</p>
 <h3>4.2 <code>getAllLedgerEntries(ledger)</code></h3>
 <p>Returns a shallow copy of the full ledger. Used by the <strong>self-mesh</strong> (same-user devices) during initial catch-up and live broadcast (see §9): a self-peer is entitled to the full ledger because it represents another device of the same user.</p>
+<h3>4.3 <code>getOpenPaymentRequests(ledger, myId)</code></h3>
+<p>Derived state rather than a slice: the <a href="glossary.html#payment-request">payment requests</a> still awaiting an answer, grouped by friend. Requests are deliberately <strong>not</strong> stored on the friend record — the ledger already holds everything needed, and a stored copy could only hold one request and drifted when entries arrived out of order.</p>
+<p>A <code>payment_request</code> (keyed by its <code>payload.request_id</code>, falling back to the entry <code>id</code> for old entries) is open until the ledger holds a closing entry for the same id:</p>
+<ul><li>a <code>payment_request_response</code> authored by the request's <strong>recipient</strong> (paid or declined), or</li><li>a <code>payment_request_cancel</code> authored by its <strong>requester</strong>.</li></ul>
+<p>The role check means one party cannot close a request on the other's behalf with the wrong kind of entry. Because closure is a set lookup, the result does not depend on arrival order: a cancel synced in before the request it cancels still hides it. Closing entries are recorded even when the request is already closed — if a cancel crosses a payment in flight, the ledger keeps both, and the requester is told money moved.</p>
 <hr />
 <h2>5. Authorship Verification</h2>
 <h3>5.1 Why verify?</h3>

@@ -40,6 +40,7 @@ import {
   PEER_MESSAGE_TYPE_NAME_CHANGED,
   PEER_MESSAGE_TYPE_PAYMENT_REQUEST,
   PEER_MESSAGE_TYPE_PAYMENT_REQUEST_RESPONSE,
+  PEER_MESSAGE_TYPE_PAYMENT_REQUEST_CANCEL,
   PEER_MESSAGE_TYPE_TRANSACTION_CREATED,
 } from "./messages.js";
 import { asTrimmedString, createId } from "../state-utils.js";
@@ -267,56 +268,44 @@ const applyInboundNameChanged = (state, entry) => {
   return friendNotification(`${oldName} changed their name to ${newName}`, entry.from_user_id);
 };
 
+// Payment requests, their responses, and cancellations change no friend state:
+// whether a request is still open is derived from the ledger entries themselves
+// (see getOpenPaymentRequests in ledger.ts). These handlers only vet an entry
+// and word its notification. A closing entry for an already-closed request is
+// still accepted — when a cancel crosses a payment in flight, the ledger should
+// record both, and the notification tells the requester money did move.
+const isFromAcceptedFriend = (state, entry) => {
+  const friend = getFriend(state, entry.from_user_id);
+  return Boolean(friend) && isAcceptedFriendshipStatus(friend.friendship_status);
+};
+
 const applyInboundPaymentRequest = (state, entry) => {
   const amount = normalizeCurrencyAmount(entry.payload?.amount_eur, NaN);
-  if (!Number.isFinite(amount) || amount <= 0) {
-    return null;
-  }
-
-  const displayName = getDisplayName(state, entry.from_user_id);
-  const friend = getFriend(state, entry.from_user_id);
-  if (!friend || !isAcceptedFriendshipStatus(friend.friendship_status)) {
-    return null;
-  }
-
-  const note = asTrimmedString(entry.payload?.note) || "";
-  const requestId = asTrimmedString(entry.payload?.request_id) || entry.id;
-
-  friend.pending_payment_request = {
-    id: requestId,
-    amount_eur: amount,
-    note,
-    is_incoming: true,
-    created_at: entry.originated_at || entry.timestamp || new Date().toISOString(),
-  };
+  if (!Number.isFinite(amount) || amount <= 0) return null;
+  if (!isFromAcceptedFriend(state, entry)) return null;
 
   return friendNotification(
-    `${displayName} requested €${amount.toFixed(2)}`,
+    `${getDisplayName(state, entry.from_user_id)} requested €${amount.toFixed(2)}`,
+    entry.from_user_id,
+  );
+};
+
+const applyInboundPaymentRequestCancel = (state, entry) => {
+  if (!asTrimmedString(entry.payload?.request_id)) return null;
+  if (!isFromAcceptedFriend(state, entry)) return null;
+
+  return friendNotification(
+    `${getDisplayName(state, entry.from_user_id)} cancelled their payment request`,
     entry.from_user_id,
   );
 };
 
 const applyInboundPaymentRequestResponse = (state, entry) => {
+  if (!asTrimmedString(entry.payload?.request_id)) return null;
+  if (!isFromAcceptedFriend(state, entry)) return null;
+
   const displayName = getDisplayName(state, entry.from_user_id);
-  const friend = getFriend(state, entry.from_user_id);
-  if (!friend || !isAcceptedFriendshipStatus(friend.friendship_status)) {
-    return null;
-  }
-
-  const pendingRequest = friend.pending_payment_request;
-  if (!pendingRequest || pendingRequest.is_incoming) {
-    return null;
-  }
-
-  const requestId = asTrimmedString(entry.payload?.request_id);
-  if (requestId && pendingRequest.id && requestId !== pendingRequest.id) {
-    return null;
-  }
-
-  const accepted = entry.payload?.accepted === true;
-  friend.pending_payment_request = null;
-
-  if (accepted) {
+  if (entry.payload?.accepted === true) {
     return friendNotification(
       `${displayName} accepted your payment request`,
       entry.from_user_id,
@@ -401,6 +390,8 @@ export const routeInboundEntry = async (state, entry) => {
       return applyInboundPaymentRequest(state, entry);
     case PEER_MESSAGE_TYPE_PAYMENT_REQUEST_RESPONSE:
       return applyInboundPaymentRequestResponse(state, entry);
+    case PEER_MESSAGE_TYPE_PAYMENT_REQUEST_CANCEL:
+      return applyInboundPaymentRequestCancel(state, entry);
     case PEER_MESSAGE_TYPE_TRANSACTION_CREATED:
       return applyInboundTransactionCreated(state, entry);
     case PEER_MESSAGE_TYPE_NAME_CHANGED:
@@ -501,36 +492,6 @@ const applyOutboundTransactionCreated = (state, entry) => {
   return true;
 };
 
-const applyOutboundPaymentRequest = (state, entry) => {
-  const toId = asTrimmedString(entry.to_user_id);
-  if (!toId) return false;
-  const friend = getFriend(state, toId);
-  if (!friend || !isAcceptedFriendshipStatus(friend.friendship_status)) return false;
-  // Don't overwrite — a later payment_request_response may have cleared it.
-  if (friend.pending_payment_request) return false;
-
-  const amount = normalizeCurrencyAmount(entry.payload?.amount_eur, NaN);
-  if (!Number.isFinite(amount) || amount <= 0) return false;
-
-  friend.pending_payment_request = {
-    id: asTrimmedString(entry.payload?.request_id) || asTrimmedString(entry.id),
-    amount_eur: amount,
-    note: asTrimmedString(entry.payload?.note) || "",
-    is_incoming: false,
-    created_at: entry.originated_at || entry.timestamp || new Date().toISOString(),
-  };
-  return true;
-};
-
-const applyOutboundPaymentRequestResponse = (state, entry) => {
-  const toId = asTrimmedString(entry.to_user_id);
-  if (!toId) return false;
-  const friend = getFriend(state, toId);
-  if (!friend || friend.pending_payment_request === null) return false;
-  friend.pending_payment_request = null;
-  return true;
-};
-
 const applyOutboundCreditLimitSuggestion = (state, entry) => {
   const toId = asTrimmedString(entry.to_user_id);
   if (!toId) return false;
@@ -592,10 +553,8 @@ export const routeOutboundEntry = (state, entry) => {
       return applyOutboundFriendReject(state, entry);
     case PEER_MESSAGE_TYPE_TRANSACTION_CREATED:
       return applyOutboundTransactionCreated(state, entry);
-    case PEER_MESSAGE_TYPE_PAYMENT_REQUEST:
-      return applyOutboundPaymentRequest(state, entry);
-    case PEER_MESSAGE_TYPE_PAYMENT_REQUEST_RESPONSE:
-      return applyOutboundPaymentRequestResponse(state, entry);
+    // Payment requests, responses and cancels need no case: their open/closed
+    // state is derived from the ledger, so there is nothing to mutate.
     case PEER_MESSAGE_TYPE_TRUST_LIMIT_SUGGESTION:
       return applyOutboundCreditLimitSuggestion(state, entry);
     default:
