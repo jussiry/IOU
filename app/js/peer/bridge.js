@@ -39,7 +39,11 @@ import {
   routeInboundEntry,
   routeOutboundEntry,
 } from "./handlers.js";
-import { appendLedgerEntryFromMessage, mergeSyncedLedgerEntries } from "../ledger.js";
+import {
+  appendLedgerEntryFromMessage,
+  hasValidLedgerValues,
+  mergeSyncedLedgerEntries,
+} from "../ledger.js";
 import {
   PEER_MESSAGE_TYPE_RECEIVED,
   PEER_RECEIPT_RESULT_IGNORED,
@@ -130,13 +134,17 @@ export const addOutboundLedgerEntries = async (entries) => {
   const state = await loadState();
   if (!hasUser(state)) return 0;
 
-  const added = await mergeSyncedLedgerEntries(state, entries);
+  // Drop entries with impossible values up front, so they are neither stored
+  // nor applied. The merge re-checks this; the filter also guards the replay
+  // loop below, which runs over entries the merge skipped as already stored.
+  const validEntries = entries.filter(hasValidLedgerValues);
+  const added = await mergeSyncedLedgerEntries(state, validEntries);
 
   // Apply every entry regardless of whether it was newly added — the
   // connection record may be missing even if the ledger entry was already
   // stored (e.g. a previous sync that crashed before persisting contacts).
   let stateChanged = added;
-  for (const entry of entries) {
+  for (const entry of validEntries) {
     if (routeOutboundEntry(state, entry)) stateChanged += 1;
   }
 
@@ -287,8 +295,10 @@ export const applyInboundPeerMessage = async (incomingMessage) => {
   }
 
   // Filter: the message isn't addressed to us. Nothing to do and no receipt
-  // semantics to report.
-  if (message.to_user_id && message.to_user_id !== state.user.id) {
+  // semantics to report. A missing recipient counts as "not us": every
+  // durable message is queued with one (queuePeerMessage refuses otherwise),
+  // and transport messages (ping, receipts, sync) never reach this function.
+  if (message.to_user_id !== state.user.id) {
     return createInboundProcessingResult(buildView(state));
   }
 

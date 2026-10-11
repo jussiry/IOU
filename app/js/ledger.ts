@@ -24,9 +24,13 @@ import {
 } from "./models/data-model.js";
 import { verifyTallyAuthorship } from "./peer/authorship.js";
 import {
+  PEER_MESSAGE_TYPE_FRIEND_ACCEPT,
+  PEER_MESSAGE_TYPE_FRIEND_REQUEST,
   PEER_MESSAGE_TYPE_PAYMENT_REQUEST,
   PEER_MESSAGE_TYPE_PAYMENT_REQUEST_CANCEL,
   PEER_MESSAGE_TYPE_PAYMENT_REQUEST_RESPONSE,
+  PEER_MESSAGE_TYPE_TRANSACTION_CREATED,
+  PEER_MESSAGE_TYPE_TRUST_LIMIT_SUGGESTION,
 } from "./peer/messages.js";
 import { createId } from "./state-utils.js";
 
@@ -228,13 +232,52 @@ export const verifyLedgerEntryAuthorship = async (
 };
 
 // ---------------------------------------------------------------------------
+// Value validation for untrusted entries
+// ---------------------------------------------------------------------------
+
+// A valid signature proves who wrote an entry, not that its values make sense.
+// These rules reject entries whose money values could never have come from a
+// command: a non-positive IOU or payment request, or a negative trust limit.
+// They are state-independent (no friend lookup), so they can run before an
+// entry is stored. Types without a money value always pass.
+const isPositiveAmount = (value: unknown): boolean =>
+  normalizeCurrencyAmount(value, NaN) > 0;
+
+const isNonNegativeAmount = (value: unknown): boolean =>
+  normalizeCurrencyAmount(value, NaN) >= 0;
+
+// Optional limits: commands sometimes omit them, and handlers then leave the
+// stored limit untouched.
+const isAbsentOrNonNegativeAmount = (value: unknown): boolean =>
+  value === undefined || value === null || isNonNegativeAmount(value);
+
+const VALUE_RULES: Record<string, (payload: Record<string, unknown>) => boolean> = {
+  [PEER_MESSAGE_TYPE_TRANSACTION_CREATED]: (p) => isPositiveAmount(p.amount_eur),
+  [PEER_MESSAGE_TYPE_PAYMENT_REQUEST]: (p) => isPositiveAmount(p.amount_eur),
+  [PEER_MESSAGE_TYPE_TRUST_LIMIT_SUGGESTION]: (p) => isNonNegativeAmount(p.credit_limit_eur),
+  [PEER_MESSAGE_TYPE_FRIEND_ACCEPT]: (p) => isAbsentOrNonNegativeAmount(p.trust_credit_limit_eur),
+  [PEER_MESSAGE_TYPE_FRIEND_REQUEST]: (p) =>
+    isAbsentOrNonNegativeAmount(p.suggested_credit_limit_eur),
+};
+
+export const hasValidLedgerValues = (
+  entry: Pick<LedgerEntryModel, "type" | "payload"> | null | undefined
+): boolean => {
+  if (!entry) return false;
+  const rule = VALUE_RULES[entry.type];
+  return !rule || rule((entry.payload || {}) as Record<string, unknown>);
+};
+
+// ---------------------------------------------------------------------------
 // Sync merge
 // ---------------------------------------------------------------------------
 
 // Merge a batch of entries received from a sync peer into the local ledger.
 // Entries without a valid Schnorr signature by their claimed `from_user_id`
 // are rejected — this is what blocks a compromised peer from backfilling
-// forged history during recovery. Returns the count actually added.
+// forged history during recovery. Entries with impossible money values
+// (see hasValidLedgerValues) are rejected too, so they never reach storage.
+// Returns the count actually added.
 //
 // Does not persist; callers own persistence so a single save can cover
 // whatever else changed in the same tick.
@@ -251,6 +294,10 @@ export const mergeSyncedLedgerEntries = async (
   for (const entry of entries) {
     const normalized = createLedgerEntryModel(entry);
     if (!normalized.id || existingIds.has(normalized.id)) continue;
+    if (!hasValidLedgerValues(normalized)) {
+      console.warn("[Ledger] Rejected synced entry with invalid values:", normalized.id);
+      continue;
+    }
     const authorshipValid = await verifyLedgerEntryAuthorship(normalized);
     if (!authorshipValid) {
       console.warn(
