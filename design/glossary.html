@@ -223,7 +223,10 @@
       <dd>The <a href="#webrtc">WebRTC</a> overlay of live peer connections. Split
         into two: the <strong>friend mesh</strong> (one connection per friend
         device) and the <strong>self-mesh</strong> (one connection per the user's
-        <em>own</em> other devices, used to sync devices in lock-step).</dd>
+        <em>own</em> other devices, used to sync devices in lock-step). When
+        WebRTC can't connect own devices, their sync falls back to the
+        <a href="#relay">relay</a> (see
+        <a href="spec-peer-communication.html">peer communication spec</a> §13.8).</dd>
 
       <dt id="relay" data-files="js/signaling/relay-pool.js js/signaling/socket-client.js js/signaling/relay-status-registry.js js/commands/relays.js js/utils/relay-url.js"><a class="term-self" href="#relay">Relay, Relay server, Signaling server</a></dt>
       <dd>Tally's own WebSocket server. It does two jobs: relays WebRTC signaling

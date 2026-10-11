@@ -25,6 +25,14 @@ Both overlays use the same `createPeerMesh` factory and the same sync
 wire format (`sync_hello` / `sync_data`); only the sender-side slice and
 the mesh key differ.
 
+**Self-sync relay fallback.** Without a TURN server some networks (carrier
+NAT, routers without hairpinning) never let two devices open a direct
+channel. So whenever another own device is present on a relay but has no
+open self-mesh channel, the same sync messages also go out as self-addressed
+envelopes through the relay, which delivers them to the user's other online
+devices. The pseudo peer key `SELF_RELAY_PEER_KEY` stands for that path in
+the sync code, so hello/data handling is shared with the direct channel.
+
 Application-level peer messages travel inside encrypted envelopes wrapped
 here so the WebRTC channel and the signaling server's fallback queue see
 only ciphertext. Transport-only messages (ping/pong/receipts) keep flowing
@@ -75,6 +83,12 @@ import {
 
 const SCOPE_FRIEND = "friend";
 const SCOPE_SELF = "self";
+// Pseudo peer key for self-sync messages sent through the relay to all other
+// own devices at once (see the relay fallback note above).
+const SELF_RELAY_PEER_KEY = "relay";
+// Relay-delivered sync messages arrive once per relay; remember recent ids so
+// each is handled once. Bounded because sync ids are never reused.
+const SEEN_RELAY_SYNC_IDS_LIMIT = 500;
 
 const logRealtimeEvent = (message) => {
   console.log(`[Realtime] ${message}`);
@@ -111,6 +125,15 @@ const createRealtimeClient = () => {
   // Self-mesh sync tracking — keyed by peerDeviceId.
   const pendingSelfSync = new Map(); // deviceId -> peerUserId (= my userId)
   const syncedSelfDevices = new Set();
+  // Own devices a relay reports online, whether or not WebRTC connects them.
+  const selfDevicesOnRelay = new Set();
+  const seenRelaySyncIds = new Set();
+
+  // True when some own device is reachable only through the relay.
+  const hasSelfDeviceWithoutChannel = () =>
+    Array.from(selfDevicesOnRelay).some((deviceId) => !selfMesh.canSend(deviceId));
+  const canSendSelf = (peerKey) =>
+    peerKey === SELF_RELAY_PEER_KEY ? selfDevicesOnRelay.size > 0 : selfMesh.canSend(peerKey);
 
   // Tracks ledger entry ids already broadcast to self-devices in this session.
   // Every locally-applied or locally-merged entry is a candidate for re-send,
@@ -122,7 +145,8 @@ const createRealtimeClient = () => {
   const sendSyncMessage = async (peerKey, { scope }, type, payload, peerUserId) => {
     if (!currentSnapshot?.keyProvider || !currentSnapshot?.userId) return;
     const mesh = scope === SCOPE_SELF ? selfMesh : peerMesh;
-    if (!mesh.canSend(peerKey)) return;
+    const viaRelay = scope === SCOPE_SELF && peerKey === SELF_RELAY_PEER_KEY;
+    if (!(viaRelay ? canSendSelf(peerKey) : mesh.canSend(peerKey))) return;
 
     const randomId = (window.crypto?.randomUUID && window.crypto.randomUUID())
       || `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
@@ -139,7 +163,11 @@ const createRealtimeClient = () => {
       const envelope = await wrapPeerMessage(message, {
         keyProvider: currentSnapshot.keyProvider,
       });
-      mesh.sendPeerMessage(peerKey, envelope);
+      if (viaRelay) {
+        signalingClient.queuePeerEnvelopeOnServer(envelope);
+      } else {
+        mesh.sendPeerMessage(peerKey, envelope);
+      }
     } catch (error) {
       logRealtimeEvent(
         `Failed to wrap sync message (${scope}/${type}): ${String(error?.message || error)}`
@@ -324,7 +352,7 @@ const createRealtimeClient = () => {
     });
     // Self-mesh pending hellos.
     Array.from(pendingSelfSync.entries()).forEach(([deviceId, peerUserId]) => {
-      if (!selfMesh.canSend(deviceId)) return;
+      if (!canSendSelf(deviceId)) return;
       if (syncedSelfDevices.has(deviceId)) {
         pendingSelfSync.delete(deviceId);
         return;
@@ -442,6 +470,16 @@ const createRealtimeClient = () => {
           peerUserId,
           peerDeviceId,
         });
+        // When the device newly appears on a relay, sync through the relay
+        // right away instead of waiting to see whether WebRTC connects — it
+        // may never, and the exchange is idempotent if the direct channel
+        // opens later. Relays repeat peer_connect on every candidate update,
+        // so only the first one per presence triggers a sync.
+        if (selfDevicesOnRelay.has(peerDeviceId)) return;
+        selfDevicesOnRelay.add(peerDeviceId);
+        syncedSelfDevices.delete(SELF_RELAY_PEER_KEY);
+        pendingSelfSync.set(SELF_RELAY_PEER_KEY, myUserId);
+        trySyncPendingPeers();
         return;
       }
       // Different user → friend mesh keyed by `${userId}|${deviceId}` so
@@ -464,6 +502,7 @@ const createRealtimeClient = () => {
         selfMesh.closePeer(peerDeviceId);
         syncedSelfDevices.delete(peerDeviceId);
         pendingSelfSync.delete(peerDeviceId);
+        selfDevicesOnRelay.delete(peerDeviceId);
         return;
       }
       logRealtimeEvent(`Peer disconnected from server (${peerUserId?.slice(0, 10)}…)`);
@@ -599,34 +638,30 @@ const createRealtimeClient = () => {
   // ledger we iterate is the one that was just persisted.
   const broadcastNewLedgerEntriesToSelfDevices = async () => {
     if (!currentSnapshot) return;
-    const connected = [];
-    selfMesh.forEachConnectedPeer((ctx) => connected.push(ctx));
-    if (connected.length === 0) {
-      // Still keep broadcastedLedgerIds up to date so future sends don't
-      // re-push the entire ledger the moment a self-device connects.
-      currentSnapshot.ledger.forEach((entry) => {
-        if (entry?.id) broadcastedLedgerIds.add(entry.id);
-      });
-      return;
-    }
-
     const freshEntries = currentSnapshot.ledger.filter(
       (entry) => entry?.id && !broadcastedLedgerIds.has(entry.id)
     );
     if (freshEntries.length === 0) return;
-
+    // Marked even when nobody is listening, so future sends don't re-push
+    // the entire ledger the moment a self-device connects (sync_hello
+    // covers catching up).
     freshEntries.forEach((entry) => broadcastedLedgerIds.add(entry.id));
 
-    for (const { peerKey, peerUserId } of connected) {
+    const targets = [];
+    selfMesh.forEachConnectedPeer(({ peerKey }) => targets.push(peerKey));
+    if (hasSelfDeviceWithoutChannel()) targets.push(SELF_RELAY_PEER_KEY);
+    if (targets.length === 0) return;
+
+    for (const peerKey of targets) {
       await sendSyncMessage(
         peerKey,
         { scope: SCOPE_SELF },
         PEER_MESSAGE_TYPE_SYNC_DATA,
         { entries: freshEntries },
-        peerUserId || currentSnapshot.userId,
+        currentSnapshot.userId,
       );
     }
-    logRealtimeEvent(`Broadcast ${freshEntries.length} ledger entries to ${connected.length} self-devices`);
+    logRealtimeEvent(`Broadcast ${freshEntries.length} ledger entries to self-devices (${targets.length} path(s))`);
   };
 
   const syncRealtimeState = async () => {
@@ -636,6 +671,7 @@ const createRealtimeClient = () => {
       signalingClient.setSession({ userId: "", deviceId: "", peerIds: [] });
       peerMesh.closePeersNotMatching(() => false);
       selfMesh.closePeersNotInSet([]);
+      selfDevicesOnRelay.clear();
       replaceConnectedPeerIds([]);
       replaceConnectedSelfDeviceIds([]);
       clearServerPresentPeers();
@@ -850,8 +886,22 @@ const createRealtimeClient = () => {
       return;
     }
 
-    // Server-delivered envelopes are always friend-scope (the server never
-    // mediates same-user syncing — that only travels over the self-mesh).
+    // Self-addressed envelopes are the own-device sync fallback. Only sync
+    // messages are expected there; each relay delivers its own copy.
+    if (innerMessage.from_user_id === currentSnapshot?.userId) {
+      const isSync = [PEER_MESSAGE_TYPE_SYNC_HELLO, PEER_MESSAGE_TYPE_SYNC_DATA]
+        .includes(innerMessage.type);
+      if (!isSync || seenRelaySyncIds.has(innerMessage.id)) return;
+      if (seenRelaySyncIds.size >= SEEN_RELAY_SYNC_IDS_LIMIT) seenRelaySyncIds.clear();
+      seenRelaySyncIds.add(innerMessage.id);
+      await processInnerPeerMessage(innerMessage, {
+        scope: SCOPE_SELF,
+        peerKey: SELF_RELAY_PEER_KEY,
+        peerUserId: innerMessage.from_user_id,
+      });
+      return;
+    }
+
     await processInnerPeerMessage(innerMessage, {
       receiptChannelPeerKey: innerMessage.from_user_id,
       scope: SCOPE_FRIEND,

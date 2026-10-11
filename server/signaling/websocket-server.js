@@ -21,7 +21,9 @@ setup when availability changes.
 Cross-user peering uses the existing `peer_candidates` eligibility rule
 (mutual opt-in). Same-user device pairs are *always* eligible — the user
 naturally trusts their own other devices, and they sync ledger state over
-WebRTC the same way peers do during recovery.
+WebRTC the same way peers do during recovery. When WebRTC can't connect them,
+self-addressed envelopes carry that sync through this server instead (see
+handleQueuePeerEnvelope).
 */
 
 const { WebSocket, WebSocketServer } = require("ws");
@@ -166,10 +168,22 @@ const createSignalingServer = (server) => {
 
     const recipientUserId =
       typeof envelope.to_user_id === "string" ? envelope.to_user_id.trim() : "";
-    if (!recipientUserId || recipientUserId === sendingClient.userId) {
+    if (!recipientUserId) {
       return;
     }
     if (!envelope.id || !envelope.from_user_id || !envelope.ciphertext) {
+      return;
+    }
+
+    // Self-addressed envelopes are the own-device sync fallback for when two
+    // devices of the same user can't open a direct WebRTC channel. Deliver
+    // them to the sender's *other* online devices only. They're never stored
+    // or pushed: a device that comes online later re-runs sync_hello anyway.
+    if (recipientUserId === sendingClient.userId) {
+      getUserClients(recipientUserId).forEach((recipientClient) => {
+        if (recipientClient === sendingClient) return;
+        sendJson(recipientClient.socket, { type: "peer_envelope", envelope });
+      });
       return;
     }
 

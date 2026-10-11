@@ -41,6 +41,11 @@ const BUILT_IN_SCENARIOS = {
     "scenarios",
     "wake-reconnect.cjs"
   ),
+  "self-relay-sync": path.join(
+    __dirname,
+    "scenarios",
+    "self-relay-sync.cjs"
+  ),
 };
 
 const parseArgs = (argv) => {
