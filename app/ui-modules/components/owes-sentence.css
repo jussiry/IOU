@@ -36,6 +36,14 @@ Slot positions are fixed by CSS so the markup order can vary between pages
   width: fit-content(9ch);
 }
 
+/* "Choose friend…" placeholder, shown until a friend is picked. Smaller so it
+   fits beside "owes <name> <amount>" on a phone-width row. */
+.owes-sentence-select.is-placeholder {
+  color: var(--muted);
+  font-weight: 400;
+  font-size: 16px;
+}
+
 .owes-sentence-name--debtor,
 .owes-sentence-select--debtor { grid-column: 1; }
 

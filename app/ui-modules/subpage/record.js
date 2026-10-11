@@ -3,14 +3,14 @@ This module binds the record-tally subpage form. It populates selectable friends
 
 Only accepted friendships can be used for transactions, so the binder also owns the empty states shown when the user has no friends yet or only pending friendships.
 
-The submit button label updates dynamically to "Send €[amount]" as the user types an amount, making clear that recording a tally is equivalent in effect to sending that value.
+The submit button label names the chosen friend. Opened from a friend page (`#record/<friendId>`) that friend is preselected; opened from the Tally page the select starts on "Choose friend…" and the submit stays disabled until a friend and a positive amount are given (see `bindFriendSelect`).
 @category ui
 */
 
 import { isAcceptedFriendshipStatus } from "../../js/utils/friendships.js";
 import { loadVendorScript } from "../../js/utils/vendor-loader.js";
 import { parseIouUri } from "../../js/utils/qr-uri.js";
-import { bindOwesPreview } from "../components/owes-sentence.js";
+import { bindFriendSelect, bindOwesPreview } from "../components/owes-sentence.js";
 import { randomNotePlaceholder } from "../../js/utils/note-placeholders.js";
 
 
@@ -109,47 +109,20 @@ export const bindRecord = (root, data, friendId) => {
     `;
   };
 
-  if (selectEl) {
-    selectEl.innerHTML = "";
-    acceptedFriends.forEach((friend) => {
-      const option = document.createElement("option");
-      option.value = friend.person_id;
-      option.textContent = friend.person_name || friend.person_id;
-      selectEl.appendChild(option);
-    });
-
-    const initialSelection =
-      acceptedFriends.find((friend) => friend.person_id === friendId) ||
-      acceptedFriends[0] ||
-      null;
-    if (initialSelection) {
-      selectEl.value = initialSelection.person_id;
-    }
-
-
-    const selected = acceptedFriends.find(
-      (friend) => friend.person_id === selectEl.value
-    );
-    const selectedName = selected?.person_name || selected?.person_id;
-    currentFriendName = selectedName || "your friend";
-    updateExplainer(selectedName);
-    updateSubmitLabel(selectedName);
-    updatePreview();
-
-    selectEl.addEventListener("change", () => {
-      const current = acceptedFriends.find(
-        (friend) => friend.person_id === selectEl.value
-      );
-      const name = current?.person_name || current?.person_id;
+  bindFriendSelect({
+    selectEl,
+    friends: acceptedFriends,
+    friendId,
+    amountEl,
+    submitEl,
+    onChange: (friend) => {
+      const name = friend?.person_name || friend?.person_id;
       currentFriendName = name || "your friend";
       updateExplainer(name);
       updateSubmitLabel(name);
       updatePreview();
-    });
-  } else {
-    updateExplainer(null);
-    updateSubmitLabel(null);
-  }
+    },
+  });
 
   // --- QR code scanning ---
   const headerRightEl = root.querySelector('[data-slot="subpage-header-right"]');
@@ -257,11 +230,10 @@ export const bindRecord = (root, data, friendId) => {
   return {
     submitEl,
     getPayload: () => {
-      const selectedId = selectEl?.value || acceptedFriends[0]?.person_id || "";
       const amount = amountEl ? parseFloat(amountEl.value) : NaN;
       const message = messageEl ? messageEl.value : "";
       return {
-        friendId: selectedId,
+        friendId: selectEl?.value || "",
         amount,
         message,
       };

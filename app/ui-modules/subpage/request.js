@@ -3,7 +3,11 @@ This module binds the request subpage. It provides two tabs:
 
 1. "Send request" — select a friend, enter amount and note, and send a payment
    request that appears as an actionable notification on the friend's side.
-2. "Use QR code" — generate a QR code encoding the user's public key with
+   Opened from a friend page (`#request/<friendId>`) that friend is preselected
+   as the debtor; opened from the Tally page the select starts on "Choose
+   friend…" and the submit stays disabled until a friend and a positive amount
+   are given (see `bindFriendSelect`).
+2. "Create QR code" — generate a QR code encoding the user's public key with
    optional amount and note so a sender can scan it.
 
 Tab state is local to this page visit; switching tabs shows/hides panels.
@@ -13,7 +17,7 @@ Tab state is local to this page visit; switching tabs shows/hides panels.
 import { isAcceptedFriendshipStatus } from "../../js/utils/friendships.js";
 import { loadVendorScript } from "../../js/utils/vendor-loader.js";
 import { encodePayUri } from "../../js/utils/qr-uri.js";
-import { bindOwesPreview } from "../components/owes-sentence.js";
+import { bindFriendSelect, bindOwesPreview } from "../components/owes-sentence.js";
 import { randomNotePlaceholder } from "../../js/utils/note-placeholders.js";
 
 const getFirstName = (fullName) => fullName.split(/\s+/)[0] || fullName;
@@ -35,7 +39,7 @@ const bindTabs = (root) => {
   });
 };
 
-const bindRequestFriend = (root, data) => {
+const bindRequestFriend = (root, data, friendId) => {
   const selectEl = root.querySelector('[data-bind="request-to"]');
   const amountEl = root.querySelector('[data-bind="request-amount"]');
   const messageEl = root.querySelector('[data-bind="request-message"]');
@@ -90,33 +94,21 @@ const bindRequestFriend = (root, data) => {
       submitLabelEl.textContent = `Request payment from ${name ? getFirstName(name) : "friend"}`;
   };
 
-  if (selectEl) {
-    selectEl.innerHTML = "";
-    acceptedFriends.forEach((friend) => {
-      const option = document.createElement("option");
-      option.value = friend.person_id;
-      option.textContent = friend.person_name || friend.person_id;
-      selectEl.appendChild(option);
-    });
-
-    const initialName =
-      acceptedFriends.find((friend) => friend.person_id === selectEl.value)
-        ?.person_name || acceptedFriends[0]?.person_name;
-    updateSubmitLabel(initialName);
-
-    selectEl.addEventListener("change", () => {
-      const current = acceptedFriends.find((friend) => friend.person_id === selectEl.value);
-      updateSubmitLabel(current?.person_name || current?.person_id);
-    });
-  }
+  bindFriendSelect({
+    selectEl,
+    friends: acceptedFriends,
+    friendId,
+    amountEl,
+    submitEl,
+    onChange: (friend) => updateSubmitLabel(friend?.person_name || friend?.person_id),
+  });
 
   return {
     submitEl,
     getPayload: () => {
-      const selectedId = selectEl?.value || acceptedFriends[0]?.person_id || "";
       const amount = amountEl ? parseFloat(amountEl.value) : NaN;
       const message = messageEl ? messageEl.value : "";
-      return { friendId: selectedId, amount, message };
+      return { friendId: selectEl?.value || "", amount, message };
     },
   };
 };
@@ -186,12 +178,12 @@ const bindQrCode = (root, data) => {
     });
 };
 
-export const bindRequest = (root, data) => {
+export const bindRequest = (root, data, friendId) => {
   const titleEl = root.querySelector('[data-bind="page-title"]');
   if (titleEl) titleEl.textContent = "Request";
 
   bindTabs(root);
-  const requestResult = bindRequestFriend(root, data);
+  const requestResult = bindRequestFriend(root, data, friendId);
   bindQrCode(root, data);
 
   return requestResult;

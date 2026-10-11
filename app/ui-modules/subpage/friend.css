@@ -115,6 +115,11 @@
   height: 18px;
 }
 
+/* Icon-only sibling of Send — square, to save header space */
+.friend-request {
+  padding: 8px;
+}
+
 .friend-send-label {
   font-size: 13px;
   letter-spacing: 0.08em;

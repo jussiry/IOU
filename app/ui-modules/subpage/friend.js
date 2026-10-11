@@ -144,6 +144,11 @@ export const bindFriendDetail = (root, data, friendId) => {
           </svg>
           <span class="friend-send-label">Send</span>
         </button>
+        <button class="friend-send friend-request surface-box" type="button" data-action="request" aria-label="Request payment">
+          <svg class="friend-send-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <use href="#icon-request" />
+          </svg>
+        </button>
       `;
     } else if (friendshipStatus === FRIENDSHIP_STATUS_REJECTED) {
       headerRight.innerHTML = `

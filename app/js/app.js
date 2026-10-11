@@ -206,8 +206,9 @@ const parseRoute = () => {
     const parts = hash.split("/");
     return createSubpageRoute("record", parts[1] || null);
   }
-  if (hash === "request") {
-    return createSubpageRoute("request");
+  if (hash.startsWith("request")) {
+    const parts = hash.split("/");
+    return createSubpageRoute("request", parts[1] || null);
   }
   if (hash.startsWith("trust/")) {
     const friendId = hash.replace("trust/", "");
@@ -368,7 +369,7 @@ const loadPage = async (route) => {
     } else if (route.type === "request") {
       const requestHtml = await fetchTemplate(templatePaths.request);
       renderSubpageContent(pageView, requestHtml);
-      const requestHandlers = bindRequest(pageView, data);
+      const requestHandlers = bindRequest(pageView, data, route.friendId);
       document.title = "Tally — Request";
       setFallbackBackNavigation(pageView);
       if (requestHandlers?.submitEl) {

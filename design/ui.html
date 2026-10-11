@@ -49,12 +49,22 @@
       ui-modules/subpage/trust.js ui-modules/subpage/add-friend.js
       ui-modules/subpage/transfer.js ui-modules/subpage/friend.js
       ui-modules/components/check-toggle.js ui-modules/components/confirm-modal.js
+      ui-modules/components/owes-sentence.js ui-modules/components/tally-actions.js
       js/utils/qr-uri.js
     ">Flows (subpages)</h2>
     <p>
       Task-focused subpages under <code>app/ui-modules/subpage/</code>: record a
       transaction, request a payment, set a trust limit, add a friend (QR /
       key), and transfer the account to another device.
+    </p>
+    <p>
+      <strong>Send</strong> and <strong>Request</strong> share one friend
+      picker. Opened from a <a href="glossary.html#friend">friend</a>'s page
+      (<code>#record/&lt;id&gt;</code>, <code>#request/&lt;id&gt;</code>) that
+      friend is preselected; opened from the Tally page the picker starts on
+      "Choose friend…". Either way the submit button stays gray until a friend
+      is chosen and the amount is positive. Request also offers a
+      <em>Create QR code</em> tab for payers who aren't friends yet.
     </p>
 
     <h2 data-files="
