@@ -31,6 +31,11 @@ export const getRelayStatus = (url) => {
   return statuses.get(key) || RELAY_STATUS_PENDING;
 };
 
+// True when at least one relay currently has a live, registered session — i.e.
+// this device is reachable by its peers.
+export const isAnyRelayConnected = () =>
+  Array.from(statuses.values()).includes(RELAY_STATUS_CONNECTED);
+
 export const setRelayStatus = (url, status) => {
   const key = normaliseKey(url);
   if (!key) return;

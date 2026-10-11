@@ -337,6 +337,23 @@ const createRealtimeClient = () => {
     });
   };
 
+  // When a peer drops unexpectedly, ask the relay to re-pair us. We only
+  // retry if the connection had previously reached "connected" — otherwise
+  // the network likely blocks WebRTC outright and retrying in a tight loop is
+  // pointless. Intentional closes (server_disconnect, stale_replaced) are
+  // skipped. `forgetSync` drops the per-peer sync state so a reconnect re-runs
+  // sync_hello on the fresh data channel.
+  const createPeerClosedHandler = (forgetSync) =>
+    ({ peerUserId, peerKey, reason, wasConnected }) => {
+      forgetSync(peerKey);
+      if (!wasConnected) return;
+      if (reason === "server_disconnect" || reason === "stale_replaced") return;
+      requestPeerConnectionIfNeeded(
+        peerUserId,
+        "Retrying peer connection after unexpected close"
+      );
+    };
+
   // --- Friend mesh --------------------------------------------------------
 
   const peerMesh = createPeerMesh({
@@ -372,28 +389,10 @@ const createRealtimeClient = () => {
     onPeerMessage: ({ peerKey, peerUserId, message }) => {
       void handlePeerMessage(peerKey, peerUserId, message, SCOPE_FRIEND);
     },
-    // When a friend peer drops unexpectedly, ask the server to re-pair us.
-    // We only retry if the connection had previously reached "connected" —
-    // otherwise the network likely blocks WebRTC outright and retrying in
-    // a tight loop is pointless. Intentional closes (server_disconnect,
-    // stale_replaced) are skipped.
-    onPeerClosed: ({ peerUserId, peerKey, reason, wasConnected }) => {
-      // Drop sync state for this specific device-peer so a reconnect
-      // re-runs sync_hello on the fresh data channel.
+    onPeerClosed: createPeerClosedHandler((peerKey) => {
       pendingFriendSync.delete(peerKey);
       syncedFriends.delete(peerKey);
-      if (!wasConnected) return;
-      if (
-        reason === "server_disconnect" ||
-        reason === "stale_replaced"
-      ) {
-        return;
-      }
-      requestPeerConnectionIfNeeded(
-        peerUserId,
-        "Retrying peer connection after unexpected close"
-      );
-    },
+    }),
   });
 
   // --- Self-mesh ----------------------------------------------------------
@@ -424,6 +423,10 @@ const createRealtimeClient = () => {
     onPeerMessage: ({ peerKey, peerUserId, message }) => {
       void handlePeerMessage(peerKey, peerUserId || currentSnapshot?.userId || "", message, SCOPE_SELF);
     },
+    onPeerClosed: createPeerClosedHandler((peerKey) => {
+      pendingSelfSync.delete(peerKey);
+      syncedSelfDevices.delete(peerKey);
+    }),
   });
 
   // --- Signaling ----------------------------------------------------------
@@ -510,10 +513,13 @@ const createRealtimeClient = () => {
 
   const requestPeerConnectionIfNeeded = (peerUserId, logTitle = "Requesting peer connection") => {
     if (!peerUserId) return;
-    // Skip if any device of this friend is already connected or
-    // mid-handshake — the server will fan out new peer_connects for
-    // additional devices on its own.
-    if (peerMesh.findAnyPeerKeyByUserId(peerUserId)) {
+    // Skip if any device of this user is already connected or mid-handshake
+    // — the server will fan out new peer_connects for additional devices on
+    // its own. Our own user id (used by the self-mesh retry) means "pair me
+    // with my other devices"; the server answers with a peer_connect per
+    // other device, or nothing if none are online.
+    const mesh = peerUserId === currentSnapshot?.userId ? selfMesh : peerMesh;
+    if (mesh.findAnyPeerKeyByUserId(peerUserId)) {
       return;
     }
 

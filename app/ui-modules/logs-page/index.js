@@ -13,6 +13,7 @@ import {
   getConnectedPeerIds,
   getConnectedSelfDeviceIds,
 } from "../../js/peer/status.js";
+import { isAnyRelayConnected } from "../../js/signaling/relay-status-registry.js";
 import { initInfiniteList } from "../../js/ui/infinite-list.js";
 
 const formatEur = (amount) => {
@@ -102,8 +103,10 @@ export const bindLogs = (root, data) => {
     peerConnectionsEl.textContent = String(getConnectedPeerIds().length);
   }
   if (selfDeviceConnectionsEl) {
+    // This device counts itself once it is reachable through a relay; each
+    // open WebRTC channel to another own device adds one more.
     selfDeviceConnectionsEl.textContent = String(
-      getConnectedSelfDeviceIds().length
+      isAnyRelayConnected() ? 1 + getConnectedSelfDeviceIds().length : 0
     );
   }
 

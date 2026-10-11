@@ -36,6 +36,11 @@ const BUILT_IN_SCENARIOS = {
     "scenarios",
     "multiple-payment-requests.cjs"
   ),
+  "wake-reconnect": path.join(
+    __dirname,
+    "scenarios",
+    "wake-reconnect.cjs"
+  ),
 };
 
 const parseArgs = (argv) => {

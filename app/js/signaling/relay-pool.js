@@ -11,11 +11,13 @@ holds N of them in parallel and presents the same callback surface to
   WebRTC signals are absorbed by perfect-negotiation; duplicate envelopes
   are absorbed by `processed_peer_message_ids` at the recipient.
 
-- Inbound peer_connect / peer_disconnect are folded into a single "this
-  (userId, deviceId) is online somewhere" event by tracking a per-peer set
-  of relays that currently report them online. The wrapped callback fires
-  once on the first relay that announces, and once again when the last
-  relay drops them.
+- Inbound peer_disconnect is folded into a single "this (userId, deviceId)
+  went offline everywhere" event by tracking a per-peer set of relays that
+  currently report them online; it fires only when the last relay drops them.
+  Every peer_connect is passed through, though: a relay re-sends one when we
+  ask it to re-pair after a dropped WebRTC connection, and swallowing it just
+  because the peer is still present would leave the pair unconnected forever.
+  `ensurePeer` above is idempotent, so duplicates across relays are harmless.
 
 - Other inbound events (peer_signal, peer_envelope) just pass through; the
   layer above is already designed to swallow duplicates.
@@ -78,9 +80,7 @@ export const createRelayPool = ({
       set = new Set();
       presence.set(key, set);
     }
-    const wasEmpty = set.size === 0;
     set.add(url);
-    return wasEmpty;
   };
 
   const presenceRemove = (key, url) => {
@@ -150,8 +150,8 @@ export const createRelayPool = ({
       onPeerConnect: ({ peerUserId, peerDeviceId, initiator }) => {
         const key = peerKey(peerUserId, peerDeviceId);
         if (!key) return;
-        const wasEmpty = presenceAdd(key, url);
-        if (wasEmpty && typeof onPeerConnect === "function") {
+        presenceAdd(key, url);
+        if (typeof onPeerConnect === "function") {
           onPeerConnect({ peerUserId, peerDeviceId, initiator });
         }
       },
