@@ -81,9 +81,13 @@ export const registerServiceWorker = async () => {
       });
     });
 
-    // Reload exactly once when the new worker takes control.
+    // Reload exactly once when a new worker replaces the current one. On a
+    // first visit the page has no controller and the fresh worker's
+    // clients.claim() also fires controllerchange — the page already runs the
+    // newest assets then, so reloading would only interrupt it.
+    const hadController = Boolean(navigator.serviceWorker.controller);
     navigator.serviceWorker.addEventListener("controllerchange", () => {
-      if (reloading) return;
+      if (reloading || !hadController) return;
       reloading = true;
       window.location.reload();
     });
