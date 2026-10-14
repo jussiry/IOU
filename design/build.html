@@ -88,7 +88,10 @@
     <p>
       Because the manifest's bytes change whenever any cached file changes, the
       browser's byte-comparison of the worker detects an update on its own — no
-      version string to remember to bump. The new worker installs into the
+      version string to remember to bump. The browser only runs that comparison on navigation, though, so a
+      desktop tab left open for days would never notice; the app therefore
+      also asks for a check whenever it regains focus or comes back online, and
+      every 30 minutes while it stays open. The new worker installs into the
       <strong>waiting</strong> state and deliberately does <em>not</em>
       auto-activate: <code>js/ui/app-update.js</code> surfaces "update available"
       as one piece of state (a nav badge, a settings banner, a toast), and only
