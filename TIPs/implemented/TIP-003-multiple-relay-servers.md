@@ -91,9 +91,9 @@ Parallel is simpler and the bandwidth cost is trivial:
 
 ### 3. Ask all relays for all friends
 
-Same reasoning as §2. Each relay independently fires `peer_connect` for whichever friends it sees online. The pool collapses duplicates via the friend mesh's composite key `(peerUserId, peerDeviceId)`, which already exists for multi-device support (TIP-001 era work).
+Same reasoning as §2. Each relay independently fires `peer_connect` for whichever friends it sees online. The pool passes every `peer_connect` through and lets the mesh collapse duplicates via its composite key `(peerUserId, peerDeviceId)`, which already exists for multi-device support (TIP-001 era work).
 
-If a friend is online on relays {A, C} and not B, the pool receives two `peer_connect` events for the same `(userId, deviceId)` pair. The mesh's `ensurePeer` short-circuits on the second call. No race, no duplicate WebRTC handshake.
+If a friend is online on relays {A, C} and not B, the pool receives two `peer_connect` events for the same `(userId, deviceId)` pair. The mesh's `ensurePeer` short-circuits on the second call. No race, no duplicate WebRTC handshake. The pool must **not** swallow a `peer_connect` just because the peer is already present: relays re-send one when a client asks to re-pair after a dropped WebRTC connection (e.g. wake from suspend), and that is the only way the pair reconnects while both stay registered.
 
 If a friend disconnects on A, the pool receives a `peer_disconnect` from A — but only counts the peer as truly offline once **all** relays that previously announced them have reported the disconnect (or have themselves gone down). This requires the pool to track, per `(userId, deviceId)`, the set of relays that currently report the peer online.
 
@@ -120,7 +120,7 @@ For the initial offer, the initiator is chosen by `getInitiatorClient` — deter
 
 ### 6. Same-user multi-device across relays
 
-Each device has a stable `device_id`. Device A on relays {X, Y} and device B on relays {Y, Z} share Y → their self-mesh works through Y. If they have no relay in common they cannot signal at all and cannot sync ledger state. This is a configuration concern, not a protocol failure: the UI should warn the user when a device's relay set has no overlap with another device's relay set.
+Each device has a stable `device_id`. Device A on relays {X, Y} and device B on relays {Y, Z} share Y → their self-mesh works through Y (signaling, plus the relay fallback for self-sync when WebRTC can't connect — see [spec-peer-communication](../../design/spec-peer-communication.html) §13.8). If they have no relay in common they cannot signal at all and cannot sync ledger state. This is a configuration concern, not a protocol failure: the UI should warn the user when a device's relay set has no overlap with another device's relay set.
 
 ### 7. Settings UI
 

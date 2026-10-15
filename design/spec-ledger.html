@@ -129,6 +129,24 @@ signature     = Schnorr over the canonical inner-message digest</code></pre>
 <div class="table-scroll"><table><thead><tr><th>Property</th><th>Mechanism</th></tr></thead><tbody><tr><td><strong>Authorship integrity</strong></td><td>Every entry carries an authorship proof by <code>from_user_id</code>; <code>verifyLedgerEntryAuthorship</code> rejects entries without a valid one</td></tr><tr><td><strong>Non-repudiation</strong></td><td>The proof commits to the canonical inner-message digest (id, type, from/to, created_at, payload); neither the transport peer nor the server can produce a valid one for a different <code>from_user_id</code></td></tr><tr><td><strong>No forged history</strong></td><td><code>mergeSyncedLedgerEntries</code> and <code>handleSyncData</code> reject unsigned or invalidly-signed entries before they enter the local state</td></tr><tr><td><strong>Replay-safe deduplication</strong></td><td><code>processed_peer_message_ids</code> prevents the same entry from being applied twice, even across multiple sync cycles</td></tr><tr><td><strong>Bilateral isolation</strong></td><td><code>getLedgerEntriesForPeer</code> only shares entries involving both parties; third-party conversations are never forwarded</td></tr></tbody></table></div>
 <h3>9.1 Limitations</h3>
 <ul><li><strong>Key compromise</strong> — if a user's private key is stolen, an attacker can produce valid signatures for arbitrary messages. There is currently no key rotation mechanism.</li><li><strong>Timestamp forgery</strong> — <code>originated_at</code> is sender-asserted and covered by the signature, so it cannot be altered after signing; however, a malicious sender can choose any timestamp at signing time.</li><li><strong>Selective disclosure</strong> — a peer can withhold entries from <code>sync_data</code>. There is no way for the recovering peer to know that entries are missing. Full recovery depends on peers being cooperative.</li></ul>
+<hr />
+<h2 id="format-evolution">10. Record Format Evolution</h2>
+<p>A signed record cannot be edited — not even to modernise its shape — without breaking its proof, and only its author can sign it again. So a format change never rewrites history; it changes how history is <em>read</em>. This is the rule for every future change to a durable record. <strong>No change has needed it yet</strong>, so none of the machinery below exists in code.</p>
+<h3>10.1 What versions a record today</h3>
+<ul>
+<li><code>type</code> says <em>what</em> a record is (<code>transaction_created</code>, <code>payment_request</code>, …). It is not a version.</li>
+<li><code>authorship.scheme</code> says <em>how it is signed</em> (<code>tally-nostr-event-v1</code>, or the legacy <code>tally-canonical-schnorr-v1</code>), and the signed content names its framing (<code>tally.signed_message.v1</code>).</li>
+<li>Nothing yet says which <em>payload shape</em> a given type uses — every payload is implicitly version 1.</li>
+</ul>
+<h3>10.2 The rule</h3>
+<ol>
+<li><strong>Version the payload, per type, inside the signature.</strong> When a type's payload changes shape, records of the new shape carry <code>payload.v</code> (absent = 1). It is per type, not the app version: app versions change for unrelated reasons, and two peers on different app versions must read the same record the same way — so the version has to travel in the record, signed, not be inferred from when or where it arrived.</li>
+<li><strong>Verify the original, then upcast.</strong> On arrival a record is verified exactly as signed. Then an <em>upcaster</em> — a pure function per <code>(type, v)</code>, chained v1 → v2 → v3 like the storage migrations in <code>migrations.ts</code> — converts the payload to the current shape. Everything downstream (handlers, <a href="glossary.html#view">view</a>, Logs) only ever sees the current shape, so legacy knowledge lives in the upcasters and nowhere else.</li>
+<li><strong>Keep the original bytes alongside.</strong> The stored entry keeps what was signed, because it is forwarded during sync and the receiver verifies the original, not your conversion of it.</li>
+</ol>
+<p>Nobody signs the upcast form. Your own signature over a friend's record would prove only that <em>you</em> vouch for it, which no third party should accept — and locally there is nothing to prove: the record was verified once, on arrival.</p>
+<h3>10.3 When old code can go</h3>
+<p>An upcaster can go once no stored entry uses its version. A <em>verifier</em> must stay as long as old records can still be forwarded to someone who needs to verify them — today, forever. <a href="tip-008-bilateral-checkpoints.html">TIP-008</a> (bilateral checkpoints) is what bounds that: once both friends have co-signed a checkpoint past a record, it is never forwarded again.</p>
   </main>
   <script src="assets/pages.js"></script>
   <script src="assets/design.js"></script>

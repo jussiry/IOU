@@ -232,6 +232,12 @@ const DOCS = [
     files: ["js/commands/transaction.js", "js/ledger.ts", "js/peer/authorship.js",
       "js/crypto/canonical.js", "js/peer/messages.js", "js/models/data-model.ts"],
   },
+  {
+    src: "TIPs/TIP-008-bilateral-checkpoints.md", out: "tip-008-bilateral-checkpoints.html",
+    title: "TIP-008 Bilateral checkpoints", status: "proposal", group: "TIPs",
+    files: ["js/ledger.ts", "js/peer/authorship.js", "js/peer/client.js",
+      "js/peer/bridge.js", "js/peer/handlers.js", "js/crypto/canonical.js"],
+  },
 ];
 
 // ---- Cross-link rewriting ------------------------------------------------
