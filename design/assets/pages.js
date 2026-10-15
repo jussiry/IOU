@@ -50,6 +50,7 @@ window.DESIGN_PAGES = [
   { group: "TIPs", href: "tip-006-remote-signers.html", title: "TIP-006 Remote signers (cont.)", status: "proposal" },
   { group: "TIPs", href: "tip-007-chained-transactions.html", title: "TIP-007 Chained transactions", status: "proposal" },
   { group: "TIPs", href: "tip-008-bilateral-checkpoints.html", title: "TIP-008 Bilateral checkpoints", status: "proposal" },
+  { group: "TIPs", href: "tip-009-offline-intermediaries.html", title: "TIP-009 Offline intermediaries", status: "proposal" },
 
   { group: "Tooling", href: "tooling.html", title: "Tooling", status: "reference" },
   { group: "Tooling", href: "build.html", title: "Build & runtime", status: "reference" },

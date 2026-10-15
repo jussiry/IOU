@@ -238,6 +238,12 @@ const DOCS = [
     files: ["js/ledger.ts", "js/peer/authorship.js", "js/peer/client.js",
       "js/peer/bridge.js", "js/peer/handlers.js", "js/crypto/canonical.js"],
   },
+  {
+    src: "TIPs/TIP-009-offline-intermediaries.md", out: "tip-009-offline-intermediaries.html",
+    title: "TIP-009 Offline intermediaries", status: "proposal", group: "TIPs",
+    files: ["js/commands/trust-limit.js", "js/commands/transaction.js", "js/peer/authorship.js",
+      "js/ledger.ts", "js/utils/friendships.js", "sw.js"],
+  },
 ];
 
 // ---- Cross-link rewriting ------------------------------------------------

@@ -120,6 +120,7 @@
 <hr />
 <h2>Offline chains (future — explicitly not v1)</h2>
 <p>v1 requires every hop to be connected, because the aim is instant payments and because a chain that sits half-signed for hours ties up credit along the whole path. The payer-signs-last rule does not depend on this: a later version can let proposals and signatures travel through relays to offline hops, with longer deadlines. The cost is longer reservations and more late-arrival overshoots, not weaker safety. Nothing in the record shape needs to change.</p>
+<p><a href="tip-009-offline-intermediaries.html">TIP-009</a> is the concrete design for one part of this: an intermediary who is unreachable takes part through a binding <strong>routing budget</strong> granted in advance, kept separate from the informal trust limit.</p>
 <hr />
 <h2>Partly private chained transactions (future — explicitly not v1)</h2>
 <p>In v1 every participant sees the whole record: the full route, every amount, and the identities of the endpoints. That is a real privacy regression relative to bilateral transactions, and worth improving later — but the obvious fix does not work.</p>

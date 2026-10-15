@@ -253,6 +253,8 @@ A chained record must be held by participants who are not one of its two endpoin
 
 v1 requires every hop to be connected, because the aim is instant payments and because a chain that sits half-signed for hours ties up credit along the whole path. The payer-signs-last rule does not depend on this: a later version can let proposals and signatures travel through relays to offline hops, with longer deadlines. The cost is longer reservations and more late-arrival overshoots, not weaker safety. Nothing in the record shape needs to change.
 
+[TIP-009](TIP-009-offline-intermediaries.md) is the concrete design for one part of this: an intermediary who is unreachable takes part through a binding **routing budget** granted in advance, kept separate from the informal trust limit.
+
 ---
 
 ## Partly private chained transactions (future — explicitly not v1)
