@@ -1491,7 +1491,7 @@ function CTA() {
             Try Tally <ArrowRight size={18} />
           </a>
           <a
-            href="https://github.com/jussiry/IOU"
+            href="https://github.com/jussiry/Tally"
             target="_blank"
             rel="noopener noreferrer"
             className="btn font-display text-lg px-6 py-4 rounded-full text-[var(--ink)] hover:bg-[var(--parchment-dark)]"
