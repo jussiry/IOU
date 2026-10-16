@@ -1510,7 +1510,7 @@ function CTA() {
       </div>
 
       <footer className="border-t border-[var(--ink-muted)]/15 py-8 px-6 text-center font-mono text-[10px] uppercase tracking-widest text-[var(--ink-muted)]">
-        © 2026 Tally · community money, honestly · interactive primer made by claude
+        Tally · community money, honestly · interactive primer made by claude
       </footer>
     </section>
   );
