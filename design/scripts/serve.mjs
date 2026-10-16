@@ -7,7 +7,9 @@
  *      cross-document fetch is blocked on the file:// origin, so search shows
  *      nothing when the docs are opened straight from the filesystem.
  *   2. Inline editing (see assets/design.js) POSTs edited markdown back to the
- *      source .html file via the /api/save endpoint below.
+ *      source .html file via the /api/save endpoint below. Editing and the
+ *      GraphEditor column are switched on only by the flag this server injects
+ *      into the pages it serves, so the public copy of the site stays read-only.
  *
  * Static files are served from design/. Clean URLs work too: a path with no
  * extension falls back to "<path>.html" (so /purpose and /purpose.html both
@@ -104,7 +106,17 @@ createServer(async (req, res) => {
   }
 
   try {
-    const body = await readFile(abs);
+    let body = await readFile(abs);
+    // Mark pages served here as authoring-enabled: design.js turns on inline
+    // editing and the GraphEditor column only when this flag is set, so the
+    // public site (served by server/server.js, which doesn't inject it) stays
+    // read-only. Injected before the first script so it is set when design.js runs.
+    if (extname(abs) === '.html') {
+      body = Buffer.from(String(body).replace(
+        '<script src="assets/pages.js">',
+        '<script>window.DESIGN_AUTHORING = true;</script>\n  <script src="assets/pages.js">'
+      ));
+    }
     res.writeHead(200, {
       'Content-Type': TYPES[extname(abs)] || 'application/octet-stream',
       'Cache-Control': 'no-store',

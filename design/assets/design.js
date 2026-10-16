@@ -201,8 +201,16 @@
   // Built on every page (inert until opened — see body.graph-open in the CSS)
   // so that editing a page into having graph metadata for the first time works
   // without a reload. graphColumn.rescan() re-attaches icons/wiring after edits.
-  var graphColumn = setupGraphColumn();
-  setupEditing(graphColumn);
+  //
+  // Both are authoring tools, so they exist only where they can work: the
+  // GraphEditor runs as a separate local process, and edits are saved through
+  // the Design dev server's /api/save. That server marks the pages it serves
+  // with window.DESIGN_AUTHORING (design/scripts/serve.mjs); the public site and
+  // a file:// copy don't, so there the docs are read-only and show no graph icons.
+  if (window.DESIGN_AUTHORING === true) {
+    document.body.classList.add("authoring");
+    setupEditing(setupGraphColumn());
+  }
 
   // Mobile drawer toggle
   topbar.querySelector(".nav-toggle").addEventListener("click", function () {

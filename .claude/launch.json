@@ -29,18 +29,8 @@
     },
     {
       "name": "Web landing",
-      "runtimeExecutable": "/Users/jussi/.nvm/versions/node/v24.14.0/bin/npx",
-      "runtimeArgs": [
-        "serve",
-        "web",
-        "-l",
-        "3001"
-      ],
-      "env": {
-        "PATH": "/Users/jussi/.nvm/versions/node/v24.14.0/bin:/usr/bin:/bin:/usr/sbin:/sbin"
-      },
-      "port": 3001,
-      "autoPort": false
+      "url": "http://localhost:3000",
+      "port": 3000
     },
     {
       "name": "GraphEditor",

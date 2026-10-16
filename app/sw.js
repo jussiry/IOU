@@ -33,6 +33,7 @@ const PRECACHE = Array.isArray(self.__PRECACHE) ? self.__PRECACHE : [];
 const toAbsolute = (url) => new URL(url, self.location.href).href;
 const PRECACHED_URLS = new Set(PRECACHE.map((entry) => toAbsolute(entry.url)));
 const INDEX_URL = toAbsolute("index.html");
+const WEB_SITE_URL = toAbsolute("web/");
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -98,8 +99,11 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // App-shell fallback: any in-scope navigation (e.g. "/") serves index.html.
-  if (request.mode === "navigate") {
+  // App-shell fallback: any in-scope navigation (e.g. "/") serves index.html —
+  // except the landing site and its Design docs. On the public domains those are
+  // a separate origin, but locally server/server.js mounts them under /web on the
+  // app's own origin, where this fallback would otherwise replace them with the app.
+  if (request.mode === "navigate" && !url.href.startsWith(WEB_SITE_URL)) {
     event.respondWith(cacheFirst(INDEX_URL, request));
     return;
   }

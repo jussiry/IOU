@@ -323,6 +323,34 @@
       100% { transform: scaleY(1); opacity: 1; }
     }
 
+    /* ── DOCS ── */
+    .docs {
+      padding: clamp(80px,12vh,140px) clamp(24px,7vw,120px);
+      background: var(--bg-stripe); border-top: 1px solid var(--rule);
+    }
+    .docs-inner {
+      max-width: 1080px; margin: 0 auto;
+      display: grid; grid-template-columns: repeat(auto-fit,minmax(300px,1fr));
+      gap: 72px; align-items: start;
+    }
+    .docs-h2 {
+      font-family: 'DM Serif Display', serif;
+      font-size: clamp(28px,3.5vw,44px); font-weight: 400; line-height: 1.2; margin-bottom: 24px;
+    }
+    .docs-h2 em { color: var(--green); font-style: italic; }
+    .docs-body { color: var(--ink-mid); line-height: 1.75; margin-bottom: 32px; max-width: 460px; }
+    .docs-ctas { display: flex; gap: 18px; flex-wrap: wrap; align-items: center; }
+    .docs-meta { color: var(--ink-mid); font-size: 14px; opacity: 0.75; }
+    .docs-topics { display: grid; gap: 12px; }
+    .docs-topic {
+      display: block; padding: 18px 22px; text-decoration: none; color: inherit;
+      background: var(--bg-card); border: 1px solid var(--rule); border-radius: 12px;
+      transition: border-color 0.15s, transform 0.15s;
+    }
+    .docs-topic:hover { border-color: var(--green); transform: translateY(-1px); }
+    .docs-topic-title { font-family: 'DM Serif Display', serif; font-size: 19px; margin-bottom: 4px; }
+    .docs-topic-body { color: var(--ink-mid); font-size: 15px; line-height: 1.55; }
+
     /* ── CTA ── */
     .cta {
       padding: clamp(100px,14vh,160px) clamp(24px,7vw,120px);
@@ -390,6 +418,7 @@
     <a href="#currents">Currents of trust</a>
     <a href="#why">The roots</a>
     <a href="#learn">Learn</a>
+    <a href="#docs">Docs</a>
     <a href="https://app.tally.earth/" target="_blank" rel="noopener" class="btn-primary">Try Tally</a>
   </div>
   <button class="nav-burger" id="nav-burger" aria-label="Open menu" aria-expanded="false">
@@ -402,6 +431,7 @@
   <a href="#currents" class="nav-dd-link">Currents of trust</a>
   <a href="#why" class="nav-dd-link">The roots</a>
   <a href="#learn" class="nav-dd-link">Learn</a>
+  <a href="#docs" class="nav-dd-link">Docs</a>
   <a href="https://app.tally.earth/" target="_blank" rel="noopener" class="btn-primary">Try Tally</a>
 </div>
 
@@ -547,11 +577,11 @@
   <div class="learn-inner">
     <div>
       <div class="section-label">KEEP LEARNING</div>
-      <h2 class="learn-h2">Want to go <em>deeper?</em></h2>
+      <h2 class="learn-h2">Learn the ideas <em>by playing.</em></h2>
       <p class="learn-body">
         Walk through eight short, interactive chapters — from the first notch on a
         wooden stick to currents of trust flowing across the network. Tap, poke, and see
-        every idea behind Tally in motion.
+        every idea behind Tally in motion. No technical background needed.
       </p>
       <div class="learn-ctas">
         <a href="tally-teaching.html" class="btn-primary-lg">Open the primer →</a>
@@ -569,6 +599,45 @@
         <g id="learn-stick-notches"></g>
       </svg>
       <div class="learn-stick-hint">↑ tap the stick to add a notch</div>
+    </div>
+  </div>
+</section>
+
+<!-- ── DOCS ── -->
+<section id="docs" class="docs">
+  <div class="docs-inner">
+    <div>
+      <div class="section-label">UNDER THE HOOD</div>
+      <h2 class="docs-h2">Every detail, <em>written down.</em></h2>
+      <p class="docs-body">
+        Where the primer explains the ideas, Design is Tally's full technical
+        documentation: how the ledger works, how devices find each other without a
+        central server, how every record is signed and encrypted, and the proposals
+        for what comes next. Written for developers — and for anyone who wants to
+        check exactly how their money is handled.
+      </p>
+      <div class="docs-ctas">
+        <a href="design/" class="btn-primary-lg">Read the docs →</a>
+        <span class="docs-meta">Technical · open to everyone</span>
+      </div>
+    </div>
+    <div class="docs-topics">
+      <a class="docs-topic" href="design/purpose.html">
+        <div class="docs-topic-title">Purpose</div>
+        <div class="docs-topic-body">Why Tally exists, and the economics of trust behind it.</div>
+      </a>
+      <a class="docs-topic" href="design/p2p.html">
+        <div class="docs-topic-title">Peer-to-peer core</div>
+        <div class="docs-topic-body">The local ledger, how data is stored, and how peers stay in sync.</div>
+      </a>
+      <a class="docs-topic" href="design/security.html">
+        <div class="docs-topic-title">Security</div>
+        <div class="docs-topic-body">Identity, keys, encryption, and what stays private.</div>
+      </a>
+      <a class="docs-topic" href="design/tips.html">
+        <div class="docs-topic-title">Proposals</div>
+        <div class="docs-topic-body">Tally Improvement Proposals — chained payments and more, designed in the open.</div>
+      </a>
     </div>
   </div>
 </section>
@@ -597,6 +666,7 @@
   <div class="footer-links">
     <a href="https://github.com/jussiry/Tally" target="_blank" rel="noopener">GitHub</a>
     <a href="https://app.tally.earth/" target="_blank" rel="noopener">App</a>
+    <a href="design/">Docs</a>
     <a href="https://t.me/TallyEarth" target="_blank" rel="noopener">Telegram</a>
   </div>
   <div style="opacity:0.55">Tally. Community money, honestly.</div>

@@ -437,7 +437,8 @@ mark.search-hit.search-hit-first {
   overflow: hidden;
   white-space: pre-wrap;
 }
-main.page :where(p, li, h1, h2, h3, h4, h5, h6, blockquote):hover {
+/* Only where editing is on (see the authoring flag in design.js). */
+body.authoring main.page :where(p, li, h1, h2, h3, h4, h5, h6, blockquote):hover {
   cursor: text;
 }
 
