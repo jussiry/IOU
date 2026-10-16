@@ -26,7 +26,7 @@
     </p>
 
     <h2>The root: Ripple (2004)</h2>
-    <p>Ryan Fugger's <strong>RipplePay</strong> is the origin of the whole family. Its claim: money is already just mutual credit between people who trust each other, so a payment to a stranger is a chain of IOUs passed along a path of friends — exactly the model in <a href="purpose.html">Purpose</a>. It is an ordinary GPL-licensed web server with one shared database — still running, renamed <a href="https://rumplepay.com/">Rumplepay</a> in 2020 — and never grew a user base large enough for routing to matter. Everything below is a descendants and variations of the idea.</p>
+    <p>Ryan Fugger's <strong>RipplePay</strong> is the origin of the whole family. Its claim: money is already just mutual credit between people who trust each other, so a payment to a stranger is a series of IOUs passed along a path of friends — exactly the model in <a href="purpose.html">Purpose</a>. It is an ordinary GPL-licensed web server with one shared database — still running, renamed <a href="https://rumplepay.com/">Rumplepay</a> in 2020 — and never grew a user base large enough for routing to matter. Everything below is a descendants and variations of the idea.</p>
 
 
     <div class="table-scroll">
@@ -86,7 +86,7 @@
       personal token (a UBI), and a trust graph decides whose tokens you will
       accept. Paying a stranger means swapping along a transitive chain of
       trusted currencies until you hold one the recipient accepts — the same
-      routing problem as a chained transaction, reached from the opposite
+      routing problem as a routed payment, reached from the opposite
       direction. Worth watching for its pathfinder and its group currencies,
       not for its money model.
     </p>
@@ -135,7 +135,7 @@
       independent, mutually-trusting hops using prepare/fulfil/reject packets;
       <strong>Lightning</strong> does the same over payment channels, with
       onion-routed paths so no intermediary learns the full route. Both are the
-      literature to read before designing chained transactions — see
+      literature to read before designing routed payments — see
       <a href="tips.html">TIPs</a>.
     </p>
 
@@ -205,7 +205,7 @@
 
     <h2>Open problems this lineage leaves us</h2>
     <p>
-      <a href="glossary.html#transaction">Chained transactions</a> are not
+      <a href="glossary.html#routed-payment">Routed payments</a> are not
       implemented, and the two obstacles are exactly the ones every project
       above had to answer:
     </p>
@@ -215,7 +215,7 @@
         them. Tally has no such graph and does not want one, so a route has to
         be discovered by asking friends — probing, gossip, or source-routing
         over a locally-known neighbourhood, as Lightning does.</li>
-      <li><strong>The decentralised commit problem.</strong> A chain of IOUs
+      <li><strong>The decentralised commit problem.</strong> A routed payment
         must be all-or-nothing: no intermediary may end up having paid out
         without being paid in. On-chain systems get this from a single
         transaction. Without consensus it needs either a signature from every

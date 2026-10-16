@@ -111,8 +111,28 @@
         balance with them — how much more they could still owe you before hitting
         the limit. E.g. a 50 € limit with Bob already owing you 30 € leaves 20 €
         of available trust (and Bob has 80 €). Never negative: if the balance
-        already exceeds the limit, available trust is 0. The headroom chained
-        transactions route through.</dd>
+        already exceeds the limit, available trust is 0. The headroom
+        <a href="#routed-payment">routed payments</a> travel through.</dd>
+
+      <dt id="routed-payment"><a class="term-self" href="#routed-payment">Routed payment, Current</a></dt>
+      <dd>A payment to someone you are not friends with, made of ordinary
+        <a href="#transaction">IOUs</a> passed along a
+        <a href="#payment-route">route</a> of friends: Alice owes Bob, Bob owes
+        Charlie, and Bob ends up neutral. All-or-nothing, as one multi-party
+        record that every participant signs, the payer last. Not implemented
+        yet; see <a href="tip-007-routed-payments.html">TIP-007</a>. The website
+        calls one a <em>current</em> (currency flowing friend to friend); the
+        app says payments <em>flow friend to friend</em>. Formerly "chained
+        transaction".</dd>
+
+      <dt id="payment-route"><a class="term-self" href="#payment-route">Route (payment), hop</a></dt>
+      <dd>The path of friends a <a href="#routed-payment">routed payment</a>
+        travels along, payer to payee (Alice → Bob → Charlie). Each step between
+        two friends is a <em>hop</em>, and every hop must have enough
+        <a href="#available-trust">available trust</a>. A
+        <a href="tip-002-circular-cancellation.html">circular cancellation</a>
+        runs along a cycle: a path that closes back on itself. Not the UI
+        <a href="#route">route</a>. Formerly "chain".</dd>
 
       <dt id="command" data-files="js/commands/index.js js/commands/transaction.js js/commands/friendship.js js/commands/payment-request.js js/commands/trust-limit.js js/commands/relays.js js/commands/stun.js js/commands/user.js"><a class="term-self" href="#command">Command</a></dt>
       <dd>A domain module under <code>app/js/commands/</code> that performs one

@@ -38,7 +38,7 @@ Loop search and loop-found messages are transient protocol traffic — similar t
 
 **3. The protocol is non-blocking.**
 
-Every message is fire-and-forget. No node waits for a response before continuing other work. If a signing chain stalls (a node is offline or doesn't respond), the unsigned proposal simply evaporates — there is no persistent "waiting" state to clean up. The only in-memory state across the whole protocol is the Phase 1 `search_id` cache, which expires automatically via TTL. The loop will be re-discovered on the next search cycle.
+Every message is fire-and-forget. No node waits for a response before continuing other work. If a signing pass stalls (a node is offline or doesn't respond), the unsigned proposal simply evaporates — there is no persistent "waiting" state to clean up. The only in-memory state across the whole protocol is the Phase 1 `search_id` cache, which expires automatically via TTL. The loop will be re-discovered on the next search cycle.
 
 ---
 
@@ -78,7 +78,7 @@ Sent from a node to one of its creditors (someone they owe). This message is eph
 loop_search {
   search_id:  uuid          // unique per search run, used only to deduplicate forwarding
   initiator:  A_pubkey      // who started the search
-  chain:      [A, B, ...]   // ordered list of pubkeys in the chain so far
+  path:       [A, B, ...]   // ordered list of pubkeys in the path so far
   max_hops:   number        // how many more forwards are allowed (decrements each hop)
 }
 ```
@@ -90,30 +90,30 @@ loop_search {
 **Step 1 — A initiates:**
 A owes B. A sends B a `loop_search`:
 ```
-{ search_id: uuid, initiator: A, chain: [A], max_hops: 2 }
+{ search_id: uuid, initiator: A, path: [A], max_hops: 2 }
 ```
 
 **Step 2 — B forwards:**
 B receives the search. B checks:
-- Is B already in `chain`? If yes, ignore.
+- Is B already in `path`? If yes, ignore.
 - Has B already seen this `search_id`? If yes, ignore.
 - Is `max_hops` > 0?
 
-For each creditor C that B owes **and that is not already in `chain`**, B sends C a `loop_search`:
+For each creditor C that B owes **and that is not already in `path`**, B sends C a `loop_search`:
 ```
-{ search_id: uuid, initiator: A, chain: [A, B], max_hops: 1 }
+{ search_id: uuid, initiator: A, path: [A, B], max_hops: 1 }
 ```
 
-The chain membership filter happens at the sender before dispatching — no receiver needs to check whether it is in the chain.
+The path membership filter happens at the sender before dispatching — no receiver needs to check whether it is in the path.
 
 **Step 3 — C checks for closure:**
 C receives the search. C checks:
-- Does C have a debt **to** the initiator A (i.e., `chain[0]`)?
+- Does C have a debt **to** the initiator A (i.e., `path[0]`)?
 
 If yes: loop A→B→C→A found. C sends A a `loop_found` directly (C and A are friends):
 ```
 loop_found {
-  chain: [A, B, C]   // full ordered loop; A is both start and implicit end
+  path: [A, B, C]   // full ordered loop; A is both start and implicit end
 }
 ```
 
@@ -131,30 +131,30 @@ When A receives `loop_found`, A becomes the coordinator. Phase 2 has two sub-pha
 
 ### Phase 2a — Amount negotiation (unsigned, ephemeral)
 
-Each participant contributes their edge amount; the running minimum propagates forward. These messages carry no IDs — they are identified solely by their `chain` content, are never stored, and evaporate if the chain stalls.
+Each participant contributes their edge amount; the running minimum propagates forward. These messages carry no IDs — they are identified solely by their `path` content, are never stored, and evaporate if the path stalls.
 
 **A → B:**
 ```
-{ chain: [A,B,C], running_min: X }   // X = A_owes_B
+{ path: [A,B,C], running_min: X }   // X = A_owes_B
 ```
 
 **B → C:**
 B clips to its own edge: `running_min = min(X, Y)` where Y = B_owes_C.
 ```
-{ chain: [A,B,C], running_min: min(X,Y) }
+{ path: [A,B,C], running_min: min(X,Y) }
 ```
 
 **C → A:**
 C clips to its own edge: `M = min(running_min, Z)` where Z = C_owes_A. C returns the final amount:
 ```
-{ chain: [A,B,C], final_amount: M }
+{ path: [A,B,C], final_amount: M }
 ```
 
 ### Phase 2b — Signing (permanent)
 
 Now that M is known, all participants sign the same canonical record. A creates it and passes it around the loop for sequential signing:
 
-**A → B → C:** each adds their signature over `{chain, cancel_amount: M}`.
+**A → B → C:** each adds their signature over `{path, cancel_amount: M}`.
 
 C, holding all three signatures, broadcasts the completed record to A and B.
 
@@ -164,12 +164,12 @@ C, holding all three signatures, broadcasts the completed record to A and B.
 LedgerEntry {
   type:    "loop_cancellation"
   payload: {
-    chain:         [A, B, C]   // ordered: each node cancels their debt to the next
+    path:          [A, B, C]   // ordered: each node cancels their debt to the next
     cancel_amount: M
     signatures: {
-      A: <sig over {chain, cancel_amount: M}>,
-      B: <sig over {chain, cancel_amount: M}>,
-      C: <sig over {chain, cancel_amount: M}>
+      A: <sig over {path, cancel_amount: M}>,
+      B: <sig over {path, cancel_amount: M}>,
+      C: <sig over {path, cancel_amount: M}>
     }
   }
 }
@@ -180,10 +180,10 @@ Each participant writes this same record to their own ledger. The ledger handler
 - For B: reduce B's debt to C by M.
 - For C: reduce C's debt to A by M.
 
-Which edge to reduce is determined by each node's position in `chain`: node at index `i` reduces their debt to node at index `(i+1) % len(chain)`.
+Which edge to reduce is determined by each node's position in `path`: node at index `i` reduces their debt to node at index `(i+1) % len(path)`.
 
 The entry is valid if and only if:
-1. All signatures in `chain` are present and verify against `{chain, cancel_amount}`.
+1. All signatures in `path` are present and verify against `{path, cancel_amount}`.
 2. `cancel_amount ≤ current_debt` on this node's edge (verified before writing).
 
 Condition 2 is the sole correctness guard for concurrent cancellations — no additional deduplication mechanism is needed.
@@ -200,7 +200,7 @@ In a 3-hop cycle A→B→C→A:
 |-------|--------------------|----------------------------------|----------------------------|
 | A     | A_owes_B           | B and C are in a cycle with A    | B_owes_C, C_owes_A, M      |
 | B     | A_owes_B, B_owes_C | A is searching, C is a link to A | C_owes_A, M                |
-| C     | B_owes_C, C_owes_A | A and B are in the chain         | A_owes_B, M                |
+| C     | B_owes_C, C_owes_A | A and B are in the path          | A_owes_B, M                |
 
 ### Irreducible minimum leakage
 
@@ -216,7 +216,7 @@ In a 3-hop cycle A→B→C→A:
 
 ### Leakage comparison with 4-hop cycles
 
-Each additional hop adds one participant who learns one more chain segment. The leakage profile scales linearly with loop length. For 3-hop it is minimal; for long chains it becomes more significant.
+Each additional hop adds one participant who learns one more path segment. The leakage profile scales linearly with loop length. For 3-hop it is minimal; for long paths it becomes more significant.
 
 ---
 
@@ -226,7 +226,7 @@ Each additional hop adds one participant who learns one more chain segment. The 
 
 Any two cancellations that share an edge — whether they are the same loop discovered by two different peers (e.g. [A,B,C] and [B,C,A]) or different loops that happen to share an edge (e.g. [A,B,C] and [A,B,D]) — are handled identically: whichever completes first reduces the shared edge; the second is rejected at signing time when the node on that edge detects `cancel_amount > remaining_debt` and stops forwarding. The residual debt is re-discoverable on the next search.
 
-### Signing chain stalls
+### Signing pass stalls
 
 If any participant in Phase 2 is offline or unresponsive, the unsigned proposal is never completed. No node holds any persistent state waiting for it — the proposal evaporates. No rollback or cleanup is needed. The loop is re-discovered on the next search cycle.
 
@@ -248,9 +248,9 @@ The `loop_search`, `loop_found`, and Phase 2 negotiation messages are **not** le
 
 1. **When to initiates** a loop searches and how to deal with **WebRTC connection (actively peers) vs. server connection (partly active peers)**? WebRTC connections can be querried more performantly
 
-2. **Re-initiation after stall.** After a signing chain evaporates, should the coordinator automatically retry after a backoff, or wait for the next new tally to trigger a fresh search?
+2. **Re-initiation after stall.** After a signing pass evaporates, should the coordinator automatically retry after a backoff, or wait for the next new tally to trigger a fresh search?
 
-3. **Maximum chain length in practice.** In a community of 30 people with average 5 friends each, what fraction of debts participate in 3-hop vs 4-hop cycles? Empirical data would inform whether 4-hop is worth the extra complexity.
+3. **Maximum path length in practice.** In a community of 30 people with average 5 friends each, what fraction of debts participate in 3-hop vs 4-hop cycles? Empirical data would inform whether 4-hop is worth the extra complexity.
 
 4. **Notification UX.** Should the user see "€15 cancelled in a 3-way loop with Bob and Carol"? Silent is simpler; notification is better for trust and transparency. Probably notification for v1.
 
@@ -264,7 +264,7 @@ The `loop_search`, `loop_found`, and Phase 2 negotiation messages are **not** le
 
 - New ephemeral peer message kinds: `loop_search`, `loop_found`, `loop_cancel_negotiate`, `loop_cancel_sign`.
 - New ledger entry type: `loop_cancellation`.
-- New command: `cancelLoop(chain, cancelAmount)` — analogous to `createTransaction`.
+- New command: `cancelLoop(path, cancelAmount)` — analogous to `createTransaction`.
 - Phase 1 state: in-memory `Set<search_id>` with TTL expiry. Not persisted to IndexedDB.
 - Phase 2 state: none. All negotiation and signing messages are fire-and-forget.
-- Signature payload: `{chain, cancel_amount}` — no IDs required.
+- Signature payload: `{path, cancel_amount}` — no IDs required.

@@ -2,7 +2,7 @@
 
 A peer-to-peer IOU app that records debts and trust between friends. Debts live
 on users' own devices, and trust limits let them extend to strangers — as long
-as there is a chain of trusted friends in between.
+as there is a route of trusted friends in between.
 
 *(The project was formerly called "IOU"; the name survives in package names and
 in `iou_` storage keys.)*
@@ -11,7 +11,7 @@ in `iou_` storage keys.)*
 
 Money, in its essence, is bookkeeping that tracks good deeds owed back. Tally
 returns money to that root by basing it on personal loans that can be extended
-to strangers through a trusted chain of friends. This relatively basic
+to strangers along a route of trusted friends. This relatively basic
 functionality can become the basis for a whole monetary system — returning the
 control, and the responsibility, of money from governments and banks back to
 people.
@@ -33,10 +33,10 @@ reconciles with peers when both are online. Messages that can't be delivered
 immediately are queued in an outbox, held by a relay server as encrypted
 envelopes, and retried on reconnection.
 
-Chained transactions — paying someone you don't know through a chain of mutual
+Routed payments — paying someone you don't know through a route of mutual
 friends — are the idea the whole design is aimed at, and are **not implemented
 yet**. See [Purpose](design/purpose.html) for how they work and
-[TIP-007](TIPs/TIP-007-chained-transactions.md) for the design in progress.
+[TIP-007](TIPs/TIP-007-routed-payments.md) for the design in progress.
 
 ## Documentation
 
@@ -74,12 +74,12 @@ Non-trivial changes get a **TIP** (Tally Improvement Proposal) under
 
 ## Roadmap
 
-- Chained transactions ([TIP-007](TIPs/TIP-007-chained-transactions.md))
+- Routed payments ([TIP-007](TIPs/TIP-007-routed-payments.md))
 - Circular debt cancellation — if A owes B, B owes C, and C owes A, cancel the
   loop ([TIP-002](TIPs/TIP-002-circular-cancellation.md))
 - Currencies other than euros — anything users agree to transact in
 - A "marketplace": personal exchange rates between currencies
-- Fees on chained transactions (see
+- Fees on routed payments (see
   [the original idea notes](design/plan-idea.html))
 
 ## Architecture

@@ -400,8 +400,8 @@ const ConceptCard = ({ title, body, accent, bg }) => (
   </div>
 );
 
-// ─── SVG: Chained trust — Alice ↔ Bob ↔ Charlie ─────────────────────────
-const ChainDiagram = ({ green, amber, inkMid, bgCard, rule }) => {
+// ─── SVG: Currents of trust — Alice ↔ Bob ↔ Charlie ─────────────────────
+const CurrentsDiagram = ({ green, amber, inkMid, bgCard, rule }) => {
   const nodes = [
     { x: 90,  label: 'Alice',   sub: '−10 €', subColor: amber },
     { x: 280, label: 'Bob',     sub: 'neutral',  subColor: 'oklch(55% 0.01 150)' },
@@ -621,7 +621,7 @@ function App() {
             <Step n="2" title="Record a favour" green={green} rule={rule}
               body="Did someone cover your coffee? Buy groceries for a neighbour? Log a tally. It's kept on your phone, not on any server."/>
             <Step n="3" title="Let it flow through the community" green={green} rule={rule}
-              body={<>Your favours can travel through <a href="#chain" style={{ color:green, textDecoration:'none', borderBottom:`1px solid ${green}55`, paddingBottom:1, fontWeight:600 }}>chains of trust</a> to someone you don't even know. When loops form, they cancel automatically. The whole network stays in balance.</>}/>
+              body={<>Your favours can flow on <a href="#currents" style={{ color:green, textDecoration:'none', borderBottom:`1px solid ${green}55`, paddingBottom:1, fontWeight:600 }}>currents of trust</a> to someone you don't even know. When loops form, they cancel automatically. The whole network stays in balance.</>}/>
           </div>
           <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:24 }}>
             <CreditCircle green={green} amber={amber}/>
@@ -632,8 +632,8 @@ function App() {
         </div>
       </section>
 
-      {/* ── CHAINED TRUST ── */}
-      <section id="chain" style={{
+      {/* ── CURRENTS OF TRUST ── */}
+      <section id="currents" style={{
         padding:'clamp(80px,12vh,140px) clamp(24px,7vw,120px)',
         background: bgStripe,
         borderTop:`1px solid ${rule}`,
@@ -642,14 +642,14 @@ function App() {
 
           {/* Illustration */}
           <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:20 }}>
-            <ChainDiagram green={green} amber={amber} inkMid={inkMid} bgCard={bgCard} rule={rule}/>
+            <CurrentsDiagram green={green} amber={amber} inkMid={inkMid} bgCard={bgCard} rule={rule}/>
           </div>
 
           {/* Text */}
           <div>
-            <div style={{ color:green, fontSize:12, fontWeight:500, letterSpacing:'0.12em', marginBottom:16 }}>CHAINED TRUST</div>
+            <div style={{ color:green, fontSize:12, fontWeight:500, letterSpacing:'0.12em', marginBottom:16 }}>CURRENTS OF TRUST</div>
             <h2 style={{ fontFamily:"'DM Serif Display',serif", fontSize:'clamp(28px,3.5vw,44px)', lineHeight:1.2, marginBottom:20, textWrap:'pretty' }}>
-              Reach anyone through<br/><em style={{ color:green, fontStyle:'italic' }}>a chain of friends.</em>
+              Reach anyone through<br/><em style={{ color:green, fontStyle:'italic' }}>friends of friends.</em>
             </h2>
             <p style={{ color:inkMid, lineHeight:1.75, marginBottom:20, textWrap:'pretty' }}>
               Alice and Bob trust each other. Bob and Charlie trust each other. Alice needs to pay Charlie — but they've never met.
@@ -658,7 +658,7 @@ function App() {
               Tally routes the favour through Bob: Alice records a tally with Bob, Bob records one of equal value with Charlie. Charlie is paid. Bob's balance stays neutral. Alice and Charlie can transact without having to trust each other.
             </p>
             <p style={{ color:inkMid, lineHeight:1.75, textWrap:'pretty' }}>
-              Chains can be as long as needed — the more trust connections in your community, the further a favour can travel.
+              A current can pass through as many friends as needed — the more trust connections in your community, the further a favour can flow.
             </p>
           </div>
 
@@ -713,7 +713,7 @@ function App() {
               Whether Hawala, Quipu or Tally Sticks, using records of good deeds as money is long and ancient. When you root money in the community it stays honest, and can't support wars or other destructive aims.
             </p>
             <p style={{ color:inkMid, lineHeight:1.8, textWrap:'pretty' }}>
-              Tally.earth returns this idea to the digital age — and takes it further. By chaining tallies, local trust can extend to global trade. No central monetary system. No manipulation of the money supply. No corruption.
+              Tally.earth returns this idea to the digital age — and takes it further. As tallies flow from friend to friend, local trust can extend to global trade. No central monetary system. No manipulation of the money supply. No corruption.
             </p>
           </div>
           <blockquote style={{

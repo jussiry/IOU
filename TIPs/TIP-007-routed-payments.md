@@ -1,9 +1,9 @@
-# TIP-007: Chained Transactions
+# TIP-007: Routed Payments
 
 | Field   | Value |
 |---------|-------|
 | Number  | TIP-007 |
-| Title   | Chained Transactions |
+| Title   | Routed Payments |
 | Status  | Draft — commit design settled, routing open |
 | Author  | Jussi Rytkönen |
 | Created | 2026-09-02 |
@@ -13,9 +13,9 @@
 
 ## Summary
 
-A chained transaction lets Alice pay Charlie when they are not friends, by passing IOUs along a path of mutual friends: Alice→Bob→Charlie. Each hop is an ordinary IOU between friends; the chain as a whole must be **all-or-nothing**, so that no intermediary ever ends up having paid out without being paid in.
+A routed payment lets Alice pay Charlie when they are not friends, by passing IOUs along a route of mutual friends: Alice→Bob→Charlie. Each hop is an ordinary IOU between friends; the route as a whole must be **all-or-nothing**, so that no intermediary ever ends up having paid out without being paid in.
 
-The commit mechanism is a single multi-party record that is valid only once every participant has signed it, with one ordering rule that removes the incentive to abuse it: **the payer signs last**. v1 is **online-only** — every hop must be connected while the chain is assembled — so a chained payment completes in seconds, like any other transaction. **Routing is deliberately left open** — see §Phase 1.
+The commit mechanism is a single multi-party record that is valid only once every participant has signed it, with one ordering rule that removes the incentive to abuse it: **the payer signs last**. v1 is **online-only** — every hop must be connected while the payment is assembled — so a routed payment completes in seconds, like any other transaction. **Routing is deliberately left open** — see §Phase 1.
 
 The commit mechanism is intended to be the *same primitive* used by [TIP-002](TIP-002-circular-cancellation.md). See §Relationship to TIP-002.
 
@@ -23,17 +23,17 @@ The commit mechanism is intended to be the *same primitive* used by [TIP-002](TI
 
 ## Motivation
 
-Chained transactions are the feature that turns Tally from a shared debt notebook into money: without them, value only moves between people who already trust each other. They are named in `README.md` and [Purpose](../design/purpose.html) as core to the idea, and are the largest unimplemented piece of the project.
+Routed payments are the feature that turns Tally from a shared debt notebook into money: without them, value only moves between people who already trust each other. They are named in `README.md` and [Purpose](../design/purpose.html) as core to the idea, and are the largest unimplemented piece of the project.
 
-The design constraint that makes this hard is Tally's own: there is **no chain and no global ledger** (see [Related work](../design/related-work.html)). Every comparable system — Trustlines, Circles — solved multi-hop atomicity by putting the whole path in one on-chain transaction, and solved routing by publishing the trust graph. Tally has neither, by choice.
+The design constraint that makes this hard is Tally's own: there is **no blockchain and no global ledger** (see [Related work](../design/related-work.html)). Every comparable system — Trustlines, Circles — solved multi-hop atomicity by putting the whole path in one on-chain transaction, and solved routing by publishing the trust graph. Tally has neither, by choice.
 
 ---
 
 ## Relationship to TIP-002 — one primitive, two features
 
-A chained transaction and a circular cancellation are **structurally the same operation**:
+A routed payment and a circular cancellation are **structurally the same operation**:
 
-|                         | TIP-002 circular cancellation | TIP-007 chained transaction |
+|                         | TIP-002 circular cancellation | TIP-007 routed payment |
 |-------------------------|-------------------------------|-----------------------------|
 | Shape                   | A cycle (last hop closes back to the first) | A path (distinct payer and payee ends) |
 | Effect on each edge     | Reduces existing debt          | Creates new debt            |
@@ -43,9 +43,9 @@ A chained transaction and a circular cancellation are **structurally the same op
 
 They differ in one respect that matters for safety:
 
-> **Cancellation can only ever make you better off; a chained transaction can make you worse off.**
+> **Cancellation can only ever make you better off; a routed payment can make you worse off.**
 
-TIP-002 can therefore sign in any order. A chained transaction cannot: whoever adds the final signature decides whether and when the record becomes valid, and §Who signs last shows that only one participant can safely hold that decision.
+TIP-002 can therefore sign in any order. A routed payment cannot: whoever adds the final signature decides whether and when the record becomes valid, and §Who signs last shows that only one participant can safely hold that decision.
 
 **Recommendation:** build a shared `multi_party_record` primitive — canonical digest, signature set, signing order, reservation, signed cancel, ledger sharing rules — and express both TIPs on top of it. Its signing order is "initiator signs last", which is required here and harmless for TIP-002. If TIP-002 lands first with its own ad-hoc flow, it should be rebased onto the primitive when this TIP is implemented.
 
@@ -57,7 +57,7 @@ TIP-002 can therefore sign in any order. A chained transaction cannot: whoever a
 
 **1. Every hop is between direct friends.** As in TIP-002, no message ever has to be routed through a non-friend: each edge of the path is an existing friendship with an existing peer connection. The protocol runs on the existing signed envelope infrastructure.
 
-**2. Only the completed chain is a ledger entry.** Route discovery, proposal and signing traffic are ephemeral (like `sync_hello`); only the fully-signed record is durable.
+**2. Only the completed payment is a ledger entry.** Route discovery, proposal and signing traffic are ephemeral (like `sync_hello`); only the fully-signed record is durable.
 
 **3. There is no double-spend to resolve, so no consensus is needed — only evidence.** Either the complete signature set exists or it does not, and it is self-verifying: anyone holding it can prove validity to anyone else. "Did it commit?" is a **delivery** question, and §Who signs last removes anyone's reason to interfere with delivery.
 
@@ -68,8 +68,8 @@ TIP-002 can therefore sign in any order. A chained transaction cannot: whoever a
 ## The record
 
 ```
-ChainedTransaction {
-  id:        "ctx_…"          // unique; part of the signed digest
+RoutedPayment {
+  id:        "rpay_…"          // unique; part of the signed digest
   legs: [                      // ordered, payer → payee
     { from: A, to: B, amount: 50.10 },
     { from: B, to: C, amount: 50.05 },
@@ -80,7 +80,7 @@ ChainedTransaction {
 }
 ```
 
-The **payer** is `legs[0].from`, the **payee** is the last `to`. Participants = every pubkey appearing in any leg. Each participant signs the canonical digest of the whole object (`js/crypto/canonical.js`), exactly as TIP-002 signs `{chain, cancel_amount}`.
+The **payer** is `legs[0].from`, the **payee** is the last `to`. Participants = every pubkey appearing in any leg. Each participant signs the canonical digest of the whole object (`js/crypto/canonical.js`), exactly as TIP-002 signs `{route, cancel_amount}`.
 
 The record is **valid if and only if** every participant's signature is present and verifies. There is no partial state: an incomplete signature set is not a transaction, it is a proposal.
 
@@ -106,7 +106,7 @@ This is why the design needs no referee, no hash-lock and no received-by deadlin
 
 - **A complete record is valid whenever it arrives.** Nobody can prove *when* the payer signed — the payer's signature is the commit — and nobody needs to, because the payer has no reason to sign late. Rejecting late records would only split ledgers: one hop applies it, the next does not.
 - **The payer's own reservation is released only by the payer.** The first hop keeps the payer's credit reserved until it sees the commit or the payer's signed cancel — not merely until the deadline. Otherwise a payer could let the reservation lapse, spend the same credit elsewhere, then commit and overdraw their line with the first hop: the only way a late signature could pay off. Holding it costs only the payer's own credit.
-- **Withholding is cancelling.** A payer who changes their mind after collecting signatures should send `ctx_cancel` so reservations are released at once instead of at the deadline.
+- **Withholding is cancelling.** A payer who changes their mind after collecting signatures should send `routed_cancel` so reservations are released at once instead of at the deadline.
 
 ---
 
@@ -131,7 +131,7 @@ Open sub-questions: what "optimal" means (fewest hops / greatest bottleneck capa
 
 The payer builds the record and sends it along the path. Nothing is signed or reserved yet.
 
-### Message: `ctx_propose` (ephemeral)
+### Message: `routed_propose` (ephemeral)
 
 Carries the unsigned record. Each hop forwards it to its next hop, after checking:
 
@@ -145,7 +145,7 @@ Carries the unsigned record. Each hop forwards it to its next hop, after checkin
 
 The payee signs first and the signatures travel back along the path, so each participant signs knowing everyone downstream already has. The payer receives the full set of other signatures last.
 
-### Message: `ctx_sign` (ephemeral)
+### Message: `routed_sign` (ephemeral)
 
 Carries the record plus the signatures gathered so far. Before signing, each participant verifies:
 
@@ -154,7 +154,7 @@ Carries the record plus the signatures gathered so far. Before signing, each par
 3. Its **incoming** leg is within its own trust limit for the previous hop — it is willing to be owed this much more by that friend.
 4. It has not already signed or cancelled this `id`, and `deadline` has not passed.
 
-If all pass, the participant signs, **reserves**, and passes `ctx_sign` to its previous hop. Once signed, a participant cannot retract: a signature is a commitment, and only the payer — by not signing — can still abort.
+If all pass, the participant signs, **reserves**, and passes `routed_sign` to its previous hop. Once signed, a participant cannot retract: a signature is a commitment, and only the payer — by not signing — can still abort.
 
 ## Phase 4 — Commit (forward, payer → payee)
 
@@ -168,11 +168,11 @@ The complete record is a durable ledger entry, delivered through the normal outb
 
 ## Cancel
 
-A participant that has **not yet signed** may refuse, and the payer may abandon the chain at any point before their own signature:
+A participant that has **not yet signed** may refuse, and the payer may abandon the payment at any point before their own signature:
 
 ```
-ChainedTransactionCancel {
-  id:       "ctx_…"
+RoutedPaymentCancel {
+  id:       "rpay_…"
   by:       <pubkey>
   reason?:  "declined" | "insufficient_capacity" | "peer_offline" | "expired" | …
   signature
@@ -181,7 +181,7 @@ ChainedTransactionCancel {
 
 A valid signed cancel **voids the id permanently** for everyone who sees it: no signature may be added afterwards, and every recipient releases its reservation immediately instead of waiting out the deadline. It propagates in both directions along the path.
 
-A payer who signs both a cancel and a commit for the same `id` has equivocated. The first hop is the only way in: it forwards whichever it sees first and refuses the other, so the rest of the path never sees both, and it keeps the conflicting pair as evidence. Participants only accept chain messages from their neighbours on the path.
+A payer who signs both a cancel and a commit for the same `id` has equivocated. The first hop is the only way in: it forwards whichever it sees first and refuses the other, so the rest of the path never sees both, and it keeps the conflicting pair as evidence. Participants only accept routed-payment messages from their neighbours on the path.
 
 *Open:* whether a cancel should be a ledger entry or ephemeral. Ephemeral is cheaper and matches TIP-002's treatment of failed flows; durable makes "why did this fail?" answerable later and gives evidence against a peer who cancels constantly.
 
@@ -200,14 +200,14 @@ A payer who signs both a cancel and a commit for the same `id` has equivocated. 
 None of these give anyone a way to profit:
 
 - **Credit held until the deadline.** A payer who collects signatures and neither signs nor cancels keeps intermediaries' credit reserved until the deadline. This is a nuisance with no gain, short in v1, and caused by a friend of the first hop.
-- **Late arrival past a limit.** If the commit reaches a hop after its reservation expired, and that credit was used in the meantime, applying it can push an edge past its limit. The hop applies it anyway (§Validation rule 6) and the UI flags it. It needs a dropped connection at the worst moment, and the overshoot is bounded by the chain amount.
-- **Variable amounts would reopen the option.** If legs ever cross currencies or fees float with time, delaying the payer's signature gains something from the price change. Multi-currency chains must revisit this section.
+- **Late arrival past a limit.** If the commit reaches a hop after its reservation expired, and that credit was used in the meantime, applying it can push an edge past its limit. The hop applies it anyway (§Validation rule 6) and the UI flags it. It needs a dropped connection at the worst moment, and the overshoot is bounded by the payment amount.
+- **Variable amounts would reopen the option.** If legs ever cross currencies or fees float with time, delaying the payer's signature gains something from the price change. Multi-currency payments must revisit this section.
 
 ---
 
 ## In-flight reservations
 
-Without reservations, two concurrent chains through Bob can each individually fit inside his available credit and jointly exceed it.
+Without reservations, two concurrent routed payments through Bob can each individually fit inside his available credit and jointly exceed it.
 
 **Rule:** signing reserves the amount on both of that participant's affected edges — outgoing capacity toward the next hop, and headroom against the previous hop — until the record commits, is cancelled, or the deadline passes (with the payer-edge exception in §Deadline).
 
@@ -215,8 +215,8 @@ Reserved amounts are subtracted from `available_trust` everywhere it is computed
 
 - **Sign time, not propose time.** A reservation is the local half of a commitment; reserving at propose time would let a hostile proposer freeze a friend's credit with no signature cost.
 - **Persisted.** A reload must not drop a reservation while a signature is outstanding. Reservations live alongside the outbox and are reconciled on load against the deadline and the payer-edge rule.
-- **Visible.** Reserved credit is shown ("€50 pending in a chained payment"), otherwise available trust silently drops and looks like a bug.
-- **Shared with TIP-002.** A cancellation and a chained payment competing for the same edge must see each other's reservations.
+- **Visible.** Reserved credit is shown ("€50 pending in a routed payment"), otherwise available trust silently drops and looks like a bug.
+- **Shared with TIP-002.** A cancellation and a routed payment competing for the same edge must see each other's reservations.
 
 *Open:* whether the first hop can manually release a payer's held reservation (e.g. the payer vanished), accepting the overdraw risk.
 
@@ -224,22 +224,22 @@ Reserved amounts are subtracted from `available_trust` everywhere it is computed
 
 ## Validation rules
 
-An inbound `chained_transaction` entry is applied only if:
+An inbound `routed_payment` entry is applied only if:
 
 1. Every participant in `legs` has a present, verifying signature over the canonical digest.
 2. It arrived from the applying node's upstream neighbour on the path (or during sync with a neighbour it shares a leg with).
 3. No participant appears twice in the path (a self-intersecting route would multiply that person's exposure).
 4. Each leg amount is positive, and amounts are non-increasing along the path.
 5. The `id` has not already been applied, and the node has not seen a valid cancel for it.
-6. **Limits are not re-checked at apply time.** Each node checked its limits when it signed; a late arrival that now exceeds a limit is applied and surfaced as a warning. Rejecting it would leave the chain committed for some participants and not others.
+6. **Limits are not re-checked at apply time.** Each node checked its limits when it signed; a late arrival that now exceeds a limit is applied and surfaced as a warning. Rejecting it would leave the payment committed for some participants and not others.
 
 ---
 
 ## Ledger integration
 
-A chained transaction is the ledger's **first multi-party record**, and it breaks an assumption baked into the current design: entries have one `from_user_id` and one `to_user_id`, and `getLedgerEntriesForPeer` slices the ledger bilaterally, never forwarding third-party entries ([Ledger spec](../design/spec-ledger.html) §4.1).
+A routed payment is the ledger's **first multi-party record**, and it breaks an assumption baked into the current design: entries have one `from_user_id` and one `to_user_id`, and `getLedgerEntriesForPeer` slices the ledger bilaterally, never forwarding third-party entries ([Ledger spec](../design/spec-ledger.html) §4.1).
 
-A chained record must be held by participants who are not one of its two endpoints, so the spec needs:
+A routed payment record must be held by participants who are not one of its two endpoints, so the spec needs:
 
 - a definition of which participants receive which parts during sync,
 - a rule for verifying a multi-party record that arrives from someone who is not its author,
@@ -249,15 +249,15 @@ A chained record must be held by participants who are not one of its two endpoin
 
 ---
 
-## Offline chains (future — explicitly not v1)
+## Offline routed payments (future — explicitly not v1)
 
-v1 requires every hop to be connected, because the aim is instant payments and because a chain that sits half-signed for hours ties up credit along the whole path. The payer-signs-last rule does not depend on this: a later version can let proposals and signatures travel through relays to offline hops, with longer deadlines. The cost is longer reservations and more late-arrival overshoots, not weaker safety. Nothing in the record shape needs to change.
+v1 requires every hop to be connected, because the aim is instant payments and because a payment that sits half-signed for hours ties up credit along the whole path. The payer-signs-last rule does not depend on this: a later version can let proposals and signatures travel through relays to offline hops, with longer deadlines. The cost is longer reservations and more late-arrival overshoots, not weaker safety. Nothing in the record shape needs to change.
 
 [TIP-009](TIP-009-offline-intermediaries.md) is the concrete design for one part of this: an intermediary who is unreachable takes part through a binding **routing budget** granted in advance, kept separate from the informal trust limit.
 
 ---
 
-## Partly private chained transactions (future — explicitly not v1)
+## Partly private routed payments (future — explicitly not v1)
 
 In v1 every participant sees the whole record: the full route, every amount, and the identities of the endpoints. That is a real privacy regression relative to bilateral transactions, and worth improving later — but the obvious fix does not work.
 
@@ -286,22 +286,22 @@ HTLCs become worth revisiting if hops stop being friends-of-friends, or if a pri
 
 ## Open questions
 
-1. **Deadline length** for online chains, and absolute vs relative time (§Deadline).
-2. **Maximum path length.** Longer chains find more routes and multiply every failure mode; 3 hops is probably the right ceiling to start.
+1. **Deadline length** for online payments, and absolute vs relative time (§Deadline).
+2. **Maximum route length.** Longer routes find more routes and multiply every failure mode; 3 hops is probably the right ceiling to start.
 3. **Fees in v1 or later**, and who sets them.
 4. **Commit receipts** back to the payer (§Phase 4).
 5. **Manual release** of a payer's held reservation by the first hop (§Reservations).
 6. **Cancel durability** — ledger entry or ephemeral (§Cancel).
 7. **Shared primitive scope** — is a cycle just a path that closes (§Relationship to TIP-002)?
-8. **Multi-currency chains** — out of scope, and they break the payer-signs-last guarantee (§Residual risks).
+8. **Multi-currency payments** — out of scope, and they break the payer-signs-last guarantee (§Residual risks).
 
 ---
 
 ## Implementation notes
 
-- New ephemeral peer message kinds: `ctx_propose` (forward), `ctx_sign` (backward), `ctx_cancel` (both directions). All WebRTC-only in v1.
-- New ledger entry type: `chained_transaction` — the project's first multi-party record — delivered forward through the normal outbox.
-- New command: `createChainedTransaction(route, amount)`, alongside `createTransaction` in `js/commands/transaction.js`.
+- New ephemeral peer message kinds: `routed_propose` (forward), `routed_sign` (backward), `routed_cancel` (both directions). All WebRTC-only in v1.
+- New ledger entry type: `routed_payment` — the project's first multi-party record — delivered forward through the normal outbox.
+- New command: `createRoutedPayment(route, amount)`, alongside `createTransaction` in `js/commands/transaction.js`.
 - Reservations belong next to the outbox in persisted state; `available_trust` computations must subtract them.
 - Signature payload: the canonical digest of `{id, legs, deadline}` via `js/crypto/canonical.js`, signed with the existing authorship-proof machinery (`js/peer/authorship.js`) so a third-party-forwarded record verifies without change.
 - Build the `multi_party_record` helpers first and port TIP-002 onto them, rather than duplicating the signing flow.

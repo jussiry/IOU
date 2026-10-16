@@ -23,7 +23,7 @@
       Money, in its essence, is bookkeeping that tracks good deeds owed back.
       Tally returns money to that root: it is <strong>money as peer-to-peer
       IOUs</strong> — promissory notes between people who trust each other —
-      extended to strangers through a chain of mutual friends.
+      extended to strangers along routes of mutual friends.
     </p>
 
     <h2>The idea</h2>
@@ -38,10 +38,10 @@
       between two friends.
     </p>
 
-    <h2>Tally and chained transactions</h2>
+    <h2>Tally and routed payments</h2>
     
     <ul><li><strong>Tally</strong> — the current balance of IOUs with a friend: positive (they owe you) or negative (you owe them). It only moves when you send or receive an IOU.</li><li><strong>Trust</strong> — the <a href="glossary.html#trust-limit">trust limit</a> you set per friend: the most you're comfortable being owed by them.</li></ul>
-    <p>Trust limits let value flow between people who <em>don't</em> know each other. If Alice and Bob trust each other and so do Bob and Charlie, Alice can pay Charlie by passing an IOU through Bob: Alice's IOU to Bob, Bob's own IOU to Charlie. Bob is left neutral (equal in and out), and Charlie gets an IOU he trusts. Chains can be any length, so with enough trust in the network, anyone can transact with anyone. The <a href="glossary.html#available-trust">available trust</a> along a route is the headroom these chains flow through.</p>
+    <p>Trust limits let value flow between people who <em>don't</em> know each other. If Alice and Bob trust each other and so do Bob and Charlie, Alice can pay Charlie by passing an IOU through Bob: Alice's IOU to Bob, Bob's own IOU to Charlie. Bob is left neutral (equal in and out), and Charlie gets an IOU he trusts. This is a <a href="glossary.html#routed-payment">routed payment</a>: it travels along a <a href="glossary.html#payment-route">route</a> of friends, and routes can be any length, so with enough trust in the network, anyone can transact with anyone. The <a href="glossary.html#available-trust">available trust</a> along a route is the headroom routed payments flow through.</p>
 
     <pre><code>Alice wants to pay Charlie for a table, but they don't know each other.
 Bob is friends with both.
@@ -58,16 +58,16 @@ After:
   Bob's net balance: 0    (received 50 from Alice, gave 50 to Charlie)
   Charlie got paid        (holds Bob's trusted IOU worth 50)
 
-Longer chains work the same way:
+Longer routes work the same way:
   Alice ──&gt; Bob ──&gt; Carol ──&gt; Dave ──&gt; Charlie
-  Each link passes an IOU of equal value to the next.</code></pre>
+  Each hop passes an IOU of equal value to the next.</code></pre>
 
     <p>
       This is the feature the whole design points at, and it is
       <strong>not implemented yet</strong> — it is the largest outstanding piece
-      of the project. The commit mechanism that makes a chain all-or-nothing is
+      of the project. The commit mechanism that makes a routed payment all-or-nothing is
       being worked out in
-      <a href="tip-007-chained-transactions.html">TIP-007</a>.
+      <a href="tip-007-routed-payments.html">TIP-007</a>.
     </p>
 
     <h2>Why it's built the way it is</h2>

@@ -19,7 +19,7 @@
 <h2>Motivation</h2>
 <p>The ledger is append-only and nothing ever leaves it. Three costs grow with it, without limit:</p>
 <ol><li><strong>Format debt.</strong> Records are verified again whenever they are forwarded during sync (<code>verifyLedgerEntryAuthorship</code>). So the legacy <code>tally-canonical-schnorr-v1</code> verifier, and every future one, can never be deleted while any ledger anywhere holds a record signed that way. The same goes for old payload shapes that state derivation must keep understanding.</li><li><strong>Sync cost.</strong> <code>sync_hello</code> advertises <em>every</em> known entry id for the relationship, and recovery replays the entire bilateral history. Both grow with the age of the friendship, not with what changed.</li><li><strong>Exposure.</strong> A full, signed, forwardable history of every IOU between two people is kept on every device of both, indefinitely.</li></ol>
-<p>Re-signing old records in a new format was considered and rejected: only a record's author can re-sign it, so one unreachable friend (lost key, stopped using Tally) blocks retiring a format for everyone; the "replace" record type itself becomes permanent legacy; and chained records would need every participant to re-sign. A checkpoint needs one co-signature per friendship and replaces <em>all</em> of that history at once.</p>
+<p>Re-signing old records in a new format was considered and rejected: only a record's author can re-sign it, so one unreachable friend (lost key, stopped using Tally) blocks retiring a format for everyone; the "replace" record type itself becomes permanent legacy; and routed payments would need every participant to re-sign. A checkpoint needs one co-signature per friendship and replaces <em>all</em> of that history at once.</p>
 <hr />
 <h2>What a checkpoint says — and what it deliberately does not</h2>
 <p>A checkpoint is an agreement about <strong>debt</strong>, and only debt:</p>
@@ -35,7 +35,7 @@
   created_at:  &lt;timestamp&gt;
 }</code></pre>
 <p><code>balance_eur</code> is the balance <em>after</em> every covered entry, so the checkpoint is self-contained — nobody needs <code>previous</code>'s balance, or anything before it, to read the current one.</p>
-<p><strong>Trust limits are not in it.</strong> A trust limit is an informal statement of willingness, not an obligation: a friend who set a limit that would allow a chained transaction can still decline to sign it (TIP-007). Agreeing on a number that binds nobody adds a negotiation without adding certainty. Each side keeps its current trust limit as ordinary local state, and the most recent trust-limit message in each direction is simply kept past the checkpoint (see §What survives a checkpoint).</p>
+<p><strong>Trust limits are not in it.</strong> A trust limit is an informal statement of willingness, not an obligation: a friend who set a limit that would allow a routed payment can still decline to sign it (TIP-007). Agreeing on a number that binds nobody adds a negotiation without adding certainty. Each side keeps its current trust limit as ordinary local state, and the most recent trust-limit message in each direction is simply kept past the checkpoint (see §What survives a checkpoint).</p>
 <p>Nor does a checkpoint carry names, open payment requests, or anything else that is still in motion.</p>
 <hr />
 <h2>Agreeing on a checkpoint</h2>
@@ -54,8 +54,8 @@
 <h2>Sync and recovery</h2>
 <ul><li><strong><code>sync_hello</code></strong> advertises the latest checkpoint id plus the ids after it, instead of every id ever.</li><li><strong>Behind on checkpoints.</strong> A peer whose latest checkpoint is older is sent the newer checkpoint and the entries after it, not the entries the checkpoint replaced.</li><li><strong>Recovery.</strong> A wiped device that reconnects is sent the latest checkpoint and everything live after it, and rebuilds the relationship from that. This is shorter than today's full replay and needs no legacy verifier for anything older than the checkpoint.</li><li><strong>Self-sync.</strong> Checkpoints are ordinary durable entries, so the user's other devices receive them and can archive the same entries.</li></ul>
 <hr />
-<h2>Chained transactions</h2>
-<p>Each hop of a chained transaction (TIP-007) is an ordinary IOU between two friends, so its effect on each pair's balance is covered by that pair's next checkpoint like any other transaction. The multi-party chain record itself is balance-affecting for every hop that appears in it; it becomes archivable for a given participant once that participant has checkpointed past it with <strong>both</strong> of its neighbours in the chain. Until then it stays live, so it can still be produced as evidence if a neighbour disputes the hop.</p>
+<h2>Routed payments</h2>
+<p>Each hop of a routed payment (TIP-007) is an ordinary IOU between two friends, so its effect on each pair's balance is covered by that pair's next checkpoint like any other transaction. The multi-party payment record itself is balance-affecting for every hop that appears in it; it becomes archivable for a given participant once that participant has checkpointed past it with <strong>both</strong> of its neighbours in the route. Until then it stays live, so it can still be produced as evidence if a neighbour disputes the hop.</p>
 <hr />
 <h2>Disputes and evidence</h2>
 <p>Today the evidence for a balance is the set of individually signed IOUs. After a checkpoint it is one record signed by <strong>both</strong> parties — strictly stronger, since it is an explicit agreement on the total rather than a sum the parties must each reconstruct. A user who wants the itemised history anyway keeps their archive; nothing about the protocol depends on it.</p>

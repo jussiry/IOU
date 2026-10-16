@@ -10,10 +10,10 @@
   <main class="page" data-status="proposal"
     data-files="js/commands/trust-limit.js js/commands/transaction.js js/peer/authorship.js js/ledger.ts js/utils/friendships.js sw.js">
 <h1>TIP-009: Offline Intermediaries</h1>
-<div class="table-scroll"><table><thead><tr><th>Field</th><th>Value</th></tr></thead><tbody><tr><td>Number</td><td>TIP-009</td></tr><tr><td>Title</td><td>Offline Intermediaries — binding routing budgets</td></tr><tr><td>Status</td><td>Draft</td></tr><tr><td>Author</td><td>Jussi Rytkönen</td></tr><tr><td>Created</td><td>2026-10-16</td></tr><tr><td>Extends</td><td><a href="tip-007-chained-transactions.html">TIP-007</a></td></tr></tbody></table></div>
+<div class="table-scroll"><table><thead><tr><th>Field</th><th>Value</th></tr></thead><tbody><tr><td>Number</td><td>TIP-009</td></tr><tr><td>Title</td><td>Offline Intermediaries — binding routing budgets</td></tr><tr><td>Status</td><td>Draft</td></tr><tr><td>Author</td><td>Jussi Rytkönen</td></tr><tr><td>Created</td><td>2026-10-16</td></tr><tr><td>Extends</td><td><a href="tip-007-routed-payments.html">TIP-007</a></td></tr></tbody></table></div>
 <hr />
 <h2>Summary</h2>
-<p>TIP-007 v1 needs every participant of a chained transaction online, because each one signs. This TIP lets an <strong>intermediary be offline</strong> by signing their consent in advance: a <strong>routing budget</strong> — "while I can't be reached, up to €X may be routed from Alice onward through me". The budget is a binding promise, separate from the informal trust limit, opt-in, consumed by use and never self-renewing. The upstream neighbour, who is online, keeps its running total; overspending it is provable fraud, and the intermediary's exposure can never exceed the budget they chose.</p>
+<p>TIP-007 v1 needs every participant of a routed payment online, because each one signs. This TIP lets an <strong>intermediary be offline</strong> by signing their consent in advance: a <strong>routing budget</strong> — "while I can't be reached, up to €X may be routed from Alice onward through me". The budget is a binding promise, separate from the informal trust limit, opt-in, consumed by use and never self-renewing. The upstream neighbour, who is online, keeps its running total; overspending it is provable fraud, and the intermediary's exposure can never exceed the budget they chose.</p>
 <hr />
 <h2>The example used throughout</h2>
 <p><strong>Alice</strong> wants to pay <strong>Carol</strong> €20 for a lamp. They are not friends, but both are friends with <strong>Bob</strong>, so the payment is routed through him:</p>
@@ -23,7 +23,7 @@ payer            intermediary        payee</code></pre>
 <p>What Bob risks is the first link: he now holds Alice's IOU, and if she never pays it, he still owes Carol. So the question this TIP answers is how Bob can agree in advance, and how much.</p>
 <hr />
 <h2>Motivation</h2>
-<p>A chained transaction succeeds only if every intermediary approves it immediately. People's phones are off, out of signal, or in a drawer; most of the time a route of three friends will have at least one who can't answer. Service-worker signing (push wakes the app, which signs with its local key) covers a device that has network but a closed app. It cannot cover a device that is unreachable, and nothing can sign there without the key. The only way to take part while unreachable is to have agreed <em>beforehand</em>.</p>
+<p>A routed payment succeeds only if every intermediary approves it immediately. People's phones are off, out of signal, or in a drawer; most of the time a route of three friends will have at least one who can't answer. Service-worker signing (push wakes the app, which signs with its local key) covers a device that has network but a closed app. It cannot cover a device that is unreachable, and nothing can sign there without the key. The only way to take part while unreachable is to have agreed <em>beforehand</em>.</p>
 <p>That is what a credit line was in RipplePay: standing consent to be routed through. Tally cannot copy it directly, because RipplePay had a server that knew every balance and could stop a revoked line instantly. Here there is no such authority, which shapes everything below.</p>
 <hr />
 <h2>Why not make the trust limit binding</h2>
@@ -61,19 +61,19 @@ payer            intermediary        payee</code></pre>
   previous:  "ru_…" | null    // the previous use of this budget
   amount:    20.00
   spent:     35.00            // running total including this use
-  chain:     "ctx_…"          // the chained transaction it backs
+  payment:   "rpay_…"         // the routed payment it backs
 }</code></pre>
-<p>In the chained transaction record, Bob's leg carries this use in place of Bob's live signature. The record is valid if every <em>online</em> participant signed it and every offline intermediary's leg carries a use that fits its budget.</p>
+<p>In the routed payment record, Bob's leg carries this use in place of Bob's live signature. The record is valid if every <em>online</em> participant signed it and every offline intermediary's leg carries a use that fits its budget.</p>
 <p><strong>Overspending is provable.</strong> Uses form a single line: each names the one before it. If Alice issues two uses naming the same <code>previous</code>, she has signed two contradictory accounts of the same budget, and both are evidence against her. Bob is liable only for uses that fit the budget in order. Whoever accepted an IOU from Bob beyond that holds Alice's signed contradiction as their claim against her — see §Open questions for whether downstream friends should be able to limit that risk.</p>
-<p><strong>Bob learns everything when he returns.</strong> Every routed payment is a chained record that downstream friends also hold, so Bob receives all of them by ordinary sync, whether or not Alice delivers them, and can check the running total himself.</p>
+<p><strong>Bob learns everything when he returns.</strong> Every routed payment is a multi-party record that downstream friends also hold, so Bob receives all of them by ordinary sync, whether or not Alice delivers them, and can check the running total himself.</p>
 <hr />
 <h2>Who may be offline</h2>
-<p>Every leg of a chain moves risk to the person who receives the IOU: on the leg Alice → Bob, Bob now holds Alice's IOU. That person must either sign live, or have granted a budget <strong>and</strong> have the other end of that leg online, to keep the running total. It follows that:</p>
-<ul><li><strong>The payer is always online.</strong> They start the chain and, per TIP-007, sign last.</li><li><strong>No two neighbours in a chain may both be offline,</strong> because the leg between them would have nobody to approve it or keep its total.</li><li><strong>The payee may be offline</strong> if the last intermediary is online and the payee has granted that intermediary a budget: they can be paid while away, which is the same promise in the other position.</li></ul>
-<p>A three-person chain therefore works with the middle person offline; a longer chain works with every other person offline.</p>
+<p>Every leg of a route moves risk to the person who receives the IOU: on the leg Alice → Bob, Bob now holds Alice's IOU. That person must either sign live, or have granted a budget <strong>and</strong> have the other end of that leg online, to keep the running total. It follows that:</p>
+<ul><li><strong>The payer is always online.</strong> They start the payment and, per TIP-007, sign last.</li><li><strong>No two neighbours in a route may both be offline,</strong> because the leg between them would have nobody to approve it or keep its total.</li><li><strong>The payee may be offline</strong> if the last intermediary is online and the payee has granted that intermediary a budget: they can be paid while away, which is the same promise in the other position.</li></ul>
+<p>A three-person route therefore works with the middle person offline; a longer route works with every other person offline.</p>
 <hr />
 <h2>Disputes</h2>
-<p>A routed payment is not one deal but a chain of IOUs, and only its two ends made the deal. If the lamp Carol sold Alice turns out to be broken, that is between Alice and Carol. A refund is a new chained transaction in the other direction, with the same consent rules; no intermediary is ever obliged to reverse anything, because none of them was party to the sale.</p>
+<p>A routed payment is not one deal but a route of IOUs, and only its two ends made the deal. If the lamp Carol sold Alice turns out to be broken, that is between Alice and Carol. A refund is a new routed payment in the other direction, with the same consent rules; no intermediary is ever obliged to reverse anything, because none of them was party to the sale.</p>
 <p>That is also why an intermediary's own risk must stay small and chosen: if Alice refuses to pay Bob, Bob's IOU to Carol still stands. A routing budget is the most Bob agrees to lose that way while he cannot be asked.</p>
 <hr />
 <h2>Interaction with other TIPs</h2>
@@ -83,7 +83,7 @@ payer            intermediary        payee</code></pre>
 <ol><li><strong>Downstream protection.</strong> Carol accepts Bob's IOU on the strength of Alice's running total, which Carol cannot check. Should each friend be able to set a separate cap on how much they accept through offline-backed legs?</li><li><strong>Equivocation policy.</strong> When Alice issues two uses that conflict, which branch does Bob honour? Order by lowest id is deterministic; is it fair?</li><li><strong>Defaults and UI.</strong> How small should the suggested budget be, and how should the cost of a broken promise be explained so it isn't granted carelessly?</li><li><strong>Renewal.</strong> Should Bob's app top up a budget automatically when he comes back online, within a ceiling he set once?</li><li><strong>Visibility.</strong> Should Alice see how much of Bob's budget is left, and should Bob be notified each time his budget is used?</li><li><strong>Fees.</strong> If intermediaries take fees (TIP-007 open question 3), does an offline intermediary's fee come from the budget record?</li></ol>
 <hr />
 <h2>Implementation notes</h2>
-<ol><li>Depends on TIP-007's chained transaction record.</li><li>Two new durable record types: <code>routing_budget</code> and <code>routing_budget_use</code>.</li><li>Validation of a budget-backed leg: the use verifies, it names its budget and previous use, the running total is consistent, and it fits both the budget and the trust-limit headroom.</li><li>The "offline limit" field on the trust-limit page (§In the UI).</li></ol>
+<ol><li>Depends on TIP-007's routed payment record.</li><li>Two new durable record types: <code>routing_budget</code> and <code>routing_budget_use</code>.</li><li>Validation of a budget-backed leg: the use verifies, it names its budget and previous use, the running total is consistent, and it fits both the budget and the trust-limit headroom.</li><li>The "offline limit" field on the trust-limit page (§In the UI).</li></ol>
   </main>
   <script src="assets/pages.js"></script>
   <script src="assets/design.js"></script>

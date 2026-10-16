@@ -46,7 +46,7 @@ without limit:
 Re-signing old records in a new format was considered and rejected: only a
 record's author can re-sign it, so one unreachable friend (lost key, stopped
 using Tally) blocks retiring a format for everyone; the "replace" record type
-itself becomes permanent legacy; and chained records would need every
+itself becomes permanent legacy; and routed payments would need every
 participant to re-sign. A checkpoint needs one co-signature per friendship and
 replaces *all* of that history at once.
 
@@ -76,7 +76,7 @@ read the current one.
 
 **Trust limits are not in it.** A trust limit is an informal statement of
 willingness, not an obligation: a friend who set a limit that would allow a
-chained transaction can still decline to sign it (TIP-007). Agreeing on a
+routed payment can still decline to sign it (TIP-007). Agreeing on a
 number that binds nobody adds a negotiation without adding certainty. Each
 side keeps its current trust limit as ordinary local state, and the most recent
 trust-limit message in each direction is simply kept past the checkpoint (see
@@ -173,14 +173,14 @@ display shape and left alone.
 
 ---
 
-## Chained transactions
+## Routed payments
 
-Each hop of a chained transaction (TIP-007) is an ordinary IOU between two
+Each hop of a routed payment (TIP-007) is an ordinary IOU between two
 friends, so its effect on each pair's balance is covered by that pair's next
-checkpoint like any other transaction. The multi-party chain record itself is
+checkpoint like any other transaction. The multi-party payment record itself is
 balance-affecting for every hop that appears in it; it becomes archivable for a
 given participant once that participant has checkpointed past it with **both**
-of its neighbours in the chain. Until then it stays live, so it can still be
+of its neighbours in the route. Until then it stays live, so it can still be
 produced as evidence if a neighbour disputes the hop.
 
 ---

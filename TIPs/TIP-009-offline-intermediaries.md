@@ -7,13 +7,13 @@
 | Status  | Draft |
 | Author  | Jussi Rytkönen |
 | Created | 2026-10-16 |
-| Extends | [TIP-007](TIP-007-chained-transactions.md) |
+| Extends | [TIP-007](TIP-007-routed-payments.md) |
 
 ---
 
 ## Summary
 
-TIP-007 v1 needs every participant of a chained transaction online, because
+TIP-007 v1 needs every participant of a routed payment online, because
 each one signs. This TIP lets an **intermediary be offline** by signing their
 consent in advance: a **routing budget** — "while I can't be reached, up to
 €X may be routed from Alice onward through me". The budget is a binding
@@ -46,7 +46,7 @@ agree in advance, and how much.
 
 ## Motivation
 
-A chained transaction succeeds only if every intermediary approves it
+A routed payment succeeds only if every intermediary approves it
 immediately. People's phones are off, out of signal, or in a drawer; most of
 the time a route of three friends will have at least one who can't answer.
 Service-worker signing (push wakes the app, which signs with its local key)
@@ -175,11 +175,11 @@ RoutingBudgetUse {            // authored by the upstream neighbour (Alice)
   previous:  "ru_…" | null    // the previous use of this budget
   amount:    20.00
   spent:     35.00            // running total including this use
-  chain:     "ctx_…"          // the chained transaction it backs
+  payment:   "rpay_…"         // the routed payment it backs
 }
 ```
 
-In the chained transaction record, Bob's leg carries this use in place of
+In the routed payment record, Bob's leg carries this use in place of
 Bob's live signature. The record is valid if every *online* participant signed
 it and every offline intermediary's leg carries a use that fits its budget.
 
@@ -191,8 +191,8 @@ IOU from Bob beyond that holds Alice's signed contradiction as their claim
 against her — see §Open questions for whether downstream friends should be
 able to limit that risk.
 
-**Bob learns everything when he returns.** Every routed payment is a chained
-record that downstream friends also hold, so Bob receives all of them by
+**Bob learns everything when he returns.** Every routed payment is a
+multi-party record that downstream friends also hold, so Bob receives all of them by
 ordinary sync, whether or not Alice delivers them, and can check the running
 total himself.
 
@@ -200,29 +200,29 @@ total himself.
 
 ## Who may be offline
 
-Every leg of a chain moves risk to the person who receives the IOU: on the leg
+Every leg of a route moves risk to the person who receives the IOU: on the leg
 Alice → Bob, Bob now holds Alice's IOU. That person must either sign live, or
 have granted a budget **and** have the other end of that leg online, to keep the
 running total. It follows that:
 
-- **The payer is always online.** They start the chain and, per TIP-007, sign
+- **The payer is always online.** They start the payment and, per TIP-007, sign
   last.
-- **No two neighbours in a chain may both be offline,** because the leg between
+- **No two neighbours in a route may both be offline,** because the leg between
   them would have nobody to approve it or keep its total.
 - **The payee may be offline** if the last intermediary is online and the payee
   has granted that intermediary a budget: they can be paid while away, which is
   the same promise in the other position.
 
-A three-person chain therefore works with the middle person offline; a longer
-chain works with every other person offline.
+A three-person route therefore works with the middle person offline; a longer
+route works with every other person offline.
 
 ---
 
 ## Disputes
 
-A routed payment is not one deal but a chain of IOUs, and only its two ends
+A routed payment is not one deal but a route of IOUs, and only its two ends
 made the deal. If the lamp Carol sold Alice turns out to be broken, that is
-between Alice and Carol. A refund is a new chained transaction in the other
+between Alice and Carol. A refund is a new routed payment in the other
 direction, with the same consent rules; no intermediary is ever obliged to
 reverse anything, because none of them was party to the sale.
 
@@ -270,7 +270,7 @@ is the most Bob agrees to lose that way while he cannot be asked.
 
 ## Implementation notes
 
-1. Depends on TIP-007's chained transaction record.
+1. Depends on TIP-007's routed payment record.
 2. Two new durable record types: `routing_budget` and `routing_budget_use`.
 3. Validation of a budget-backed leg: the use verifies, it names its budget and
    previous use, the running total is consistent, and it fits both the budget

@@ -227,8 +227,8 @@ const DOCS = [
       "js/peer/authorship.js", "js/crypto/peer-crypto.js"],
   },
   {
-    src: "TIPs/TIP-007-chained-transactions.md", out: "tip-007-chained-transactions.html",
-    title: "TIP-007 Chained transactions", status: "proposal", group: "TIPs",
+    src: "TIPs/TIP-007-routed-payments.md", out: "tip-007-routed-payments.html",
+    title: "TIP-007 Routed payments", status: "proposal", group: "TIPs",
     files: ["js/commands/transaction.js", "js/ledger.ts", "js/peer/authorship.js",
       "js/crypto/canonical.js", "js/peer/messages.js", "js/models/data-model.ts"],
   },

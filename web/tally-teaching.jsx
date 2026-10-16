@@ -718,9 +718,9 @@ function ChapterUnits() {
 }
 
 /* -------------------------------------------------- */
-/* CHAPTER 4 — Chained trust                          */
+/* CHAPTER 4 — Currents of trust                     */
 /* -------------------------------------------------- */
-function ChapterChain() {
+function ChapterCurrents() {
   const [stage, setStage] = useState(0);
   // 0: idle  1: A→B drawn  2: B→C drawn  3: settled
 
@@ -737,10 +737,10 @@ function ChapterChain() {
   return (
     <Chapter
       num="04"
-      kicker="Chained trust"
+      kicker="Currents of trust"
       title={
         <>
-          Reach a stranger through a <em className="italic">chain of friends.</em>
+          Reach a stranger through <em className="italic">friends of friends.</em>
         </>
       }
     >
@@ -801,14 +801,14 @@ function ChapterChain() {
         </div>
 
         <div className="md:col-span-7">
-          <ChainGraph stage={stage} balances={balances} />
+          <CurrentGraph stage={stage} balances={balances} />
         </div>
       </div>
     </Chapter>
   );
 }
 
-function ChainGraph({ stage, balances }) {
+function CurrentGraph({ stage, balances }) {
   // SVG positions
   const nodes = {
     A: { x: 80, y: 150, name: "Alice" },
@@ -882,8 +882,8 @@ function ChainGraph({ stage, balances }) {
       <div className="mt-3 text-xs italic text-[var(--ink-muted)]">
         {stage === 0 && "Three friends, two trust links. No transfers yet."}
         {stage === 1 && "Alice owes Bob €10. Bob's balance now favours him by €10."}
-        {stage === 2 && "Bob settles the chain by recording a matching tally with Charlie. Bob is back to neutral."}
-        {stage === 3 && "Done. The favour traveled across the chain — and Bob never moved any money of his own."}
+        {stage === 2 && "Bob passes the current on by recording a matching tally with Charlie. Bob is back to neutral."}
+        {stage === 3 && "Done. The favour flowed through to Charlie — and Bob never moved any money of his own."}
       </div>
     </div>
   );
@@ -1302,7 +1302,7 @@ const QUESTIONS = [
     ],
     correct: 1,
     explain:
-      "This is chained trust. You record one tally with Bob, Bob records one of equal value with David, and Bob's net balance is unchanged. The favour reaches David through your shared friend.",
+      "This is a current of trust. You record one tally with Bob, Bob records one of equal value with David, and Bob's net balance is unchanged. The favour reaches David through your shared friend.",
   },
   {
     q: "What gets uploaded to a Tally server when you record a favour with Sam?",
@@ -1527,7 +1527,7 @@ export default function App() {
       <ChapterAncient />
       <ChapterRecord />
       <ChapterUnits />
-      <ChapterChain />
+      <ChapterCurrents />
       <ChapterLoops />
       <ChapterPrivacy />
       <ChapterQuiz />
