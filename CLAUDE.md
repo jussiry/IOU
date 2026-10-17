@@ -4,6 +4,14 @@
 
 `npm run dev` serves the app at http://localhost:3000 with auto-rebuild.
 
+### Ports across worktrees
+
+Several sessions may run at once, each in its own worktree. Start the app with
+preview_start `Tally app`, which picks a free port when 3000 is taken. Use the
+port it reports everywhere — `npm run peer -- --port <port> …`, and
+`TEST_PORT=<free port>` for e2e runs — and never kill a server you did not start.
+IndexedDB is per origin, so a new port starts empty: seed it again.
+
 Use the **Browser pane tools** for UI checks. Never use the Chrome plugin on
 localhost: it is the user's real browser and shares IndexedDB with the preview,
 so it can corrupt the seeded state.

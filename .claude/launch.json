@@ -12,7 +12,7 @@
         "PATH": "/Users/jussi/.nvm/versions/node/v24.14.0/bin:/usr/bin:/bin:/usr/sbin:/sbin"
       },
       "port": 3000,
-      "autoPort": false
+      "autoPort": true
     },
     {
       "name": "Design",

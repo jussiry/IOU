@@ -2,8 +2,13 @@
 
 Shared instructions for any coding agent. Claude-specific notes live in CLAUDE.md.
 
-> **Commit rule:** never `git commit` or `git push` without explicit approval —
-> propose a message and wait. Exception: "deploy" means add + commit + push.
+> **Git rule:** never commit, merge or push without being asked — propose a
+> message and wait. Solo project: no pull requests. When asked, the words mean:
+>
+> - **commit** — add + commit to the current branch.
+> - **merge** — merge the current worktree branch into `main` (when inside worktree).
+> - **deploy** — commit, merge into `main` (unless already in main), then push `main`.
+> - **push** — If in worktree, first ask whether the worktree branch should really be pushed.
 
 ## Where things are
 
