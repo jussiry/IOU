@@ -1,5 +1,10 @@
 @AGENTS.md
 
+## After a merge or deploy
+
+Once a worktree branch has landed in `main`, archive this session with `archive_session`
+unless instructed otherwise.
+
 ## Running and checking the app
 
 `npm run dev` serves the app at http://localhost:3000 with auto-rebuild.

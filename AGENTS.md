@@ -7,6 +7,7 @@ Shared instructions for any coding agent. Claude-specific notes live in CLAUDE.m
 >
 > - **commit** — add + commit to the current branch.
 > - **merge** — merge the current worktree branch into `main` (when inside worktree).
+>   First bring `main` up to date (`git pull --ff-only` in the main checkout).
 > - **deploy** — commit, merge into `main` (unless already in main), then push `main`.
 > - **push** — If in worktree, first ask whether the worktree branch should really be pushed.
 
